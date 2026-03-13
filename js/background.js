@@ -344,12 +344,55 @@ chrome.webNavigation.onCompleted.addListener(async (details) => {
         lastConversion: { url, markdown, timestamp: new Date().toISOString() },
       });
 
-      chrome.notifications.create({
-        type: "basic",
-        iconUrl: "/img/icon.png",
-        title: "Webpage to Markdown",
-        message: `✓ ${title || url}`,
-        priority: 0,
+      chrome.scripting.executeScript({
+        target: { tabId: details.tabId },
+        func: (pageTitle) => {
+          const overlay = document.createElement("div");
+          overlay.style.cssText = [
+            "position:fixed",
+            "inset:0",
+            "z-index:2147483647",
+            "pointer-events:none",
+            "display:flex",
+            "align-items:center",
+            "justify-content:center",
+            "background:rgba(34,197,94,0.12)",
+            "transition:opacity 0.4s ease",
+            "font-family:system-ui,sans-serif",
+          ].join(";");
+
+          const icon = document.createElement("span");
+          icon.style.cssText = "font-size:20px;margin-right:8px";
+          icon.textContent = "✓";
+
+          const text = document.createElement("span");
+          text.textContent = "Captured: " + pageTitle;
+
+          const badge = document.createElement("div");
+          badge.style.cssText = [
+            "background:rgba(34,197,94,0.92)",
+            "color:#fff",
+            "padding:12px 24px",
+            "border-radius:12px",
+            "font-size:15px",
+            "font-weight:600",
+            "box-shadow:0 4px 20px rgba(0,0,0,0.2)",
+            "display:flex",
+            "align-items:center",
+          ].join(";");
+          badge.appendChild(icon);
+          badge.appendChild(text);
+          overlay.appendChild(badge);
+          document.body.appendChild(overlay);
+
+          setTimeout(() => {
+            overlay.style.opacity = "0";
+          }, 1200);
+          setTimeout(() => {
+            overlay.remove();
+          }, 1600);
+        },
+        args: [title],
       });
     } catch (err) {
       console.error("[W2M] Auto-capture error:", err);
