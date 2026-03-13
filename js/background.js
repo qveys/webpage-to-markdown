@@ -328,6 +328,45 @@ chrome.webNavigation.onCompleted.addListener(async (details) => {
         files: ["/js/turndown.js"],
       });
 
+      // Attendre que le DOM soit stable (plus de mutations pendant 500ms)
+      try {
+        await chrome.scripting.executeScript({
+          target: { tabId: details.tabId },
+          func: () =>
+            new Promise((resolve) => {
+              if (document.readyState !== "complete") {
+                window.addEventListener("load", () => resolve(), {
+                  once: true,
+                });
+                return;
+              }
+              // Surveiller les mutations pendant 500ms max
+              let timer;
+              const observer = new MutationObserver(() => {
+                clearTimeout(timer);
+                timer = setTimeout(() => {
+                  observer.disconnect();
+                  resolve();
+                }, 300);
+              });
+              observer.observe(document.body, {
+                childList: true,
+                subtree: true,
+              });
+              // Timeout de sécurité : si pas de mutations pendant 500ms, on part
+              timer = setTimeout(() => {
+                observer.disconnect();
+                resolve();
+              }, 500);
+            }),
+        });
+      } catch (stabilityErr) {
+        console.warn(
+          "[W2M] DOM stability wait failed, proceeding anyway:",
+          stabilityErr,
+        );
+      }
+
       const results = await chrome.scripting.executeScript({
         target: { tabId: details.tabId },
         func: extractAndConvert,
@@ -541,6 +580,26 @@ function extractAndConvert() {
           return `\n\n![${alt}](${src})\n${cap ? cap.textContent : ""}\n\n`;
         }
         return content;
+      },
+    });
+    service.addRule("details", {
+      filter: "details",
+      replacement: (content, node) => {
+        const summary = node.querySelector("summary");
+        const summaryText = summary ? summary.textContent.trim() : "Details";
+        const bodyContent = content.replace(summaryText, "").trim();
+        return `\n\n<details>\n<summary>${summaryText}</summary>\n\n${bodyContent}\n\n</details>\n\n`;
+      },
+    });
+    service.addRule("imgWithAriaLabel", {
+      filter: (node) =>
+        node.nodeName === "IMG" &&
+        !node.getAttribute("alt") &&
+        node.getAttribute("aria-label"),
+      replacement: (content, node) => {
+        const alt = node.getAttribute("aria-label") || "";
+        const src = node.getAttribute("src") || "";
+        return src ? `![${alt}](${src})` : "";
       },
     });
 
