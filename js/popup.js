@@ -170,6 +170,15 @@ ${captionText}
     document.getElementById("capture-delay").value = session.delay || 2000;
     this.updateCaptureUI(session.active);
 
+    if (session.captureCount) {
+      this.updateCaptureCount(session.captureCount);
+    }
+    chrome.runtime.onMessage.addListener((message) => {
+      if (message.type === "W2M_CAPTURE_COUNT") {
+        this.updateCaptureCount(message.count);
+      }
+    });
+
     document
       .getElementById("capture-toggle")
       .addEventListener("click", () => this.toggleCapture());
@@ -238,6 +247,14 @@ ${captionText}
       iconStop.style.display = "none";
       status.style.display = "none";
       folderInput.disabled = false;
+    }
+  }
+
+  updateCaptureCount(count) {
+    const status = document.getElementById("capture-status");
+    if (status) {
+      status.style.display = "block";
+      status.textContent = `En cours… ${count} page${count > 1 ? "s" : ""} capturée${count > 1 ? "s" : ""}`;
     }
   }
 

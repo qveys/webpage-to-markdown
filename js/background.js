@@ -249,7 +249,12 @@ async function updateBadge(active) {
 // Listener pour les messages du popup
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === "W2M_GET_SESSION") {
-    getSession().then(sendResponse);
+    getSession().then((session) =>
+      sendResponse({
+        ...session,
+        captureCount: capturedUrls.size,
+      }),
+    );
     return true;
   }
   if (message.type === "W2M_START_SESSION") {
@@ -325,7 +330,7 @@ chrome.webNavigation.onCompleted.addListener(async (details) => {
       // Injecter Turndown + la fonction de conversion dans l'onglet pour avoir accès au DOM
       await chrome.scripting.executeScript({
         target: { tabId: details.tabId },
-        files: ["/js/turndown.js"],
+        files: ["/js/turndown.js", "/js/turndown-plugin-gfm.js"],
       });
 
       // Attendre que le DOM soit stable (plus de mutations pendant 500ms)
@@ -378,6 +383,13 @@ chrome.webNavigation.onCompleted.addListener(async (details) => {
       await downloadInSession(markdown, title, session.folder);
 
       capturedUrls.add(url);
+
+      chrome.runtime
+        .sendMessage({
+          type: "W2M_CAPTURE_COUNT",
+          count: capturedUrls.size,
+        })
+        .catch(() => {});
 
       await chrome.storage.local.set({
         lastConversion: { url, markdown, timestamp: new Date().toISOString() },
@@ -545,6 +557,9 @@ function extractAndConvert() {
       codeBlockStyle: "fenced",
       emDelimiter: "_",
     });
+    if (typeof turndownPluginGfm !== "undefined") {
+      service.use(turndownPluginGfm.gfm);
+    }
     service.keep(["iframe"]);
     service.addRule("codeBlocks", {
       filter: (node) => node.nodeName === "PRE" && node.querySelector("code"),
