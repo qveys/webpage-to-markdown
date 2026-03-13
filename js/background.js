@@ -468,6 +468,29 @@ function extractAndConvert() {
       emDelimiter: "_",
     });
     service.keep(["iframe", "script", "style"]);
+    service.addRule("codeBlocks", {
+      filter: (node) => node.nodeName === "PRE" && node.querySelector("code"),
+      replacement: (content, node) => {
+        const code = node.querySelector("code");
+        const rawCode = code.textContent || "";
+
+        // Détecter le langage depuis plusieurs attributs possibles
+        const lang =
+          // class="language-json" ou class="lang-json"
+          (code.className.match(/(?:language-|lang-)(\S+)/) || [])[1] ||
+          // data-lang="json"
+          code.getAttribute("data-lang") ||
+          node.getAttribute("data-lang") ||
+          // data-language="json"
+          code.getAttribute("data-language") ||
+          node.getAttribute("data-language") ||
+          // GitLab: <code data-sourcepos lang="json">
+          code.getAttribute("lang") ||
+          "";
+
+        return `\n\n\`\`\`${lang}\n${rawCode.replace(/\n$/, "")}\n\`\`\`\n\n`;
+      },
+    });
     service.addRule("figures", {
       filter: "figure",
       replacement: (content, node) => {
