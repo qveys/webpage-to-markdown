@@ -295,7 +295,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             });
             if (results?.[0]?.result?.success) {
               const { markdown, title } = results[0].result;
-              await downloadInSession(markdown, title, folder);
+              await downloadInSession(markdown, title, folder, tab.url);
               capturedUrls.add(tab.url);
               chrome.runtime
                 .sendMessage({
@@ -461,7 +461,7 @@ chrome.webNavigation.onCompleted.addListener(async (details) => {
       const { success, markdown, title } = results[0].result;
       if (!success) return;
 
-      await downloadInSession(markdown, title, session.folder);
+      await downloadInSession(markdown, title, session.folder, url);
 
       capturedUrls.add(url);
 
