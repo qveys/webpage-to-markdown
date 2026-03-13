@@ -1,70 +1,193 @@
-# Webpage to Markdown Chrome Extension
+<p align="center">
+  <img src="img/icon.png" alt="Webpage to Markdown" width="80" />
+</p>
 
-A simple Chrome extension that converts any webpage to Markdown format with a single click.
+<h1 align="center">🔄 Webpage to Markdown</h1>
 
-## Features
+<p align="center">
+  <strong>Convert any webpage to clean Markdown — one click or full auto-pilot.</strong>
+</p>
 
-- **One-Click Conversion**: Convert the current webpage to clean Markdown format
-- **Smart Content Extraction**: Automatically detects and extracts main content while filtering out navigation, ads, and other unwanted elements
-- **Iframe Support**: Extracts and includes content from embedded iframes when accessible
-- **Copy to Clipboard**: Instantly copy the converted Markdown to your clipboard
-- **Download as File**: Save the Markdown as a `.md` file with timestamp
-- **Clean Output**: Removes scripts, styles, and other non-content elements for clean conversion
+<p align="center">
+  <a href="#-features">Features</a> •
+  <a href="#-auto-capture">Auto-capture</a> •
+  <a href="#-installation">Installation</a> •
+  <a href="#-tech-stack">Tech Stack</a> •
+  <a href="#-license">License</a>
+</p>
 
-## Installation
+<p align="center">
+  <img src="https://img.shields.io/badge/Manifest-V3-blue?style=flat-square&logo=googlechrome" alt="Manifest V3" />
+  <img src="https://img.shields.io/badge/License-MIT-green?style=flat-square" alt="MIT License" />
+  <img src="https://img.shields.io/badge/JS-Vanilla-yellow?style=flat-square&logo=javascript" alt="Vanilla JS" />
+</p>
 
-1. Download or clone this repository
-2. Open Chrome and navigate to `chrome://extensions/`
-3. Enable "Developer mode" in the top right
-4. Click "Load unpacked" and select the project folder
-5. The extension icon will appear in your Chrome toolbar
+---
 
-## Usage
+> 🍴 Forked from [Webpage to Markdown](https://chromewebstore.google.com/detail/webpage-to-markdown/ajeinonckioeekcfanjndliandidilid) — extended with auto-capture sessions, URL tree downloads, asset saving, and a redesigned UI.
 
-1. Navigate to any webpage you want to convert
-2. Click the "Webpage to Markdown" extension icon in your toolbar
-3. Click the "Convert Page" button
-4. The webpage content will be converted to Markdown and displayed in the text area
-5. Use "Copy to Clipboard" or "Download .md" to save your converted content
+---
 
-## How It Works
+## 📸 Screenshots
 
-The extension uses:
-- **Chrome Scripting API** to extract content from the active webpage
-- **Turndown.js** library to convert HTML to Markdown
-- **Smart content detection** to find main article/content areas
-- **Content filtering** to remove navigation, ads, and other non-essential elements
-- **Iframe processing** to include embedded content when possible
+|                 Light Mode                 |                Dark Mode                 |                    Settings                    |
+| :----------------------------------------: | :--------------------------------------: | :--------------------------------------------: |
+| ![Light](docs/screenshots/popup-light.png) | ![Dark](docs/screenshots/popup-dark.png) | ![Settings](docs/screenshots/auto-capture.png) |
 
-## Supported Content
+---
 
-- Articles and blog posts
-- Documentation pages  
-- News articles
-- Social media posts
-- Forum discussions
-- Embedded content (iframes when accessible)
+## ✨ Features
 
-## Technical Details
+### 📝 Manual Conversion
 
-- Built with Chrome Extensions Manifest V3
-- Uses modern JavaScript with ES6+ features
-- Implements comprehensive error handling
-- Stores last conversion in Chrome local storage
-- Clean, semantic HTML to Markdown conversion
+> Convert the current page to Markdown with a single click.
 
-## Permissions
+- 🖱️ **One-click conversion** — click the button, get your Markdown
+- 📋 **Copy to clipboard** or 💾 **download as `.md`**
+- ⚙️ Configurable heading style (ATX `#` / Setext), bullet style (`-` `*` `+`), code blocks (fenced / indented)
+- 📄 Optional YAML frontmatter with title, URL, and date
 
-The extension requires these permissions:
-- `activeTab`: To access the current webpage content
-- `scripting`: To inject content extraction scripts
-- `storage`: To save conversion history
+---
 
-## Browser Support
+### 🤖 Auto-capture
 
-- Chrome (Manifest V3 compatible)
-- Chromium-based browsers (Edge, Brave, etc.)
+> Start a session, browse normally — every page you visit is automatically captured and saved.
 
-## License
+```
+┌─────────────────────────────────────────────────┐
+│  🟢 Start session                               │
+│  📂 Folder: my-docs/                            │
+│  ⏱️  Delay: 2000ms                              │
+│  🌳 URL tree: ✅    📦 Save assets: ✅          │
+└─────────────────────────────────────────────────┘
+        │
+        ▼
+   Browse normally...
+        │
+   ┌────┴────────────────────────────┐
+   │  Page visited                   │
+   │  ├─ 🟢 New page → capture + ✅ │
+   │  └─ 🟠 Already seen → skip ⚡  │
+   └─────────────────────────────────┘
+        │
+        ▼
+┌─────────────────────────────────────────────────┐
+│  🔴 Stop session                                │
+│  📊 12 pages captured                           │
+└─────────────────────────────────────────────────┘
+```
 
-This project is open source and available under the MIT License.
+| Feature                    | Description                                                                    |
+| -------------------------- | ------------------------------------------------------------------------------ |
+| 🌳 **URL Tree**            | Mirrors the URL path as folders: `example.com/docs/api/` → `docs/api/index.md` |
+| 📦 **Save Assets**         | Downloads images locally and rewrites Markdown links to relative paths         |
+| 💾 **Persistent State**    | Stop/restart without re-capturing already-visited pages                        |
+| 🟠 **Duplicate Detection** | Orange flash on already-captured pages, green flash on new ones                |
+| 📊 **Live Counter**        | Real-time count of captured pages in the popup                                 |
+| ⏱️ **Configurable Delay**  | Wait for SPAs to finish loading before capturing (500ms–10s)                   |
+
+---
+
+### 🧠 Smart Content Extraction
+
+```mermaid
+graph LR
+    A[🌐 Webpage] --> B{Readability.js}
+    B -->|Success| C[📄 Clean article]
+    B -->|Fail| D[🔍 Heuristic fallback]
+    D --> C
+    C --> E[🔄 Turndown.js]
+    E --> F[📝 Markdown]
+```
+
+- 📰 **Mozilla Readability.js** — robust article extraction used by Firefox Reader View
+- 📊 **GFM tables** via turndown-plugin-gfm
+- 🔗 Relative URLs resolved to absolute
+- 💻 Code block language detection from `class` / `data-*` attributes
+- 📂 `<details>`, `<summary>`, and `aria-label` support
+- 🧹 Scripts, styles, and inline SVGs stripped clean
+
+---
+
+### 🎨 UI
+
+- 🌙 Light / dark theme toggle
+- ✨ Animated settings panel with smooth transitions
+- 🔒 Inputs disabled during active session to prevent misconfiguration
+- 🚫 No scrollbar — settings and capture panels swap seamlessly
+
+---
+
+## 📦 Installation
+
+```bash
+git clone https://github.com/qveys/webpage-to-markdown.git
+```
+
+1. Open Chrome → `chrome://extensions/`
+2. Enable **Developer mode** (top right)
+3. Click **Load unpacked** → select the cloned folder
+4. 📌 Pin the extension to your toolbar
+
+---
+
+## 🔐 Permissions
+
+|     Permission     | Why?                                  |
+| :----------------: | ------------------------------------- |
+|   🔓 `activeTab`   | Access current page content           |
+|   💉 `scripting`   | Inject extraction scripts into pages  |
+|    💾 `storage`    | Persist settings and session state    |
+|   📥 `downloads`   | Save `.md` files and image assets     |
+|     🔄 `tabs`      | Track tab navigation for auto-capture |
+| 🧭 `webNavigation` | Detect page loads during sessions     |
+
+---
+
+## 🛠️ Tech Stack
+
+|     | Technology                                                               | Role                          |
+| :-: | ------------------------------------------------------------------------ | ----------------------------- |
+| 🧩  | Chrome Extensions Manifest V3                                            | Extension platform            |
+| 🔄  | [Turndown.js](https://github.com/mixmark-io/turndown)                    | HTML → Markdown conversion    |
+| 📊  | [turndown-plugin-gfm](https://github.com/mixmark-io/turndown-plugin-gfm) | GFM tables support            |
+| 📰  | [Readability.js](https://github.com/nicktomlin/nicktomlin.github.io)     | Content extraction            |
+| 🟡  | Vanilla JavaScript                                                       | No framework, no dependencies |
+
+---
+
+## 📁 Project Structure
+
+```
+webpage-to-markdown/
+├── 📄 manifest.json          # Extension manifest (V3)
+├── 📄 popup.html             # Popup UI
+├── 🎨 styles.css             # Popup styles (light/dark)
+├── js/
+│   ├── 🧠 background.js     # Service worker (sessions, downloads)
+│   ├── 🖥️ popup.js           # Popup logic & UI
+│   ├── 🔄 turndown.js        # Turndown.js library
+│   └── 📊 turndown-plugin-gfm.js
+├── img/
+│   └── 🖼️ icon.png           # Extension icon
+└── docs/
+    └── screenshots/          # README screenshots
+```
+
+---
+
+## 🤝 Contributing
+
+Contributions welcome! Feel free to open an issue or submit a PR.
+
+---
+
+## 📄 License
+
+MIT — free to use, modify, and distribute.
+
+---
+
+<p align="center">
+  Made with ❤️ by <a href="https://github.com/qveys">@qveys</a>
+</p>
