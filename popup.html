@@ -11,8 +11,8 @@
       <header>
         <div class="logo-area">
           <svg
-            width="24"
-            height="24"
+            width="22"
+            height="22"
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
@@ -38,8 +38,8 @@
             title="Settings"
           >
             <svg
-              width="20"
-              height="20"
+              width="18"
+              height="18"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
@@ -61,8 +61,8 @@
           >
             <svg
               class="sun-icon"
-              width="20"
-              height="20"
+              width="18"
+              height="18"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
@@ -82,8 +82,8 @@
             </svg>
             <svg
               class="moon-icon"
-              width="20"
-              height="20"
+              width="18"
+              height="18"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
@@ -98,7 +98,8 @@
         </div>
       </header>
 
-      <div id="settings-panel" class="settings-panel" style="display: none">
+      <!-- Settings panel (conversion options) -->
+      <div id="settings-panel" class="settings-panel">
         <div class="setting-group">
           <label class="setting-item">
             <input type="checkbox" id="setting-frontmatter" />
@@ -137,8 +138,8 @@
         <div class="primary-action">
           <button id="convert" class="btn btn-primary">
             <svg
-              width="18"
-              height="18"
+              width="16"
+              height="16"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
@@ -166,8 +167,8 @@
         <div class="secondary-actions">
           <button id="copy" class="btn btn-secondary" disabled>
             <svg
-              width="18"
-              height="18"
+              width="15"
+              height="15"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
@@ -184,8 +185,8 @@
           </button>
           <button id="download" class="btn btn-secondary" disabled>
             <svg
-              width="18"
-              height="18"
+              width="15"
+              height="15"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
@@ -202,18 +203,19 @@
         </div>
       </main>
 
+      <!-- Auto-capture panel -->
       <div id="capture-panel" class="capture-panel">
         <div class="capture-header">
           <span class="capture-title">Auto-capture</span>
           <button
             id="capture-toggle"
-            class="btn btn-capture"
+            class="btn-capture"
             title="Start auto-capture"
           >
             <svg
               id="capture-icon-start"
-              width="16"
-              height="16"
+              width="14"
+              height="14"
               viewBox="0 0 24 24"
               fill="currentColor"
             >
@@ -221,8 +223,8 @@
             </svg>
             <svg
               id="capture-icon-stop"
-              width="16"
-              height="16"
+              width="14"
+              height="14"
               viewBox="0 0 24 24"
               fill="currentColor"
               style="display: none"
@@ -232,9 +234,10 @@
             <span id="capture-btn-label">Start</span>
           </button>
         </div>
+
         <div id="capture-settings" class="capture-settings">
-          <div class="setting-field">
-            <label for="capture-folder">Dossier</label>
+          <div class="capture-field">
+            <label for="capture-folder">Dossier de destination</label>
             <input
               type="text"
               id="capture-folder"
@@ -242,32 +245,33 @@
               placeholder="w2m-session-..."
             />
           </div>
-          <div class="setting-field">
-            <label for="capture-delay">Délai (ms)</label>
-            <input
-              type="number"
-              id="capture-delay"
-              class="capture-input"
-              min="500"
-              max="10000"
-              step="500"
-              value="2000"
-            />
+          <div class="capture-options-row">
+            <div class="capture-field">
+              <label for="capture-delay">Délai (ms)</label>
+              <input
+                type="number"
+                id="capture-delay"
+                class="capture-input"
+                min="500"
+                max="10000"
+                step="500"
+                value="2000"
+              />
+            </div>
+            <div class="capture-checks-stack">
+              <label class="capture-check-item">
+                <input type="checkbox" id="capture-url-tree" />
+                <span>Arborescence URL</span>
+              </label>
+              <label class="capture-check-item">
+                <input type="checkbox" id="capture-save-assets" />
+                <span>Sauver les assets</span>
+              </label>
+            </div>
           </div>
-          <label class="setting-item">
-            <input type="checkbox" id="capture-url-tree" />
-            <span>Arborescence URL</span>
-          </label>
-          <label class="setting-item">
-            <input type="checkbox" id="capture-save-assets" />
-            <span>Sauver les assets</span>
-          </label>
         </div>
-        <div
-          id="capture-status"
-          class="capture-status"
-          style="display: none"
-        ></div>
+
+        <div id="capture-status" class="capture-status"></div>
       </div>
 
       <div id="toast" class="toast hidden"></div>
