@@ -1,7 +1,7 @@
 // js/background.js — Service Worker pour Webpage to Markdown
 // Expose chrome.runtime.onMessageExternal pour le message { type: "W2M_CONVERT_AND_DOWNLOAD" }
 
-importScripts("turndown.js");
+importScripts("js/turndown.js");
 
 // ─── Extraction du contenu de la page ────────────────────────────────────────
 // Cette fonction est injectée dans l'onglet actif via chrome.scripting.executeScript.
