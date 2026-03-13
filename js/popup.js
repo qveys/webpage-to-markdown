@@ -183,9 +183,9 @@ ${captionText}
     document.getElementById("capture-folder").value = session.folder || "";
     document.getElementById("capture-delay").value = session.delay || 2000;
     document.getElementById("capture-url-tree").checked =
-      session.urlTree ?? false;
+      session.urlTree ?? true;
     document.getElementById("capture-save-assets").checked =
-      session.saveAssets ?? false;
+      session.saveAssets ?? true;
     this.updateCaptureUI(session.active);
 
     if (session.captureCount) {

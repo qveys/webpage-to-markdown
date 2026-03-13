@@ -261,8 +261,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === "W2M_START_SESSION") {
     const folder = message.folder || makeSessionFolder();
     const delay = message.delay ?? DEFAULT_DELAY;
-    const urlTree = message.urlTree ?? false;
-    const saveAssets = message.saveAssets ?? false;
+    const urlTree = message.urlTree ?? true;
+    const saveAssets = message.saveAssets ?? true;
     // Ne vider les URLs que si le dossier change (= nouvelle session)
     getSession()
       .then((prev) => {
