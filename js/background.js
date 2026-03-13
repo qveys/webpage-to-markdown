@@ -330,7 +330,11 @@ chrome.webNavigation.onCompleted.addListener(async (details) => {
       // Injecter Turndown + la fonction de conversion dans l'onglet pour avoir accès au DOM
       await chrome.scripting.executeScript({
         target: { tabId: details.tabId },
-        files: ["/js/turndown.js", "/js/turndown-plugin-gfm.js"],
+        files: [
+          "/js/Readability.js",
+          "/js/turndown.js",
+          "/js/turndown-plugin-gfm.js",
+        ],
       });
 
       // Attendre que le DOM soit stable (plus de mutations pendant 500ms)
@@ -527,25 +531,43 @@ function extractAndConvert() {
       )
       .forEach((el) => el.remove());
 
-    let mainContent = null;
-    for (const sel of [
-      "main",
-      "article",
-      ".content",
-      ".post",
-      ".entry",
-      '[role="main"]',
-      "#content",
-      ".main",
-    ]) {
-      const found = bodyClone.querySelector(sel);
-      if (found && found.innerHTML.trim().length > 100) {
-        mainContent = found;
-        break;
+    let html;
+
+    if (typeof Readability !== "undefined") {
+      try {
+        const docClone = document.cloneNode(true);
+        const article = new Readability(docClone, {
+          keepClasses: false,
+        }).parse();
+        if (article && article.content && article.content.length > 200) {
+          html = article.content;
+        }
+      } catch (e) {
+        console.warn("[W2M] Readability failed, falling back", e);
       }
     }
 
-    let html = mainContent ? mainContent.innerHTML : bodyClone.innerHTML;
+    if (!html) {
+      // Fallback heuristique
+      let mainContent = null;
+      for (const sel of [
+        "main",
+        "article",
+        ".content",
+        ".post",
+        ".entry",
+        '[role="main"]',
+        "#content",
+        ".main",
+      ]) {
+        const found = bodyClone.querySelector(sel);
+        if (found && found.innerHTML.trim().length > 100) {
+          mainContent = found;
+          break;
+        }
+      }
+      html = mainContent ? mainContent.innerHTML : bodyClone.innerHTML;
+    }
     if (iframeContents.length > 0)
       html += "<h2>Embedded Content</h2>" + iframeContents.join("<hr>");
 
