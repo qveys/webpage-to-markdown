@@ -54,27 +54,27 @@
 > Start a session, browse normally — every page you visit is automatically captured and saved.
 
 ```
-┌─────────────────────────────────────────────────┐
-│  🟢 Start session                               │
-│  📂 Folder: my-docs/                            │
-│  ⏱️  Delay: 2000ms                              │
-│  🌳 URL tree: ✅    📦 Save assets: ✅          │
-└─────────────────────────────────────────────────┘
-        │
-        ▼
-   Browse normally...
-        │
-   ┌────┴────────────────────────────┐
-   │  Page visited                   │
-   │  ├─ 🟢 New page → capture + ✅ │
-   │  └─ 🟠 Already seen → skip ⚡  │
-   └─────────────────────────────────┘
-        │
-        ▼
-┌─────────────────────────────────────────────────┐
-│  🔴 Stop session                                │
-│  📊 12 pages captured                           │
-└─────────────────────────────────────────────────┘
++-----------------------------------------------+
+|  Start session                                |
+|  Folder: my-docs/                             |
+|  Delay: 2000ms                                |
+|  URL tree: ON         Save assets: ON         |
++-----------------------------------------------+
+                    |
+                    v
+            Browse normally...
+                    |
+        +-----------+--------------------------+
+        |  Page visited                        |
+        |  |-- New page  --> capture + save    |
+        |  '-- Already seen --> skip (flash)   |
+        +--------------------------------------+
+                    |
+                    v
++-----------------------------------------------+
+|  Stop session                                 |
+|  12 pages captured                            |
++-----------------------------------------------+
 ```
 
 | Feature                    | Description                                                                    |
