@@ -431,6 +431,45 @@ function extractAndConvert() {
       if (c) iframeContents.push(c);
     });
 
+    // Résoudre toutes les URLs relatives en absolues
+    const baseUrl = document.location.href;
+    bodyClone
+      .querySelectorAll("img[src], img[data-src], img[data-lazy-src]")
+      .forEach((img) => {
+        const src = img.getAttribute("src");
+        const dataSrc =
+          img.getAttribute("data-src") ||
+          img.getAttribute("data-lazy-src") ||
+          img.getAttribute("data-original");
+        // Préférer data-src si src est vide ou un placeholder (base64 court, ou "about:blank")
+        const effectiveSrc =
+          dataSrc && (!src || src.startsWith("data:") || src === "about:blank")
+            ? dataSrc
+            : src;
+        if (
+          effectiveSrc &&
+          !effectiveSrc.startsWith("data:") &&
+          !effectiveSrc.startsWith("blob:")
+        ) {
+          try {
+            img.setAttribute("src", new URL(effectiveSrc, baseUrl).href);
+          } catch (e) {}
+        }
+      });
+    bodyClone.querySelectorAll("a[href]").forEach((a) => {
+      const href = a.getAttribute("href");
+      if (
+        href &&
+        !href.startsWith("http") &&
+        !href.startsWith("mailto:") &&
+        !href.startsWith("#")
+      ) {
+        try {
+          a.setAttribute("href", new URL(href, baseUrl).href);
+        } catch (e) {}
+      }
+    });
+
     bodyClone
       .querySelectorAll(
         'script, style, nav, footer, aside, .ads, .comments, [role="complementary"], .cookie-banner, .popup, .overlay, .modal',
