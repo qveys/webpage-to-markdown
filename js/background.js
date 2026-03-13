@@ -3,6 +3,14 @@
 
 importScripts("/js/turndown.js");
 
+// Réinitialiser la session à chaque démarrage du SW (rechargement extension inclus)
+chrome.storage.local.get("session", ({ session }) => {
+  if (session?.active) {
+    chrome.storage.local.set({ session: { ...session, active: false } });
+  }
+  chrome.action.setBadgeText({ text: "" });
+});
+
 // ─── Extraction du contenu de la page ────────────────────────────────────────
 // Cette fonction est injectée dans l'onglet actif via chrome.scripting.executeScript.
 // Elle ne peut PAS référencer des variables extérieures (closure isolée).
@@ -266,13 +274,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       .catch((err) => sendResponse({ ok: false, error: err.message }));
     return true;
   }
-});
-
-// Réinitialiser le badge au démarrage du navigateur
-chrome.runtime.onStartup.addListener(async () => {
-  const session = await getSession();
-  if (session.active) await setSession({ active: false });
-  await updateBadge(false);
 });
 
 // ─── Auto-capture : écoute de la navigation ───────────────────────────────
