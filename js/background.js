@@ -4,10 +4,16 @@
 importScripts("/js/turndown.js");
 
 // Réinitialiser la session à chaque démarrage du SW (rechargement extension inclus)
+// Nouveau folder horodaté à chaque démarrage, délai conservé
 chrome.storage.local.get("session", ({ session }) => {
-  if (session?.active) {
-    chrome.storage.local.set({ session: { ...session, active: false } });
-  }
+  const ts = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
+  chrome.storage.local.set({
+    session: {
+      active: false,
+      folder: `w2m-session-${ts}`,
+      delay: session?.delay ?? 2000,
+    },
+  });
   chrome.action.setBadgeText({ text: "" });
 });
 
