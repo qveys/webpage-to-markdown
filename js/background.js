@@ -315,15 +315,20 @@ chrome.webNavigation.onCompleted.addListener(async (details) => {
   const timerId = setTimeout(async () => {
     pendingCaptures.delete(details.tabId);
     try {
+      // Injecter Turndown + la fonction de conversion dans l'onglet pour avoir accès au DOM
+      await chrome.scripting.executeScript({
+        target: { tabId: details.tabId },
+        files: ["/js/turndown.js"],
+      });
+
       const results = await chrome.scripting.executeScript({
         target: { tabId: details.tabId },
-        func: extractPageContent,
+        func: extractAndConvert,
       });
       if (!results?.[0]?.result) return;
-      const { success, content, title } = results[0].result;
+      const { success, markdown, title } = results[0].result;
       if (!success) return;
 
-      const markdown = convertToMarkdown(title, content);
       await downloadInSession(markdown, title, session.folder);
 
       capturedUrls.add(url);
@@ -346,6 +351,95 @@ chrome.webNavigation.onCompleted.addListener(async (details) => {
 
   pendingCaptures.set(details.tabId, timerId);
 });
+
+// Exécutée dans l'onglet (a accès au DOM et à TurndownService injecté)
+function extractAndConvert() {
+  try {
+    if (!document || !document.body) throw new Error("Document body not found");
+
+    const getIframeContent = (iframe) => {
+      try {
+        const iframeDoc =
+          iframe.contentDocument || iframe.contentWindow?.document;
+        if (!iframeDoc || !iframeDoc.body) return "";
+        const clone = iframeDoc.body.cloneNode(true);
+        clone
+          .querySelectorAll(
+            "script, style, nav, footer, aside, .ads, .comments",
+          )
+          .forEach((el) => el.remove());
+        return `<div class="iframe-content">${clone.innerHTML}</div>`;
+      } catch (e) {
+        return "";
+      }
+    };
+
+    const bodyClone = document.body.cloneNode(true);
+    const iframeContents = [];
+    document.querySelectorAll("iframe").forEach((iframe) => {
+      const c = getIframeContent(iframe);
+      if (c) iframeContents.push(c);
+    });
+
+    bodyClone
+      .querySelectorAll(
+        'script, style, nav, footer, aside, .ads, .comments, [role="complementary"], .cookie-banner, .popup, .overlay, .modal',
+      )
+      .forEach((el) => el.remove());
+
+    let mainContent = null;
+    for (const sel of [
+      "main",
+      "article",
+      ".content",
+      ".post",
+      ".entry",
+      '[role="main"]',
+      "#content",
+      ".main",
+    ]) {
+      const found = bodyClone.querySelector(sel);
+      if (found && found.innerHTML.trim().length > 100) {
+        mainContent = found;
+        break;
+      }
+    }
+
+    let html = mainContent ? mainContent.innerHTML : bodyClone.innerHTML;
+    if (iframeContents.length > 0)
+      html += "<h2>Embedded Content</h2>" + iframeContents.join("<hr>");
+
+    const title = document.title || "Untitled Page";
+    const service = new TurndownService({
+      headingStyle: "atx",
+      hr: "---",
+      bulletListMarker: "-",
+      codeBlockStyle: "fenced",
+      emDelimiter: "_",
+    });
+    service.keep(["iframe", "script", "style"]);
+    service.addRule("figures", {
+      filter: "figure",
+      replacement: (content, node) => {
+        const img = node.querySelector("img");
+        if (img) {
+          const alt = img.getAttribute("alt") || "";
+          const src = img.getAttribute("src") || "";
+          const cap = node.querySelector("figcaption");
+          return `\n\n![${alt}](${src})\n${cap ? cap.textContent : ""}\n\n`;
+        }
+        return content;
+      },
+    });
+
+    let markdown = service.turndown(`<div><h1>${title}</h1>${html}</div>`);
+    markdown = markdown.replace(/\n{3,}/g, "\n\n").trim();
+
+    return { success: true, markdown, title };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+}
 
 async function downloadInSession(markdown, title, folder) {
   const timestamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
