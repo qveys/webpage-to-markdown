@@ -152,13 +152,27 @@ ${captionText}
   toggleSettingsPanel() {
     const panel = document.getElementById("settings-panel");
     const btn = document.getElementById("settings-toggle");
-    const isHidden = panel.style.display === "none";
+    const capture = document.getElementById("capture-panel");
+    const isOpen = panel.classList.contains("open");
 
-    panel.style.display = isHidden ? "flex" : "none";
-    if (isHidden) {
-      btn.classList.add("active");
+    if (!isOpen) {
+      // Ouvrir settings : masquer capture d'abord, puis ouvrir
+      capture.style.display = "none";
+      requestAnimationFrame(() => {
+        panel.classList.add("open");
+        btn.classList.add("active");
+      });
     } else {
+      // Fermer settings : fermer d'abord, puis ré-afficher capture après la transition
+      panel.classList.remove("open");
       btn.classList.remove("active");
+      panel.addEventListener(
+        "transitionend",
+        () => {
+          capture.style.display = "";
+        },
+        { once: true },
+      );
     }
   }
 
@@ -257,6 +271,15 @@ ${captionText}
     const iconStop = document.getElementById("capture-icon-stop");
     const status = document.getElementById("capture-status");
     const folderInput = document.getElementById("capture-folder");
+    const delayInput = document.getElementById("capture-delay");
+    const urlTreeCheck = document.getElementById("capture-url-tree");
+    const saveAssetsCheck = document.getElementById("capture-save-assets");
+
+    const disabled = active;
+    folderInput.disabled = disabled;
+    delayInput.disabled = disabled;
+    urlTreeCheck.disabled = disabled;
+    saveAssetsCheck.disabled = disabled;
 
     if (active) {
       btn.classList.add("active");
@@ -265,14 +288,12 @@ ${captionText}
       iconStop.style.display = "block";
       status.style.display = "block";
       status.textContent = "En cours…";
-      folderInput.disabled = true;
     } else {
       btn.classList.remove("active");
       label.textContent = "Start";
       iconStart.style.display = "block";
       iconStop.style.display = "none";
       status.style.display = "none";
-      folderInput.disabled = false;
     }
   }
 
