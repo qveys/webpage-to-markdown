@@ -168,6 +168,8 @@ ${captionText}
     });
     document.getElementById("capture-folder").value = session.folder || "";
     document.getElementById("capture-delay").value = session.delay || 2000;
+    document.getElementById("capture-url-tree").checked =
+      session.urlTree ?? false;
     this.updateCaptureUI(session.active);
 
     if (session.captureCount) {
@@ -198,6 +200,15 @@ ${captionText}
         patch: { delay: Number(e.target.value) },
       });
     });
+
+    document
+      .getElementById("capture-url-tree")
+      .addEventListener("change", (e) => {
+        chrome.runtime.sendMessage({
+          type: "W2M_UPDATE_SESSION",
+          patch: { urlTree: e.target.checked },
+        });
+      });
   }
 
   async toggleCapture() {
@@ -213,10 +224,12 @@ ${captionText}
         document.getElementById("capture-folder").value.trim() || undefined;
       const delay =
         Number(document.getElementById("capture-delay").value) || 2000;
+      const urlTree = document.getElementById("capture-url-tree").checked;
       const res = await chrome.runtime.sendMessage({
         type: "W2M_START_SESSION",
         folder,
         delay,
+        urlTree,
       });
       document.getElementById("capture-folder").value = res.session.folder;
       this.updateCaptureUI(true);

@@ -260,8 +260,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === "W2M_START_SESSION") {
     const folder = message.folder || makeSessionFolder();
     const delay = message.delay ?? DEFAULT_DELAY;
+    const urlTree = message.urlTree ?? false;
     capturedUrls.clear();
-    setSession({ active: true, folder, delay })
+    setSession({ active: true, folder, delay, urlTree })
       .then(async (session) => {
         updateBadge(true);
         sendResponse({ ok: true, session });
@@ -726,16 +727,48 @@ function extractAndConvert() {
   }
 }
 
-async function downloadInSession(markdown, title, folder) {
-  const timestamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
-  const safeTitle = (title || "page")
-    .replace(/[^a-z0-9\-_]/gi, "-")
-    .slice(0, 60);
-  const filename = `${folder}/${safeTitle}-${timestamp}.md`;
+function urlToPath(pageUrl) {
+  try {
+    const u = new URL(pageUrl);
+    const host = u.hostname.replace(/[^a-z0-9.\-]/gi, "-");
+    const segments = u.pathname
+      .split("/")
+      .map((s) =>
+        s
+          .replace(/[^a-z0-9\-_.]/gi, "-")
+          .replace(/-+/g, "-")
+          .replace(/^-|-$/g, ""),
+      )
+      .filter(Boolean);
+    const filename = segments.pop() || "index";
+    return { dirs: [host, ...segments], filename };
+  } catch (e) {
+    return { dirs: [], filename: "page" };
+  }
+}
+
+async function downloadInSession(markdown, title, folder, pageUrl) {
+  const session = await getSession();
+
+  let mdPath;
+  if (session.urlTree && pageUrl) {
+    const { dirs, filename: name } = urlToPath(pageUrl);
+    mdPath = dirs.length > 0 ? `${dirs.join("/")}/${name}.md` : `${name}.md`;
+  } else {
+    const timestamp = new Date()
+      .toISOString()
+      .slice(0, 19)
+      .replace(/[:T]/g, "-");
+    const safeTitle = (title || "page")
+      .replace(/[^a-z0-9\-_]/gi, "-")
+      .slice(0, 60);
+    mdPath = `${safeTitle}-${timestamp}.md`;
+  }
+
   const encoded = encodeURIComponent(markdown);
   await chrome.downloads.download({
     url: `data:text/markdown;charset=utf-8,${encoded}`,
-    filename,
+    filename: `${folder}/${mdPath}`,
     saveAs: false,
   });
 }
