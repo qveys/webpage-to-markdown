@@ -297,3 +297,83 @@ textarea:focus {
         transform: rotate(360deg);
     }
 }
+/* ── Auto-capture panel ─────────────────────────────────── */
+.capture-panel {
+    border-top: 1px solid var(--border-color);
+    padding: 12px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.capture-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.capture-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.btn-capture {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 12px;
+    font-size: 13px;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+    background: var(--secondary-bg);
+    color: var(--text-color);
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+}
+
+.btn-capture:hover {
+    background: var(--secondary-hover);
+}
+
+.btn-capture.active {
+    background: #fee2e2;
+    color: #dc2626;
+    border-color: #fca5a5;
+}
+
+.capture-settings {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.capture-input {
+    width: 100%;
+    padding: 5px 8px;
+    border: 1px solid var(--border-color);
+    border-radius: 5px;
+    background: var(--bg-color);
+    color: var(--text-color);
+    font-size: 12px;
+    box-sizing: border-box;
+}
+
+.capture-input:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.capture-status {
+    font-size: 12px;
+    color: var(--success-color);
+    font-weight: 500;
+}
+
+[data-theme="dark"] .btn-capture.active {
+    background: #450a0a;
+    color: #f87171;
+    border-color: #7f1d1d;
+}

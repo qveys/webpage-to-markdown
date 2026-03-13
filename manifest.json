@@ -20,6 +20,13 @@
   },
   "manifest_version": 3,
   "name": "Webpage to Markdown",
-  "permissions": ["activeTab", "scripting", "storage", "downloads", "tabs"],
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage",
+    "downloads",
+    "tabs",
+    "webNavigation"
+  ],
   "version": "1.0.1"
 }

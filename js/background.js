@@ -195,3 +195,149 @@ chrome.runtime.onMessageExternal.addListener(
     return true;
   },
 );
+
+// ─── Auto-capture session ──────────────────────────────────────────────────
+
+const DEFAULT_DELAY = 2000;
+
+function makeSessionFolder() {
+  const ts = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
+  return `w2m-session-${ts}`;
+}
+
+async function getSession() {
+  const { session } = await chrome.storage.local.get("session");
+  return (
+    session || {
+      active: false,
+      folder: makeSessionFolder(),
+      delay: DEFAULT_DELAY,
+    }
+  );
+}
+
+async function setSession(patch) {
+  const current = await getSession();
+  const updated = { ...current, ...patch };
+  await chrome.storage.local.set({ session: updated });
+  return updated;
+}
+
+async function updateBadge(active) {
+  if (active) {
+    await chrome.action.setBadgeText({ text: "●" });
+    await chrome.action.setBadgeBackgroundColor({ color: "#22c55e" });
+  } else {
+    await chrome.action.setBadgeText({ text: "" });
+  }
+}
+
+// Listener pour les messages du popup
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.type === "W2M_GET_SESSION") {
+    getSession().then(sendResponse);
+    return true;
+  }
+  if (message.type === "W2M_START_SESSION") {
+    const folder = message.folder || makeSessionFolder();
+    const delay = message.delay ?? DEFAULT_DELAY;
+    setSession({ active: true, folder, delay })
+      .then((session) => {
+        updateBadge(true);
+        sendResponse({ ok: true, session });
+      })
+      .catch((err) => sendResponse({ ok: false, error: err.message }));
+    return true;
+  }
+  if (message.type === "W2M_STOP_SESSION") {
+    setSession({ active: false })
+      .then((session) => {
+        updateBadge(false);
+        sendResponse({ ok: true, session });
+      })
+      .catch((err) => sendResponse({ ok: false, error: err.message }));
+    return true;
+  }
+  if (message.type === "W2M_UPDATE_SESSION") {
+    setSession(message.patch)
+      .then((session) => sendResponse({ ok: true, session }))
+      .catch((err) => sendResponse({ ok: false, error: err.message }));
+    return true;
+  }
+});
+
+// Réinitialiser le badge au démarrage du navigateur
+chrome.runtime.onStartup.addListener(async () => {
+  const session = await getSession();
+  if (session.active) await setSession({ active: false });
+  await updateBadge(false);
+});
+
+// ─── Auto-capture : écoute de la navigation ───────────────────────────────
+
+const pendingCaptures = new Map(); // tabId → timeoutId
+
+chrome.webNavigation.onCompleted.addListener(async (details) => {
+  if (details.frameId !== 0) return;
+
+  const session = await getSession();
+  if (!session.active) return;
+
+  const [activeTab] = await chrome.tabs.query({
+    active: true,
+    lastFocusedWindow: true,
+  });
+  if (!activeTab || activeTab.id !== details.tabId) return;
+
+  const url = details.url;
+  if (
+    url.startsWith("chrome://") ||
+    url.startsWith("chrome-extension://") ||
+    url.startsWith("edge://") ||
+    url.startsWith("about:") ||
+    url.includes("chrome.google.com/webstore")
+  )
+    return;
+
+  if (pendingCaptures.has(details.tabId)) {
+    clearTimeout(pendingCaptures.get(details.tabId));
+  }
+
+  const timerId = setTimeout(async () => {
+    pendingCaptures.delete(details.tabId);
+    try {
+      const results = await chrome.scripting.executeScript({
+        target: { tabId: details.tabId },
+        func: extractPageContent,
+      });
+      if (!results?.[0]?.result) return;
+      const { success, content, title } = results[0].result;
+      if (!success) return;
+
+      const markdown = convertToMarkdown(title, content);
+      await downloadInSession(markdown, title, session.folder);
+
+      await chrome.storage.local.set({
+        lastConversion: { url, markdown, timestamp: new Date().toISOString() },
+      });
+    } catch (err) {
+      console.error("[W2M] Auto-capture error:", err);
+    }
+  }, session.delay);
+
+  pendingCaptures.set(details.tabId, timerId);
+});
+
+async function downloadInSession(markdown, title, folder) {
+  const timestamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
+  const safeTitle = (title || "page")
+    .replace(/[^a-z0-9\-_]/gi, "-")
+    .slice(0, 60);
+  const filename = `${folder}/${safeTitle}-${timestamp}.md`;
+  const encoded = encodeURIComponent(markdown);
+  await chrome.downloads.download({
+    url: `data:text/markdown;charset=utf-8,${encoded}`,
+    filename,
+    saveAs: false,
+  });
+}
