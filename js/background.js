@@ -262,9 +262,86 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     const delay = message.delay ?? DEFAULT_DELAY;
     capturedUrls.clear();
     setSession({ active: true, folder, delay })
-      .then((session) => {
+      .then(async (session) => {
         updateBadge(true);
         sendResponse({ ok: true, session });
+        // Capturer immédiatement la page active au démarrage
+        try {
+          const [tab] = await chrome.tabs.query({
+            active: true,
+            lastFocusedWindow: true,
+          });
+          if (
+            tab &&
+            tab.id &&
+            tab.url &&
+            !tab.url.startsWith("chrome://") &&
+            !tab.url.startsWith("chrome-extension://") &&
+            !tab.url.startsWith("edge://") &&
+            !tab.url.startsWith("about:") &&
+            !tab.url.includes("chrome.google.com/webstore")
+          ) {
+            await chrome.scripting.executeScript({
+              target: { tabId: tab.id },
+              files: [
+                "/js/Readability.js",
+                "/js/turndown.js",
+                "/js/turndown-plugin-gfm.js",
+              ],
+            });
+            const results = await chrome.scripting.executeScript({
+              target: { tabId: tab.id },
+              func: extractAndConvert,
+            });
+            if (results?.[0]?.result?.success) {
+              const { markdown, title } = results[0].result;
+              await downloadInSession(markdown, title, folder);
+              capturedUrls.add(tab.url);
+              chrome.runtime
+                .sendMessage({
+                  type: "W2M_CAPTURE_COUNT",
+                  count: capturedUrls.size,
+                })
+                .catch(() => {});
+              await chrome.storage.local.set({
+                lastConversion: {
+                  url: tab.url,
+                  markdown,
+                  timestamp: new Date().toISOString(),
+                },
+              });
+              chrome.scripting.executeScript({
+                target: { tabId: tab.id },
+                func: (t) => {
+                  const o = document.createElement("div");
+                  o.style.cssText =
+                    "position:fixed;inset:0;z-index:2147483647;pointer-events:none;display:flex;align-items:center;justify-content:center;background:rgba(34,197,94,0.12);transition:opacity 0.4s ease;font-family:system-ui,sans-serif";
+                  const i = document.createElement("span");
+                  i.style.cssText = "font-size:20px;margin-right:8px";
+                  i.textContent = "✓";
+                  const tx = document.createElement("span");
+                  tx.textContent = "Captured: " + t;
+                  const b = document.createElement("div");
+                  b.style.cssText =
+                    "background:rgba(34,197,94,0.92);color:#fff;padding:12px 24px;border-radius:12px;font-size:15px;font-weight:600;box-shadow:0 4px 20px rgba(0,0,0,0.2);display:flex;align-items:center";
+                  b.appendChild(i);
+                  b.appendChild(tx);
+                  o.appendChild(b);
+                  document.body.appendChild(o);
+                  setTimeout(() => {
+                    o.style.opacity = "0";
+                  }, 1200);
+                  setTimeout(() => {
+                    o.remove();
+                  }, 1600);
+                },
+                args: [results[0].result.title],
+              });
+            }
+          }
+        } catch (err) {
+          console.error("[W2M] Initial capture error:", err);
+        }
       })
       .catch((err) => sendResponse({ ok: false, error: err.message }));
     return true;
