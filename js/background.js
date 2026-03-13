@@ -472,7 +472,7 @@ function extractAndConvert() {
 
     bodyClone
       .querySelectorAll(
-        'script, style, nav, footer, aside, .ads, .comments, [role="complementary"], .cookie-banner, .popup, .overlay, .modal',
+        'script, style, svg, nav, footer, aside, .ads, .comments, [role="complementary"], .cookie-banner, .popup, .overlay, .modal',
       )
       .forEach((el) => el.remove());
 
@@ -506,7 +506,7 @@ function extractAndConvert() {
       codeBlockStyle: "fenced",
       emDelimiter: "_",
     });
-    service.keep(["iframe", "script", "style"]);
+    service.keep(["iframe"]);
     service.addRule("codeBlocks", {
       filter: (node) => node.nodeName === "PRE" && node.querySelector("code"),
       replacement: (content, node) => {
