@@ -241,6 +241,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === "W2M_START_SESSION") {
     const folder = message.folder || makeSessionFolder();
     const delay = message.delay ?? DEFAULT_DELAY;
+    capturedUrls.clear();
     setSession({ active: true, folder, delay })
       .then((session) => {
         updateBadge(true);
@@ -250,6 +251,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
   if (message.type === "W2M_STOP_SESSION") {
+    capturedUrls.clear();
     setSession({ active: false })
       .then((session) => {
         updateBadge(false);
@@ -276,6 +278,7 @@ chrome.runtime.onStartup.addListener(async () => {
 // ─── Auto-capture : écoute de la navigation ───────────────────────────────
 
 const pendingCaptures = new Map(); // tabId → timeoutId
+const capturedUrls = new Set(); // URLs déjà traitées dans la session courante
 
 chrome.webNavigation.onCompleted.addListener(async (details) => {
   if (details.frameId !== 0) return;
@@ -299,6 +302,12 @@ chrome.webNavigation.onCompleted.addListener(async (details) => {
   )
     return;
 
+  // Ne pas retraiter une URL déjà capturée dans cette session
+  if (capturedUrls.has(url)) {
+    console.log("[W2M] Already captured, skipping:", url);
+    return;
+  }
+
   if (pendingCaptures.has(details.tabId)) {
     clearTimeout(pendingCaptures.get(details.tabId));
   }
@@ -317,8 +326,18 @@ chrome.webNavigation.onCompleted.addListener(async (details) => {
       const markdown = convertToMarkdown(title, content);
       await downloadInSession(markdown, title, session.folder);
 
+      capturedUrls.add(url);
+
       await chrome.storage.local.set({
         lastConversion: { url, markdown, timestamp: new Date().toISOString() },
+      });
+
+      chrome.notifications.create({
+        type: "basic",
+        iconUrl: "/img/icon.png",
+        title: "Webpage to Markdown",
+        message: `✓ ${title || url}`,
+        priority: 0,
       });
     } catch (err) {
       console.error("[W2M] Auto-capture error:", err);

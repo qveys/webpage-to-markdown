@@ -26,7 +26,8 @@
     "storage",
     "downloads",
     "tabs",
-    "webNavigation"
+    "webNavigation",
+    "notifications"
   ],
   "version": "1.0.1"
 }
