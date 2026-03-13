@@ -1,22 +1,25 @@
 {
-   "action": {
-      "default_icon": {
-         "16": "img/icon.png",
-         "48": "img/icon.png"
-      },
-      "default_popup": "popup.html"
-   },
-   "content_security_policy": {
-      "extension_pages": "script-src 'self'; object-src 'self'"
-   },
-   "description": "Convert any webpage to Markdown format with a single click",
-   "icons": {
-      "128": "img/icon.png",
+  "action": {
+    "default_icon": {
       "16": "img/icon.png",
       "48": "img/icon.png"
-   },
-   "manifest_version": 3,
-   "name": "Webpage to Markdown",
-   "permissions": [ "activeTab", "scripting", "storage" ],
-   "version": "1.0.1"
+    },
+    "default_popup": "popup.html"
+  },
+  "background": {
+    "service_worker": "js/background.js"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  },
+  "description": "Convert any webpage to Markdown format with a single click",
+  "icons": {
+    "128": "img/icon.png",
+    "16": "img/icon.png",
+    "48": "img/icon.png"
+  },
+  "manifest_version": 3,
+  "name": "Webpage to Markdown",
+  "permissions": ["activeTab", "scripting", "storage", "downloads", "tabs"],
+  "version": "1.0.1"
 }
