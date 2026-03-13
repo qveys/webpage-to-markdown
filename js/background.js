@@ -261,8 +261,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     const folder = message.folder || makeSessionFolder();
     const delay = message.delay ?? DEFAULT_DELAY;
     const urlTree = message.urlTree ?? false;
+    const saveAssets = message.saveAssets ?? false;
     capturedUrls.clear();
-    setSession({ active: true, folder, delay, urlTree })
+    setSession({ active: true, folder, delay, urlTree, saveAssets })
       .then(async (session) => {
         updateBadge(true);
         sendResponse({ ok: true, session });
@@ -765,10 +766,69 @@ async function downloadInSession(markdown, title, folder, pageUrl) {
     mdPath = `${safeTitle}-${timestamp}.md`;
   }
 
+  // Télécharger les assets si l'option est activée
+  if (session.saveAssets) {
+    markdown = await downloadAssets(markdown, folder, mdPath);
+  }
+
   const encoded = encodeURIComponent(markdown);
   await chrome.downloads.download({
     url: `data:text/markdown;charset=utf-8,${encoded}`,
     filename: `${folder}/${mdPath}`,
     saveAs: false,
   });
+}
+
+// Télécharge les images référencées dans le markdown et remplace les URLs
+// par des chemins relatifs locaux (assets/nom-fichier.ext)
+async function downloadAssets(markdown, folder, mdPath) {
+  const imgRegex = /!\[([^\]]*)\]\((https?:\/\/[^)\s]+)\)/g;
+  const matches = [...markdown.matchAll(imgRegex)];
+  if (matches.length === 0) return markdown;
+
+  const mdDir = mdPath.includes("/")
+    ? mdPath.slice(0, mdPath.lastIndexOf("/"))
+    : "";
+  const assetsDir = mdDir ? `${folder}/${mdDir}/assets` : `${folder}/assets`;
+
+  let result = markdown;
+  const downloaded = new Map();
+
+  for (const match of matches) {
+    const [, , imgUrl] = match;
+    if (downloaded.has(imgUrl)) continue;
+
+    try {
+      const urlObj = new URL(imgUrl);
+      const rawName = urlObj.pathname.split("/").pop() || "image";
+      const dotIdx = rawName.lastIndexOf(".");
+      const ext =
+        dotIdx > -1
+          ? rawName.slice(dotIdx).split("?")[0].toLowerCase()
+          : ".jpg";
+      const baseName = rawName
+        .slice(0, dotIdx > -1 ? dotIdx : undefined)
+        .replace(/[^a-z0-9\-_]/gi, "-")
+        .slice(0, 40);
+      const localName = `${baseName}${ext}`;
+
+      await chrome.downloads.download({
+        url: imgUrl,
+        filename: `${assetsDir}/${localName}`,
+        saveAs: false,
+      });
+
+      downloaded.set(imgUrl, localName);
+    } catch (err) {
+      console.warn("[W2M] Asset download failed:", imgUrl, err);
+    }
+  }
+
+  result = result.replace(imgRegex, (full, alt, imgUrl) => {
+    const localName = downloaded.get(imgUrl);
+    if (!localName) return full;
+    return `![${alt}](assets/${localName})`;
+  });
+
+  return result;
 }

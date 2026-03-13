@@ -170,6 +170,8 @@ ${captionText}
     document.getElementById("capture-delay").value = session.delay || 2000;
     document.getElementById("capture-url-tree").checked =
       session.urlTree ?? false;
+    document.getElementById("capture-save-assets").checked =
+      session.saveAssets ?? false;
     this.updateCaptureUI(session.active);
 
     if (session.captureCount) {
@@ -209,6 +211,15 @@ ${captionText}
           patch: { urlTree: e.target.checked },
         });
       });
+
+    document
+      .getElementById("capture-save-assets")
+      .addEventListener("change", (e) => {
+        chrome.runtime.sendMessage({
+          type: "W2M_UPDATE_SESSION",
+          patch: { saveAssets: e.target.checked },
+        });
+      });
   }
 
   async toggleCapture() {
@@ -225,11 +236,13 @@ ${captionText}
       const delay =
         Number(document.getElementById("capture-delay").value) || 2000;
       const urlTree = document.getElementById("capture-url-tree").checked;
+      const saveAssets = document.getElementById("capture-save-assets").checked;
       const res = await chrome.runtime.sendMessage({
         type: "W2M_START_SESSION",
         folder,
         delay,
         urlTree,
+        saveAssets,
       });
       document.getElementById("capture-folder").value = res.session.folder;
       this.updateCaptureUI(true);
