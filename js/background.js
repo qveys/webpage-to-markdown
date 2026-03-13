@@ -12,6 +12,7 @@ chrome.storage.local.get("session", ({ session }) => {
       active: false,
       folder: `w2m-session-${ts}`,
       delay: session?.delay ?? 2000,
+      capturedUrls: [], // Nouvelle session au redémarrage du SW
     },
   });
   chrome.action.setBadgeText({ text: "" });
@@ -262,8 +263,21 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     const delay = message.delay ?? DEFAULT_DELAY;
     const urlTree = message.urlTree ?? false;
     const saveAssets = message.saveAssets ?? false;
-    capturedUrls.clear();
-    setSession({ active: true, folder, delay, urlTree, saveAssets })
+    // Ne vider les URLs que si le dossier change (= nouvelle session)
+    getSession()
+      .then((prev) => {
+        if (prev.folder !== folder) {
+          capturedUrls.clear();
+        }
+        return setSession({
+          active: true,
+          folder,
+          delay,
+          urlTree,
+          saveAssets,
+          capturedUrls: [...capturedUrls],
+        });
+      })
       .then(async (session) => {
         updateBadge(true);
         sendResponse({ ok: true, session });
@@ -283,63 +297,87 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             !tab.url.startsWith("about:") &&
             !tab.url.includes("chrome.google.com/webstore")
           ) {
-            await chrome.scripting.executeScript({
-              target: { tabId: tab.id },
-              files: [
-                "/js/Readability.js",
-                "/js/turndown.js",
-                "/js/turndown-plugin-gfm.js",
-              ],
-            });
-            const results = await chrome.scripting.executeScript({
-              target: { tabId: tab.id },
-              func: extractAndConvert,
-            });
-            if (results?.[0]?.result?.success) {
-              const { markdown, title } = results[0].result;
-              await downloadInSession(markdown, title, folder, tab.url);
-              capturedUrls.add(tab.url);
-              chrome.runtime
-                .sendMessage({
-                  type: "W2M_CAPTURE_COUNT",
-                  count: capturedUrls.size,
-                })
-                .catch(() => {});
-              await chrome.storage.local.set({
-                lastConversion: {
-                  url: tab.url,
-                  markdown,
-                  timestamp: new Date().toISOString(),
-                },
-              });
+            // Vérifier si la page est déjà capturée
+            if (capturedUrls.has(tab.url)) {
               chrome.scripting.executeScript({
                 target: { tabId: tab.id },
-                func: (t) => {
+                func: () => {
                   const o = document.createElement("div");
                   o.style.cssText =
-                    "position:fixed;inset:0;z-index:2147483647;pointer-events:none;display:flex;align-items:center;justify-content:center;background:rgba(34,197,94,0.12);transition:opacity 0.4s ease;font-family:system-ui,sans-serif";
-                  const i = document.createElement("span");
-                  i.style.cssText = "font-size:20px;margin-right:8px";
-                  i.textContent = "✓";
-                  const tx = document.createElement("span");
-                  tx.textContent = "Captured: " + t;
+                    "position:fixed;inset:0;z-index:2147483647;pointer-events:none;display:flex;align-items:center;justify-content:center;background:rgba(251,191,36,0.10);transition:opacity 0.4s ease;font-family:system-ui,sans-serif";
                   const b = document.createElement("div");
                   b.style.cssText =
-                    "background:rgba(34,197,94,0.92);color:#fff;padding:12px 24px;border-radius:12px;font-size:15px;font-weight:600;box-shadow:0 4px 20px rgba(0,0,0,0.2);display:flex;align-items:center";
-                  b.appendChild(i);
-                  b.appendChild(tx);
+                    "background:rgba(245,158,11,0.92);color:#fff;padding:10px 22px;border-radius:12px;font-size:14px;font-weight:600;box-shadow:0 4px 20px rgba(0,0,0,0.2);display:flex;align-items:center;gap:8px";
+                  b.textContent = "Déjà capturée";
                   o.appendChild(b);
                   document.body.appendChild(o);
                   setTimeout(() => {
                     o.style.opacity = "0";
-                  }, 1200);
+                  }, 800);
                   setTimeout(() => {
                     o.remove();
-                  }, 1600);
+                  }, 1200);
                 },
-                args: [results[0].result.title],
               });
-            }
+            } else {
+              await chrome.scripting.executeScript({
+                target: { tabId: tab.id },
+                files: [
+                  "/js/Readability.js",
+                  "/js/turndown.js",
+                  "/js/turndown-plugin-gfm.js",
+                ],
+              });
+              const results = await chrome.scripting.executeScript({
+                target: { tabId: tab.id },
+                func: extractAndConvert,
+              });
+              if (results?.[0]?.result?.success) {
+                const { markdown, title } = results[0].result;
+                await downloadInSession(markdown, title, folder, tab.url);
+                await addCapturedUrl(tab.url);
+                chrome.runtime
+                  .sendMessage({
+                    type: "W2M_CAPTURE_COUNT",
+                    count: capturedUrls.size,
+                  })
+                  .catch(() => {});
+                await chrome.storage.local.set({
+                  lastConversion: {
+                    url: tab.url,
+                    markdown,
+                    timestamp: new Date().toISOString(),
+                  },
+                });
+                chrome.scripting.executeScript({
+                  target: { tabId: tab.id },
+                  func: (t) => {
+                    const o = document.createElement("div");
+                    o.style.cssText =
+                      "position:fixed;inset:0;z-index:2147483647;pointer-events:none;display:flex;align-items:center;justify-content:center;background:rgba(34,197,94,0.12);transition:opacity 0.4s ease;font-family:system-ui,sans-serif";
+                    const i = document.createElement("span");
+                    i.style.cssText = "font-size:20px;margin-right:8px";
+                    i.textContent = "✓";
+                    const tx = document.createElement("span");
+                    tx.textContent = "Captured: " + t;
+                    const b = document.createElement("div");
+                    b.style.cssText =
+                      "background:rgba(34,197,94,0.92);color:#fff;padding:12px 24px;border-radius:12px;font-size:15px;font-weight:600;box-shadow:0 4px 20px rgba(0,0,0,0.2);display:flex;align-items:center";
+                    b.appendChild(i);
+                    b.appendChild(tx);
+                    o.appendChild(b);
+                    document.body.appendChild(o);
+                    setTimeout(() => {
+                      o.style.opacity = "0";
+                    }, 1200);
+                    setTimeout(() => {
+                      o.remove();
+                    }, 1600);
+                  },
+                  args: [results[0].result.title],
+                });
+              }
+            } // fin else (pas déjà capturée)
           }
         } catch (err) {
           console.error("[W2M] Initial capture error:", err);
@@ -349,7 +387,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
   if (message.type === "W2M_STOP_SESSION") {
-    capturedUrls.clear();
     setSession({ active: false })
       .then((session) => {
         updateBadge(false);
@@ -369,7 +406,20 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 // ─── Auto-capture : écoute de la navigation ───────────────────────────────
 
 const pendingCaptures = new Map(); // tabId → timeoutId
-const capturedUrls = new Set(); // URLs déjà traitées dans la session courante
+let capturedUrls = new Set(); // URLs déjà traitées dans la session courante
+
+// Recharger les URLs capturées depuis le storage au démarrage du SW
+chrome.storage.local.get("session", ({ session }) => {
+  if (session?.capturedUrls?.length) {
+    capturedUrls = new Set(session.capturedUrls);
+  }
+});
+
+// Ajouter une URL et persister dans le storage
+async function addCapturedUrl(url) {
+  capturedUrls.add(url);
+  await setSession({ capturedUrls: [...capturedUrls] });
+}
 
 chrome.webNavigation.onCompleted.addListener(async (details) => {
   if (details.frameId !== 0) return;
@@ -393,9 +443,29 @@ chrome.webNavigation.onCompleted.addListener(async (details) => {
   )
     return;
 
-  // Ne pas retraiter une URL déjà capturée dans cette session
+  // URL déjà capturée : flash orange pour informer l'utilisateur
   if (capturedUrls.has(url)) {
     console.log("[W2M] Already captured, skipping:", url);
+    chrome.scripting.executeScript({
+      target: { tabId: details.tabId },
+      func: () => {
+        const o = document.createElement("div");
+        o.style.cssText =
+          "position:fixed;inset:0;z-index:2147483647;pointer-events:none;display:flex;align-items:center;justify-content:center;background:rgba(251,191,36,0.10);transition:opacity 0.4s ease;font-family:system-ui,sans-serif";
+        const b = document.createElement("div");
+        b.style.cssText =
+          "background:rgba(245,158,11,0.92);color:#fff;padding:10px 22px;border-radius:12px;font-size:14px;font-weight:600;box-shadow:0 4px 20px rgba(0,0,0,0.2);display:flex;align-items:center;gap:8px";
+        b.textContent = "Déjà capturée";
+        o.appendChild(b);
+        document.body.appendChild(o);
+        setTimeout(() => {
+          o.style.opacity = "0";
+        }, 800);
+        setTimeout(() => {
+          o.remove();
+        }, 1200);
+      },
+    });
     return;
   }
 
@@ -465,7 +535,7 @@ chrome.webNavigation.onCompleted.addListener(async (details) => {
 
       await downloadInSession(markdown, title, session.folder, url);
 
-      capturedUrls.add(url);
+      await addCapturedUrl(url);
 
       chrome.runtime
         .sendMessage({
@@ -731,7 +801,9 @@ function extractAndConvert() {
 function urlToPath(pageUrl) {
   try {
     const u = new URL(pageUrl);
+    // Nettoyer le hostname
     const host = u.hostname.replace(/[^a-z0-9.\-]/gi, "-");
+    // Découper le pathname en segments, nettoyer chaque segment
     const segments = u.pathname
       .split("/")
       .map((s) =>
@@ -741,6 +813,7 @@ function urlToPath(pageUrl) {
           .replace(/^-|-$/g, ""),
       )
       .filter(Boolean);
+    // Le dernier segment devient le nom de fichier (.md), les autres sont des dossiers
     const filename = segments.pop() || "index";
     return { dirs: [host, ...segments], filename };
   } catch (e) {
@@ -751,7 +824,7 @@ function urlToPath(pageUrl) {
 async function downloadInSession(markdown, title, folder, pageUrl) {
   const session = await getSession();
 
-  let mdPath;
+  let mdPath; // chemin du fichier .md sans le dossier racine
   if (session.urlTree && pageUrl) {
     const { dirs, filename: name } = urlToPath(pageUrl);
     mdPath = dirs.length > 0 ? `${dirs.join("/")}/${name}.md` : `${name}.md`;
@@ -780,27 +853,31 @@ async function downloadInSession(markdown, title, folder, pageUrl) {
 }
 
 // Télécharge les images référencées dans le markdown et remplace les URLs
-// par des chemins relatifs locaux (assets/nom-fichier.ext)
+// par des chemins relatifs locaux (./assets/nom-fichier.ext)
 async function downloadAssets(markdown, folder, mdPath) {
+  // Extraire toutes les URLs d'images du markdown : ![alt](url)
   const imgRegex = /!\[([^\]]*)\]\((https?:\/\/[^)\s]+)\)/g;
   const matches = [...markdown.matchAll(imgRegex)];
   if (matches.length === 0) return markdown;
 
+  // Dossier assets : même niveau que le fichier .md
   const mdDir = mdPath.includes("/")
     ? mdPath.slice(0, mdPath.lastIndexOf("/"))
     : "";
   const assetsDir = mdDir ? `${folder}/${mdDir}/assets` : `${folder}/assets`;
 
   let result = markdown;
-  const downloaded = new Map();
+  const downloaded = new Map(); // url → filename local
 
   for (const match of matches) {
     const [, , imgUrl] = match;
     if (downloaded.has(imgUrl)) continue;
 
     try {
+      // Extraire un nom de fichier propre depuis l'URL
       const urlObj = new URL(imgUrl);
       const rawName = urlObj.pathname.split("/").pop() || "image";
+      // Garder uniquement l'extension et sanitiser
       const dotIdx = rawName.lastIndexOf(".");
       const ext =
         dotIdx > -1
@@ -824,6 +901,7 @@ async function downloadAssets(markdown, folder, mdPath) {
     }
   }
 
+  // Remplacer les URLs dans le markdown par des chemins relatifs
   result = result.replace(imgRegex, (full, alt, imgUrl) => {
     const localName = downloaded.get(imgUrl);
     if (!localName) return full;
