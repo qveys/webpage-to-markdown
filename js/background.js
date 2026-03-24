@@ -135,8 +135,20 @@ function convertToMarkdown(title, content) {
       const src = node.getAttribute("src") || "";
       if (!src) return "";
       const w = parseInt(node.getAttribute("width") || "0", 10);
-      const maxW = w > 0 ? w : 64;
-      return `<img src="${src}" alt="${alt}" style="max-width:${maxW}px; height:auto;">`;
+      const h = parseInt(node.getAttribute("height") || "0", 10);
+      const sw = w > 0 && w < 200;
+      const sh = h > 0 && h < 200;
+      let style;
+      if (sw && sh) {
+        style = `max-width:${w}px;max-height:${h}px;height:auto;width:auto`;
+      } else if (sw) {
+        style = `max-width:${w}px;height:auto`;
+      } else if (sh) {
+        style = `max-height:${h}px;width:auto`;
+      } else {
+        style = "max-width:64px;height:auto";
+      }
+      return `<img src="${src}" alt="${alt}" style="${style}">`;
     },
   });
 
