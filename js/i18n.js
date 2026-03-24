@@ -1,0 +1,352 @@
+(function () {
+  'use strict';
+
+  const translations = {
+    fr: {
+      'app.title': 'Webpage to Markdown',
+      'home.title': 'Convertir cette page\nen Markdown',
+      'home.cta': 'Convertir la page',
+      'home.crawl': 'Capturer le site',
+      'home.history': 'Dernière conversion :',
+      'result.title': 'Résultat',
+      'result.success': 'Page convertie',
+      'result.copy': 'Copier',
+      'result.download': 'Télécharger',
+      'result.reconvert': 'Reconvertir',
+      'result.meta': 'Taille : {size} · {words} mots',
+      'result.copied': 'Copié !',
+      'precrawl.title': 'Capturer le site',
+      'precrawl.start': 'Point de départ :',
+      'precrawl.folder': 'Dossier de destination',
+      'precrawl.organize': 'Organiser par dossiers (URL)',
+      'precrawl.assets': 'Sauvegarder les images',
+      'precrawl.advanced': 'Options avancées',
+      'precrawl.delay': 'Délai entre les pages',
+      'precrawl.delay.fast': 'Rapide',
+      'precrawl.delay.normal': 'Normal',
+      'precrawl.delay.careful': 'Prudent',
+      'precrawl.depth': 'Profondeur',
+      'precrawl.depth.direct': 'Page + liens directs',
+      'precrawl.depth.3': '3 niveaux',
+      'precrawl.depth.full': 'Site complet',
+      'precrawl.concurrency': 'Pages simultanées',
+      'precrawl.cta': 'Lancer la capture',
+      'precrawl.delay.hint': 'Temps d\'attente entre chaque page pour éviter d\'être bloqué.',
+      'precrawl.depth.hint': '1 = seulement les liens de cette page. 3 = exploration en profondeur.',
+      'precrawl.concurrency.hint': 'Plus de pages en parallèle = plus rapide, mais plus de risque de blocage.',
+      'precrawl.activeSettings': 'Réglages actifs',
+      'precrawl.settingsFootnote': 'Pour les modifier : panneau latéral ou icône réglages.',
+      'progress.title': 'Capture en cours…',
+      'progress.done': 'capturées',
+      'progress.waiting': 'en attente',
+      'progress.errors': 'erreurs',
+      'progress.speed': 'Vitesse : ~{speed} pages/min',
+      'progress.elapsed': 'Temps écoulé : {time}',
+      'progress.recent': 'Dernières pages :',
+      'progress.pause': 'Pause',
+      'progress.resume': 'Reprendre',
+      'progress.stop': 'Arrêter',
+      'progress.detail': 'Voir le détail complet →',
+      'crawlresult.title': 'Capture terminée',
+      'crawlresult.pages': '{count} pages capturées',
+      'crawlresult.errors': '{count} erreurs',
+      'crawlresult.images': '{count} images',
+      'crawlresult.folder': 'Dossier : {folder}',
+      'crawlresult.duration': 'Durée : {time}',
+      'crawlresult.size': 'Taille totale : {size}',
+      'crawlresult.download': 'Tout télécharger',
+      'crawlresult.new': 'Nouvelle capture',
+      'crawlresult.retry': 'Réessayer',
+      'crawlresult.errors.section': 'Erreurs ({count}) :',
+      'error.title': 'Erreur',
+      'error.convert.title': 'Impossible de convertir cette page',
+      'error.convert.message': 'La page est protégée ou ne contient pas de contenu exploitable.',
+      'error.convert.hint': 'Conseil : Essayez de recharger la page d\'abord.',
+      'error.network.title': 'Connexion perdue',
+      'error.network.message': 'Vérifiez votre réseau et réessayez.',
+      'error.unavailable.title': 'Page non disponible',
+      'error.unavailable.message': 'Cette page ne contient pas de contenu exploitable.',
+      'error.retry': 'Réessayer',
+      'error.back': 'Retour',
+      'settings.title': 'Paramètres',
+      'settings.markdown': 'FORMAT MARKDOWN',
+      'settings.frontmatter': 'En-tête de page (frontmatter)',
+      'settings.frontmatter.on': 'Activé',
+      'settings.frontmatter.off': 'Désactivé',
+      'settings.headings': 'Style des titres',
+      'settings.headings.atx': '# Dièses (ATX)',
+      'settings.headings.setext': 'Souligné (Setext)',
+      'settings.bullets': 'Style des listes',
+      'settings.bullets.dash': '- Tirets',
+      'settings.bullets.star': '* Étoiles',
+      'settings.bullets.plus': '+ Plus',
+      'settings.codeblock': 'Blocs de code',
+      'settings.codeblock.fenced': '``` Délimités (fenced)',
+      'settings.codeblock.indented': '    Indentés',
+      'settings.capture': 'CAPTURE',
+      'settings.delay': 'Délai entre les pages',
+      'settings.organize': 'Organiser par dossiers',
+      'settings.assets': 'Sauvegarder les images',
+      'settings.crawl': 'CRAWL',
+      'settings.concurrency': 'Pages simultanées',
+      'settings.maxerrors': 'Arrêter après X erreurs',
+      'settings.maxerrors.never': 'Ne jamais arrêter',
+      'settings.maxerrors.hint': 'La capture s\'arrête automatiquement après ce nombre d\'erreurs consécutives.',
+      'settings.depth': 'Profondeur maximale',
+      'settings.depth.1': 'Liens directs (1 niveau)',
+      'settings.depth.3': '3 niveaux',
+      'settings.depth.5': '5 niveaux',
+      'settings.depth.unlimited': 'Illimitée',
+      'settings.debug': 'DÉVELOPPEMENT',
+      'settings.debugCrawl': 'Panneau de diagnostic du crawl (side panel)',
+      'settings.debugCrawl.hint': 'Affiche les listes Pages capturées / À traiter / Erreurs et les logs du moteur. Les URLs complètes sont visibles.',
+      'debug.title': 'Diagnostic du crawl',
+      'debug.warn': 'Mode diagnostic : ce panneau affiche des URLs complètes.',
+      'debug.tab.done': 'Pages capturées',
+      'debug.tab.queued': 'À traiter',
+      'debug.tab.errors': 'Pages en erreur',
+      'debug.tab.logs': 'Logs moteur',
+      'debug.tab.state': 'État technique',
+      'debug.refresh': 'Rafraîchir',
+      'debug.copy': 'Copier JSON',
+      'debug.download': 'Télécharger',
+      'debug.filter': 'Filtrer…',
+      'debug.logFilter': 'Type de log',
+      'debug.logFilter.all': 'Tous',
+      'debug.truncated': 'Tronqué : {shown} / {total}',
+      'debug.depth': 'prof. {depth}',
+      'debug.syncWarn': 'Incohérence de file (UI vs moteur)',
+      'debug.storage': 'Stockage local : {size}',
+      'debug.workers': 'Workers actifs : {n}',
+      'debug.blocks': 'Blocs consécutifs : {n}',
+      'dashboard.live': 'En cours',
+      'dashboard.paused': 'En pause',
+      'dashboard.stopped': 'Arrêté',
+      'dashboard.done': 'faites',
+      'dashboard.queue': 'en file',
+      'dashboard.errors': 'erreurs',
+      'dashboard.activity': 'ACTIVITÉ RÉCENTE',
+      'dashboard.activity.asset': 'Image : {name}',
+      'dashboard.errors.section': 'ERREURS ({count})',
+      'dashboard.retry': 'Réessayer',
+      'dashboard.open': 'Ouvrir',
+      'dashboard.dismiss': 'Masquer',
+      'dashboard.retryall': 'Tout réessayer ({count})',
+      'toast.copied': 'Copié dans le presse-papiers',
+      'toast.downloaded': 'Fichier téléchargé',
+      'toast.error': 'Une erreur est survenue',
+      'toast.converting': 'Conversion en cours…',
+      'reason.404': 'page introuvable',
+      'reason.timeout': 'délai dépassé',
+      'reason.blocked': 'accès refusé',
+      'reason.network': 'erreur réseau',
+      'reason.unknown': 'erreur inconnue',
+    },
+    en: {
+      'app.title': 'Webpage to Markdown',
+      'home.title': 'Convert this page\nto Markdown',
+      'home.cta': 'Convert page',
+      'home.crawl': 'Crawl website',
+      'home.history': 'Last conversion:',
+      'result.title': 'Result',
+      'result.success': 'Page converted',
+      'result.copy': 'Copy',
+      'result.download': 'Download',
+      'result.reconvert': 'Reconvert',
+      'result.meta': 'Size: {size} · {words} words',
+      'result.copied': 'Copied!',
+      'precrawl.title': 'Crawl website',
+      'precrawl.start': 'Starting point:',
+      'precrawl.folder': 'Destination folder',
+      'precrawl.organize': 'Organize by folders (URL)',
+      'precrawl.assets': 'Save images',
+      'precrawl.advanced': 'Advanced options',
+      'precrawl.delay': 'Delay between pages',
+      'precrawl.delay.fast': 'Fast',
+      'precrawl.delay.normal': 'Normal',
+      'precrawl.delay.careful': 'Careful',
+      'precrawl.depth': 'Depth',
+      'precrawl.depth.direct': 'Page + direct links',
+      'precrawl.depth.3': '3 levels',
+      'precrawl.depth.full': 'Entire site',
+      'precrawl.concurrency': 'Simultaneous pages',
+      'precrawl.cta': 'Start crawling',
+      'precrawl.delay.hint': 'Wait time between each page to avoid being blocked.',
+      'precrawl.depth.hint': '1 = only links from this page. 3 = deep exploration.',
+      'precrawl.concurrency.hint': 'More pages in parallel = faster, but higher risk of being blocked.',
+      'precrawl.activeSettings': 'Active settings',
+      'precrawl.settingsFootnote': 'To change these: side panel or settings icon.',
+      'progress.title': 'Crawling in progress…',
+      'progress.done': 'captured',
+      'progress.waiting': 'waiting',
+      'progress.errors': 'errors',
+      'progress.speed': 'Speed: ~{speed} pages/min',
+      'progress.elapsed': 'Elapsed: {time}',
+      'progress.recent': 'Recent pages:',
+      'progress.pause': 'Pause',
+      'progress.resume': 'Resume',
+      'progress.stop': 'Stop',
+      'progress.detail': 'View full details →',
+      'crawlresult.title': 'Crawl complete',
+      'crawlresult.pages': '{count} pages captured',
+      'crawlresult.errors': '{count} errors',
+      'crawlresult.images': '{count} images',
+      'crawlresult.folder': 'Folder: {folder}',
+      'crawlresult.duration': 'Duration: {time}',
+      'crawlresult.size': 'Total size: {size}',
+      'crawlresult.download': 'Download all',
+      'crawlresult.new': 'New crawl',
+      'crawlresult.retry': 'Retry',
+      'crawlresult.errors.section': 'Errors ({count}):',
+      'error.title': 'Error',
+      'error.convert.title': 'Unable to convert this page',
+      'error.convert.message': 'The page is protected or has no usable content.',
+      'error.convert.hint': 'Tip: Try reloading the page first.',
+      'error.network.title': 'Connection lost',
+      'error.network.message': 'Check your network and try again.',
+      'error.unavailable.title': 'Page unavailable',
+      'error.unavailable.message': 'This page has no usable content.',
+      'error.retry': 'Retry',
+      'error.back': 'Back',
+      'settings.title': 'Settings',
+      'settings.markdown': 'MARKDOWN FORMAT',
+      'settings.frontmatter': 'Page header (frontmatter)',
+      'settings.frontmatter.on': 'Enabled',
+      'settings.frontmatter.off': 'Disabled',
+      'settings.headings': 'Heading style',
+      'settings.headings.atx': '# Hashes (ATX)',
+      'settings.headings.setext': 'Underlined (Setext)',
+      'settings.bullets': 'List style',
+      'settings.bullets.dash': '- Dashes',
+      'settings.bullets.star': '* Stars',
+      'settings.bullets.plus': '+ Plus',
+      'settings.codeblock': 'Code blocks',
+      'settings.codeblock.fenced': '``` Fenced',
+      'settings.codeblock.indented': '    Indented',
+      'settings.capture': 'CAPTURE',
+      'settings.delay': 'Delay between pages',
+      'settings.organize': 'Organize by folders',
+      'settings.assets': 'Save images',
+      'settings.crawl': 'CRAWL',
+      'settings.concurrency': 'Simultaneous pages',
+      'settings.maxerrors': 'Stop after X errors',
+      'settings.maxerrors.never': 'Never stop',
+      'settings.maxerrors.hint': 'Crawling stops automatically after this many consecutive errors.',
+      'settings.depth': 'Maximum depth',
+      'settings.depth.1': 'Direct links (1 level)',
+      'settings.depth.3': '3 levels',
+      'settings.depth.5': '5 levels',
+      'settings.depth.unlimited': 'Unlimited',
+      'settings.debug': 'DEVELOPMENT',
+      'settings.debugCrawl': 'Crawl debug panel (side panel)',
+      'settings.debugCrawl.hint': 'Shows Done / queue / error lists and engine logs. Full URLs are visible.',
+      'debug.title': 'Crawl debug',
+      'debug.warn': 'Debug mode: contains full URLs.',
+      'debug.tab.done': 'Done',
+      'debug.tab.queued': 'Queued',
+      'debug.tab.errors': 'Errors',
+      'debug.tab.logs': 'Logs',
+      'debug.tab.state': 'State',
+      'debug.refresh': 'Refresh',
+      'debug.copy': 'Copy JSON',
+      'debug.download': 'Download',
+      'debug.filter': 'Filter…',
+      'debug.logFilter': 'Log type',
+      'debug.logFilter.all': 'All',
+      'debug.truncated': 'Truncated: {shown} / {total}',
+      'debug.depth': 'depth {depth}',
+      'debug.syncWarn': 'Queue mismatch (UI vs engine)',
+      'debug.storage': 'Local storage: {size}',
+      'debug.workers': 'Workers: {n}',
+      'debug.blocks': 'Consecutive blocks: {n}',
+      'dashboard.live': 'Live',
+      'dashboard.paused': 'Paused',
+      'dashboard.stopped': 'Stopped',
+      'dashboard.done': 'done',
+      'dashboard.queue': 'queued',
+      'dashboard.errors': 'errors',
+      'dashboard.activity': 'RECENT ACTIVITY',
+      'dashboard.activity.asset': 'Image: {name}',
+      'dashboard.errors.section': 'ERRORS ({count})',
+      'dashboard.retry': 'Retry',
+      'dashboard.open': 'Open',
+      'dashboard.dismiss': 'Dismiss',
+      'dashboard.retryall': 'Retry all ({count})',
+      'toast.copied': 'Copied to clipboard',
+      'toast.downloaded': 'File downloaded',
+      'toast.error': 'An error occurred',
+      'toast.converting': 'Converting…',
+      'reason.404': 'page not found',
+      'reason.timeout': 'timed out',
+      'reason.blocked': 'access denied',
+      'reason.network': 'network error',
+      'reason.unknown': 'unknown error',
+    }
+  };
+
+  let currentLocale = 'fr';
+
+  function t(key, params) {
+    params = params || {};
+    var dict = translations[currentLocale] || translations.fr;
+    var str = dict[key] || translations.fr[key] || key;
+    Object.keys(params).forEach(function (k) {
+      str = str.replace(new RegExp('\\{' + k + '\\}', 'g'), String(params[k]));
+    });
+    return str;
+  }
+
+  function setLocale(locale) {
+    if (translations[locale]) {
+      currentLocale = locale;
+      chrome.storage.local.set({ locale: locale });
+      document.documentElement.setAttribute('lang', locale);
+      window.dispatchEvent(new CustomEvent('locale-changed', { detail: { locale: locale } }));
+    }
+  }
+
+  function getLocale() { return currentLocale; }
+
+  async function initLocale() {
+    try {
+      var result = await chrome.storage.local.get('locale');
+      if (result.locale && translations[result.locale]) {
+        currentLocale = result.locale;
+      } else {
+        var lang = navigator.language.substring(0, 2);
+        currentLocale = translations[lang] ? lang : 'fr';
+      }
+      document.documentElement.setAttribute('lang', currentLocale);
+    } catch (e) { currentLocale = 'fr'; }
+  }
+
+  function formatDuration(ms) {
+    var s = Math.floor(ms / 1000);
+    var m = Math.floor(s / 60);
+    var sec = s % 60;
+    var h = Math.floor(m / 60);
+    var min = m % 60;
+    if (h > 0) return h + 'h ' + min + 'min';
+    if (m > 0 && sec > 0) return m + ' min ' + sec + ' s';
+    if (m > 0) return m + ' min';
+    return s + 's';
+  }
+
+  function formatTimeAgo(ts) {
+    var diff = Date.now() - ts;
+    var m = Math.floor(diff / 60000);
+    var h = Math.floor(diff / 3600000);
+    if (m < 1) return currentLocale === 'fr' ? 'à l\'instant' : 'just now';
+    if (h < 1) return currentLocale === 'fr' ? 'il y a ' + m + ' min' : m + ' min ago';
+    return currentLocale === 'fr' ? 'il y a ' + h + 'h' : h + 'h ago';
+  }
+
+  function formatSize(bytes) {
+    if (bytes < 1024) return bytes + (currentLocale === 'fr' ? ' o' : ' B');
+    if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' Ko';
+    return (bytes / 1048576).toFixed(1) + ' Mo';
+  }
+
+  window.W2M = window.W2M || {};
+  window.W2M.i18n = { t: t, setLocale: setLocale, getLocale: getLocale, initLocale: initLocale, formatDuration: formatDuration, formatTimeAgo: formatTimeAgo, formatSize: formatSize };
+})();
