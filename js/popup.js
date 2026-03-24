@@ -1,543 +1,1192 @@
-class MarkdownConverter {
-  constructor() {
-    this.defaultSettings = {
-      frontmatter: false,
-      headingStyle: "atx",
-      bulletListMarker: "-",
-      codeBlockStyle: "fenced",
-    };
+(function () {
+  'use strict';
+  var t = W2M.i18n.t;
+  var formatDuration = W2M.i18n.formatDuration;
+  var formatTimeAgo = W2M.i18n.formatTimeAgo;
+  var formatSize = W2M.i18n.formatSize;
+  var STATES = W2M.STATES;
+  var AppState = W2M.AppState;
+  var el = W2M.el;
 
-    this.settings = { ...this.defaultSettings };
+  var DEFAULT_CAPTURE_SETTINGS = { delay: 2000, urlTree: true, saveAssets: true };
+  var DEFAULT_CRAWL_SETTINGS = { concurrency: 3, maxBlocks: 5, depth: 0 };
 
-    this.initializeTheme();
-    this.loadSettings();
-    this.initializeEventListeners();
-
-    // Restore last conversion if available
-    this.restoreLastState();
-    this.initializeAutoCapture();
+  function precrawlDelayLabel(ms) {
+    if (ms <= 500) return t('precrawl.delay.fast');
+    if (ms >= 5000) return t('precrawl.delay.careful');
+    return t('precrawl.delay.normal');
   }
 
-  createTurndownService() {
-    const service = new TurndownService({
+  function precrawlDepthLabel(depth) {
+    var d = Number(depth);
+    if (d === 0) return t('settings.depth.unlimited');
+    if (d === 1) return t('settings.depth.1');
+    if (d === 5) return t('settings.depth.5');
+    return t('settings.depth.3');
+  }
+
+  function precrawlMaxBlocksLabel(maxBlocks) {
+    if (maxBlocks === 0) return t('settings.maxerrors.never');
+    return String(maxBlocks);
+  }
+
+  // =============================================
+  // MARKDOWN CONVERTER — full business logic
+  // =============================================
+
+  function MarkdownConverter() {
+    this.defaultSettings = {
+      frontmatter: false,
+      headingStyle: 'atx',
+      bulletListMarker: '-',
+      codeBlockStyle: 'fenced'
+    };
+    this.settings = {};
+    var k;
+    for (k in this.defaultSettings) {
+      if (this.defaultSettings.hasOwnProperty(k)) {
+        this.settings[k] = this.defaultSettings[k];
+      }
+    }
+  }
+
+  MarkdownConverter.prototype.loadSettings = function (callback) {
+    var self = this;
+    chrome.storage.local.get('markdownSettings', function (data) {
+      if (data.markdownSettings) {
+        var k;
+        for (k in data.markdownSettings) {
+          if (data.markdownSettings.hasOwnProperty(k)) {
+            self.settings[k] = data.markdownSettings[k];
+          }
+        }
+      }
+      if (callback) callback();
+    });
+  };
+
+  MarkdownConverter.prototype.createTurndownService = function () {
+    var service = new TurndownService({
       headingStyle: this.settings.headingStyle,
-      hr: "---",
+      hr: '---',
       bulletListMarker: this.settings.bulletListMarker,
       codeBlockStyle: this.settings.codeBlockStyle,
-      emDelimiter: "_",
+      emDelimiter: '_'
     });
 
-    service.keep(["iframe", "script", "style"]);
+    service.keep(['iframe', 'script', 'style']);
 
-    service.addRule("figures", {
-      filter: "figure",
-      replacement: (content, node) => {
-        const img = node.querySelector("img");
-        const caption = node.querySelector("figcaption");
+    service.addRule('figures', {
+      filter: 'figure',
+      replacement: function (content, node) {
+        var img = node.querySelector('img');
+        var caption = node.querySelector('figcaption');
         if (img) {
-          const alt = img.getAttribute("alt") || "";
-          const src = img.getAttribute("src") || "";
-          const captionText = caption ? caption.textContent : "";
-          return `
-
-![${alt}](${src})
-${captionText}
-
-`;
+          var alt = img.getAttribute('alt') || '';
+          var src = img.getAttribute('src') || '';
+          var captionText = caption ? caption.textContent : '';
+          return '\n\n![' + alt + '](' + src + ')\n' + captionText + '\n\n';
         }
         return content;
+      }
+    });
+
+    // Skip tiny images (icons < 16px) -- pure noise
+    service.addRule('skipTinyImages', {
+      filter: function (node) {
+        if (node.nodeName !== 'IMG') return false;
+        var w = parseInt(node.getAttribute('width') || '0', 10);
+        var h = parseInt(node.getAttribute('height') || '0', 10);
+        return (w > 0 && w < 16) || (h > 0 && h < 16);
       },
+      replacement: function () { return ''; }
     });
 
     return service;
-  }
+  };
 
-  initializeTheme() {
-    const toggleBtn = document.getElementById("theme-toggle");
-    const sunIcon = toggleBtn.querySelector(".sun-icon");
-    const moonIcon = toggleBtn.querySelector(".moon-icon");
+  MarkdownConverter.prototype.cleanupMarkdown = function (markdown) {
+    var out = markdown || '';
 
-    // Check saved theme or system preference
-    const savedTheme = localStorage.getItem("theme");
-    const systemDark = window.matchMedia(
-      "(prefers-color-scheme: dark)",
-    ).matches;
+    // Compact links that Turndown may render on multiple lines:
+    // [
+    //   ...label...
+    // ](url)
+    out = out.replace(
+      /\[\s*\n+([\s\S]*?)\n+\s*\]\(([^)\n]+)\)/g,
+      function (_m, label, href) { return '[' + label.trim() + '](' + href.trim() + ')'; }
+    );
 
-    const isDark = savedTheme === "dark" || (!savedTheme && systemDark);
-    this.setTheme(isDark);
+    // Recover headings rendered as:
+    // ##
+    //
+    // Heading text...
+    var lines = out.split('\n');
+    var i, j, match, nextLine, isPlainHeadingText;
+    for (i = 0; i < lines.length; i++) {
+      match = lines[i].match(/^[ \t]{0,3}(#{1,6})[ \t]*$/);
+      if (!match) continue;
 
-    toggleBtn.addEventListener("click", () => {
-      const isCurrentDark =
-        document.documentElement.getAttribute("data-theme") === "dark";
-      this.setTheme(!isCurrentDark);
-    });
-  }
+      j = i + 1;
+      while (j < lines.length && lines[j].trim() === '') j++;
 
-  setTheme(isDark) {
-    const sunIcon = document.querySelector(".sun-icon");
-    const moonIcon = document.querySelector(".moon-icon");
+      if (j < lines.length) {
+        nextLine = lines[j].trim();
+        isPlainHeadingText =
+          nextLine.length > 0 &&
+          !/^(?:#{1,6}\s|>\s|```|`|[-+*]\s|\d+\.\s|\[|!\[)/.test(nextLine);
 
-    if (isDark) {
-      document.documentElement.setAttribute("data-theme", "dark");
-      localStorage.setItem("theme", "dark");
-      sunIcon.style.display = "block";
-      moonIcon.style.display = "none";
-    } else {
-      document.documentElement.removeAttribute("data-theme");
-      localStorage.setItem("theme", "light");
-      sunIcon.style.display = "none";
-      moonIcon.style.display = "block";
-    }
-  }
-
-  initializeEventListeners() {
-    document
-      .getElementById("convert")
-      .addEventListener("click", () => this.convertPage());
-    document
-      .getElementById("copy")
-      .addEventListener("click", () => this.copyToClipboard());
-    document
-      .getElementById("download")
-      .addEventListener("click", () => this.downloadMarkdown());
-    document
-      .getElementById("settings-toggle")
-      .addEventListener("click", () => this.toggleSettingsPanel());
-
-    // Settings change listeners
-    document
-      .getElementById("setting-frontmatter")
-      .addEventListener("change", (e) =>
-        this.saveSetting("frontmatter", e.target.checked),
-      );
-    document
-      .getElementById("setting-heading")
-      .addEventListener("change", (e) =>
-        this.saveSetting("headingStyle", e.target.value),
-      );
-    document
-      .getElementById("setting-bullet")
-      .addEventListener("change", (e) =>
-        this.saveSetting("bulletListMarker", e.target.value),
-      );
-    document
-      .getElementById("setting-code")
-      .addEventListener("change", (e) =>
-        this.saveSetting("codeBlockStyle", e.target.value),
-      );
-  }
-
-  loadSettings() {
-    const stored = localStorage.getItem("markdownSettings");
-    if (stored) {
-      this.settings = { ...this.defaultSettings, ...JSON.parse(stored) };
-    }
-
-    // Update UI
-    document.getElementById("setting-frontmatter").checked =
-      this.settings.frontmatter;
-    document.getElementById("setting-heading").value =
-      this.settings.headingStyle;
-    document.getElementById("setting-bullet").value =
-      this.settings.bulletListMarker;
-    document.getElementById("setting-code").value =
-      this.settings.codeBlockStyle;
-  }
-
-  saveSetting(key, value) {
-    this.settings[key] = value;
-    localStorage.setItem("markdownSettings", JSON.stringify(this.settings));
-  }
-
-  toggleSettingsPanel() {
-    const panel = document.getElementById("settings-panel");
-    const btn = document.getElementById("settings-toggle");
-    const capture = document.getElementById("capture-panel");
-    const isOpen = panel.classList.contains("open");
-
-    if (!isOpen) {
-      // Ouvrir settings : masquer capture d'abord, puis ouvrir
-      capture.style.display = "none";
-      requestAnimationFrame(() => {
-        panel.classList.add("open");
-        btn.classList.add("active");
-      });
-    } else {
-      // Fermer settings : fermer d'abord, puis ré-afficher capture après la transition
-      panel.classList.remove("open");
-      btn.classList.remove("active");
-      panel.addEventListener(
-        "transitionend",
-        () => {
-          capture.style.display = "";
-        },
-        { once: true },
-      );
-    }
-  }
-
-  async initializeAutoCapture() {
-    const session = await chrome.runtime.sendMessage({
-      type: "W2M_GET_SESSION",
-    });
-    document.getElementById("capture-folder").value = session.folder || "";
-    document.getElementById("capture-delay").value = session.delay || 2000;
-    document.getElementById("capture-url-tree").checked =
-      session.urlTree ?? true;
-    document.getElementById("capture-save-assets").checked =
-      session.saveAssets ?? true;
-    this.updateCaptureUI(session.active);
-
-    if (session.captureCount) {
-      this.updateCaptureCount(session.captureCount);
-    }
-    chrome.runtime.onMessage.addListener((message) => {
-      if (message.type === "W2M_CAPTURE_COUNT") {
-        this.updateCaptureCount(message.count);
+        if (isPlainHeadingText) {
+          lines[i] = match[1] + ' ' + nextLine;
+          lines.splice(i + 1, j - i);
+          continue;
+        }
       }
-    });
 
-    document
-      .getElementById("capture-toggle")
-      .addEventListener("click", () => this.toggleCapture());
-
-    document
-      .getElementById("capture-folder")
-      .addEventListener("change", (e) => {
-        chrome.runtime.sendMessage({
-          type: "W2M_UPDATE_SESSION",
-          patch: { folder: e.target.value },
-        });
-      });
-
-    document.getElementById("capture-delay").addEventListener("change", (e) => {
-      chrome.runtime.sendMessage({
-        type: "W2M_UPDATE_SESSION",
-        patch: { delay: Number(e.target.value) },
-      });
-    });
-
-    document
-      .getElementById("capture-url-tree")
-      .addEventListener("change", (e) => {
-        chrome.runtime.sendMessage({
-          type: "W2M_UPDATE_SESSION",
-          patch: { urlTree: e.target.checked },
-        });
-      });
-
-    document
-      .getElementById("capture-save-assets")
-      .addEventListener("change", (e) => {
-        chrome.runtime.sendMessage({
-          type: "W2M_UPDATE_SESSION",
-          patch: { saveAssets: e.target.checked },
-        });
-      });
-  }
-
-  async toggleCapture() {
-    const session = await chrome.runtime.sendMessage({
-      type: "W2M_GET_SESSION",
-    });
-    if (session.active) {
-      await chrome.runtime.sendMessage({ type: "W2M_STOP_SESSION" });
-      this.updateCaptureUI(false);
-      this.showToast("Auto-capture stopped", "info");
-    } else {
-      const folder =
-        document.getElementById("capture-folder").value.trim() || undefined;
-      const delay =
-        Number(document.getElementById("capture-delay").value) || 2000;
-      const urlTree = document.getElementById("capture-url-tree").checked;
-      const saveAssets = document.getElementById("capture-save-assets").checked;
-      const res = await chrome.runtime.sendMessage({
-        type: "W2M_START_SESSION",
-        folder,
-        delay,
-        urlTree,
-        saveAssets,
-      });
-      document.getElementById("capture-folder").value = res.session.folder;
-      this.updateCaptureUI(true);
-      this.showToast("Auto-capture started", "success");
+      // Drop truly empty headings.
+      lines[i] = '';
     }
-  }
 
-  updateCaptureUI(active) {
-    const btn = document.getElementById("capture-toggle");
-    const label = document.getElementById("capture-btn-label");
-    const iconStart = document.getElementById("capture-icon-start");
-    const iconStop = document.getElementById("capture-icon-stop");
-    const status = document.getElementById("capture-status");
-    const folderInput = document.getElementById("capture-folder");
-    const delayInput = document.getElementById("capture-delay");
-    const urlTreeCheck = document.getElementById("capture-url-tree");
-    const saveAssetsCheck = document.getElementById("capture-save-assets");
-
-    const disabled = active;
-    folderInput.disabled = disabled;
-    delayInput.disabled = disabled;
-    urlTreeCheck.disabled = disabled;
-    saveAssetsCheck.disabled = disabled;
-
-    if (active) {
-      btn.classList.add("active");
-      label.textContent = "Stop";
-      iconStart.style.display = "none";
-      iconStop.style.display = "block";
-      status.style.display = "block";
-      status.textContent = "En cours…";
-    } else {
-      btn.classList.remove("active");
-      label.textContent = "Start";
-      iconStart.style.display = "block";
-      iconStop.style.display = "none";
-      status.style.display = "none";
+    // X/Twitter cleanup: remove synthetic page title and promote post title under hero image.
+    var firstContentIndex = -1;
+    for (i = 0; i < lines.length; i++) {
+      if (lines[i].trim() !== '') { firstContentIndex = i; break; }
     }
-  }
-
-  updateCaptureCount(count) {
-    const status = document.getElementById("capture-status");
-    if (status) {
-      status.style.display = "block";
-      status.textContent = `En cours… ${count} page${count > 1 ? "s" : ""} capturée${count > 1 ? "s" : ""}`;
+    if (firstContentIndex !== -1 && lines[firstContentIndex].trim() === '# X') {
+      lines[firstContentIndex] = '';
     }
-  }
+    for (i = 0; i < Math.min(lines.length, 20); i++) {
+      var current = lines[i].trim();
+      if (!/^\[!\[[^\]]*\]\([^)]+\)\]\([^)]+\)$/.test(current)) continue;
 
-  async restoreLastState() {
-    try {
-      const data = await chrome.storage.local.get("lastConversion");
-      // Logic to restore state if desired
-    } catch (e) {
-      console.log("Error reading storage", e);
+      j = i + 1;
+      while (j < lines.length && lines[j].trim() === '') j++;
+      if (j >= lines.length) break;
+
+      var candidate = lines[j].trim();
+      var canPromote =
+        candidate.length >= 16 &&
+        !/^(?:#{1,6}\s|>\s|```|`|[-+*]\s|\d+\.\s|\[|!\[)/.test(candidate);
+
+      if (canPromote) {
+        lines[j] = '## ' + candidate;
+      }
+      break;
     }
-  }
 
-  async convertPage() {
-    try {
-      this.setLoading(true);
+    // Remove social/UI noise: orphan metadata blocks.
+    var isOrphanNoise = function (line) {
+      var trimmed = line.trim();
+      if (trimmed.length === 0) return false;
+      if (trimmed.length >= 30) return false;
+      if (/^(?:#{1,6}\s|>\s|```|[-+*]\s|\d+\.\s|\[|!\[|---|\*{3}|_{3})/.test(trimmed)) return false;
+      return true;
+    };
+    var k = 0;
+    var end, noiseCount, m;
+    while (k < lines.length) {
+      if (!isOrphanNoise(lines[k])) {
+        k++;
+        continue;
+      }
+      end = k;
+      noiseCount = 0;
+      while (end < lines.length) {
+        if (isOrphanNoise(lines[end])) {
+          noiseCount++;
+          end++;
+        } else if (lines[end].trim() === '') {
+          end++;
+        } else {
+          break;
+        }
+      }
+      if (noiseCount >= 4) {
+        for (m = k; m < end; m++) lines[m] = '';
+      }
+      k = end;
+    }
 
-      const [tab] = await chrome.tabs.query({
-        active: true,
-        currentWindow: true,
-      });
-      if (!tab || !tab.id) throw new Error("No active tab found");
+    out = lines.join('\n');
+
+    // Normalize extra spacing after cleanup.
+    out = out.replace(/\n{3,}/g, '\n\n').trim();
+    return out;
+  };
+
+  MarkdownConverter.prototype.convert = function (callback) {
+    var self = this;
+    chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
+      var tab = tabs && tabs[0];
+      if (!tab || !tab.id) {
+        callback(new Error('No active tab found'), null);
+        return;
+      }
 
       // Prevent scripting on restricted pages
       if (
-        tab.url.startsWith("chrome://") ||
-        tab.url.startsWith("chrome-extension://") ||
-        tab.url.startsWith("edge://") ||
-        tab.url.startsWith("about:") ||
-        tab.url.includes("chrome.google.com/webstore")
+        tab.url.indexOf('chrome://') === 0 ||
+        tab.url.indexOf('chrome-extension://') === 0 ||
+        tab.url.indexOf('edge://') === 0 ||
+        tab.url.indexOf('about:') === 0 ||
+        tab.url.indexOf('chrome.google.com/webstore') !== -1
       ) {
-        throw new Error("Cannot convert system pages or Web Store");
+        callback(new Error('Cannot convert system pages or Web Store'), null);
+        return;
       }
 
-      const results = await chrome.scripting.executeScript({
+      chrome.scripting.executeScript({
         target: { tabId: tab.id },
-        func: () => {
+        func: function () {
           try {
             if (!document || !document.body) {
-              throw new Error("Document body not found");
+              throw new Error('Document body not found');
             }
 
-            const getIframeContent = (iframe) => {
+            var getIframeContent = function (iframe) {
               try {
-                const iframeDoc =
-                  iframe.contentDocument || iframe.contentWindow?.document;
-                if (!iframeDoc || !iframeDoc.body) return "";
-                const iframeClone = iframeDoc.body.cloneNode(true);
-                iframeClone
-                  .querySelectorAll(
-                    "script, style, nav, footer, aside, .ads, .comments",
-                  )
-                  .forEach((el) => el.remove());
-                return `<div class="iframe-content">${iframeClone.innerHTML}</div>`;
+                var iframeDoc = iframe.contentDocument || (iframe.contentWindow ? iframe.contentWindow.document : null);
+                if (!iframeDoc || !iframeDoc.body) return '';
+                var iframeClone = iframeDoc.body.cloneNode(true);
+                var unwantedIframe = iframeClone.querySelectorAll('script, style, nav, footer, aside, .ads, .comments');
+                for (var u = 0; u < unwantedIframe.length; u++) unwantedIframe[u].remove();
+                return '<div class="iframe-content">' + iframeClone.innerHTML + '</div>';
               } catch (e) {
-                return "";
+                return '';
               }
             };
 
-            const bodyClone = document.body.cloneNode(true);
+            // Collect rendered dimensions of small images for post-processing
+            var smallImgSizes = {};
+            var allImgs = document.querySelectorAll('img');
+            for (var si = 0; si < allImgs.length; si++) {
+              var rect = allImgs[si].getBoundingClientRect();
+              var imgW = Math.round(rect.width);
+              var imgSrc = allImgs[si].src;
+              if (imgW > 0 && imgW < 200 && imgSrc) {
+                smallImgSizes[imgSrc] = imgW;
+              }
+            }
 
-            const iframes = document.querySelectorAll("iframe");
-            let iframeContents = [];
-            iframes.forEach((iframe) => {
-              const content = getIframeContent(iframe);
-              if (content) iframeContents.push(content);
-            });
+            var bodyClone = document.body.cloneNode(true);
 
-            const unwanted = bodyClone.querySelectorAll(
-              'script, style, nav, footer, aside, .ads, .comments, [role="complementary"], .cookie-banner, .popup, .overlay, .modal',
+            var iframes = document.querySelectorAll('iframe');
+            var iframeContents = [];
+            for (var fi = 0; fi < iframes.length; fi++) {
+              var fc = getIframeContent(iframes[fi]);
+              if (fc) iframeContents.push(fc);
+            }
+
+            var unwanted = bodyClone.querySelectorAll(
+              'script, style, nav, footer, aside, .ads, .comments, [role="complementary"], .cookie-banner, .popup, .overlay, .modal'
             );
-            unwanted.forEach((el) => el.remove());
+            for (var ui = 0; ui < unwanted.length; ui++) unwanted[ui].remove();
 
-            const mainSelectors = [
-              "main",
-              "article",
-              ".content",
-              ".post",
-              ".entry",
-              '[role="main"]',
-              "#content",
-              ".main",
-            ];
-            let mainContent = null;
+            var mainSelectors = ['main', 'article', '.content', '.post', '.entry', '[role="main"]', '#content', '.main'];
+            var mainContent = null;
 
-            for (const selector of mainSelectors) {
-              const found = bodyClone.querySelector(selector);
+            for (var ms = 0; ms < mainSelectors.length; ms++) {
+              var found = bodyClone.querySelector(mainSelectors[ms]);
               if (found && found.innerHTML.trim().length > 100) {
                 mainContent = found;
                 break;
               }
             }
 
-            let finalContent = mainContent
-              ? mainContent.innerHTML
-              : bodyClone.innerHTML;
+            var finalContent = mainContent ? mainContent.innerHTML : bodyClone.innerHTML;
 
             if (iframeContents.length > 0) {
-              finalContent +=
-                "<h2>Embedded Content</h2>" + iframeContents.join("<hr>");
+              finalContent += '<h2>Embedded Content</h2>' + iframeContents.join('<hr>');
             }
 
             return {
-              title: document.title || "Untitled Page",
-              url: document.location.href, // Added URL capture
+              title: document.title || 'Untitled Page',
+              url: document.location.href,
               content: finalContent,
-              success: true,
+              smallImgSizes: smallImgSizes,
+              success: true
             };
           } catch (error) {
             return { success: false, error: error.message };
           }
-        },
+        }
+      }, function (results) {
+        if (chrome.runtime.lastError) {
+          callback(new Error(chrome.runtime.lastError.message), null);
+          return;
+        }
+        if (!results || !results[0] || !results[0].result) {
+          callback(new Error('Failed to get page content'), null);
+          return;
+        }
+
+        var result = results[0].result;
+        if (!result.success) {
+          callback(new Error(result.error || 'Failed to extract content'), null);
+          return;
+        }
+
+        var title = result.title;
+        var url = result.url;
+        var content = result.content;
+        var smallImgSizes = result.smallImgSizes;
+
+        var wrappedContent = '<div class="markdown-content"><h1>' + title + '</h1>' + content + '</div>';
+
+        // Initialize Turndown with current settings
+        var turndownService = self.createTurndownService();
+        var markdown = turndownService.turndown(wrappedContent);
+
+        markdown = self.cleanupMarkdown(markdown);
+
+        // Constrain small images to their rendered CSS size
+        if (smallImgSizes && Object.keys(smallImgSizes).length > 0) {
+          markdown = markdown.replace(
+            /!\[([^\]]*)\]\(([^)\s]+)\)/g,
+            function (match, alt, src) {
+              var w = smallImgSizes[src];
+              if (w) {
+                return '<img src="' + src + '" alt="' + alt + '" style="max-width:' + w + 'px; height:auto;">';
+              }
+              return match;
+            }
+          );
+        }
+
+        // Add Frontmatter if enabled
+        if (self.settings.frontmatter) {
+          var date = new Date().toISOString().split('T')[0];
+          var frontmatter = '---\ntitle: "' + title.replace(/"/g, '\\"') + '"\nurl: "' + url + '"\ndate: ' + date + '\n---\n\n';
+          markdown = frontmatter + markdown;
+        }
+
+        callback(null, { markdown: markdown, url: url, title: title });
+
+        // Persist last conversion
+        chrome.storage.local.set({
+          lastConversion: {
+            url: url,
+            markdown: markdown,
+            timestamp: Date.now()
+          }
+        });
       });
+    });
+  };
 
-      if (!results || !results[0] || !results[0].result) {
-        throw new Error("Failed to get page content");
+  // =============================================
+  // SVG HELPERS (no innerHTML)
+  // =============================================
+
+  function createSvgIcon(type) {
+    var ns = 'http://www.w3.org/2000/svg';
+    var svg = document.createElementNS(ns, 'svg');
+    svg.setAttribute('width', '48');
+    svg.setAttribute('height', '48');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('fill', 'none');
+    svg.setAttribute('stroke', 'currentColor');
+    svg.setAttribute('stroke-width', '1.5');
+    svg.setAttribute('stroke-linecap', 'round');
+    svg.setAttribute('stroke-linejoin', 'round');
+
+    if (type === 'document') {
+      var p1 = document.createElementNS(ns, 'path');
+      p1.setAttribute('d', 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z');
+      var p2 = document.createElementNS(ns, 'polyline');
+      p2.setAttribute('points', '14 2 14 8 20 8');
+      var l1 = document.createElementNS(ns, 'line');
+      l1.setAttribute('x1', '16'); l1.setAttribute('y1', '13'); l1.setAttribute('x2', '8'); l1.setAttribute('y2', '13');
+      var l2 = document.createElementNS(ns, 'line');
+      l2.setAttribute('x1', '16'); l2.setAttribute('y1', '17'); l2.setAttribute('x2', '8'); l2.setAttribute('y2', '17');
+      svg.appendChild(p1); svg.appendChild(p2); svg.appendChild(l1); svg.appendChild(l2);
+    } else if (type === 'alert') {
+      var p = document.createElementNS(ns, 'path');
+      p.setAttribute('d', 'M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z');
+      var line = document.createElementNS(ns, 'line');
+      line.setAttribute('x1', '12'); line.setAttribute('y1', '9'); line.setAttribute('x2', '12'); line.setAttribute('y2', '13');
+      var line2 = document.createElementNS(ns, 'line');
+      line2.setAttribute('x1', '12'); line2.setAttribute('y1', '17'); line2.setAttribute('x2', '12.01'); line2.setAttribute('y2', '17');
+      svg.appendChild(p); svg.appendChild(line); svg.appendChild(line2);
+    }
+    return svg;
+  }
+
+  // =============================================
+  // VIEWS
+  // =============================================
+
+  function createHomeView(data) {
+    return {
+      render: function () {
+        var container = el('div', { className: 'view-home' });
+        var icon = el('div', { className: 'view-home__icon' });
+        icon.appendChild(createSvgIcon('document'));
+        container.appendChild(icon);
+        container.appendChild(el('h1', { className: 'heading-lg view-home__title', textContent: t('home.title') }));
+        var actions = el('div', { className: 'view-home__actions' });
+        actions.appendChild(el('button', { className: 'btn btn-primary btn-full', id: 'btn-convert', textContent: t('home.cta'), onClick: function () { app.handleConvert(); } }));
+        actions.appendChild(el('button', { className: 'btn btn-secondary btn-full', textContent: t('home.crawl'), onClick: function () { state.navigate(STATES.PRECRAWL, { url: app.currentUrl }); } }));
+        container.appendChild(actions);
+        if (data && data.lastConversion) {
+          var hist = el('div', { className: 'view-home__history text-muted' }, t('home.history') + ' ' + data.lastConversion.url + ' — ' + formatTimeAgo(data.lastConversion.timestamp));
+          container.appendChild(hist);
+        }
+        return container;
+      },
+      init: function () {
+        document.getElementById('header-title').textContent = t('app.title');
+        document.getElementById('btn-back').classList.add('hidden');
       }
+    };
+  }
 
-      const { success, content, title, url, error } = results[0].result;
-
-      if (!success) throw new Error(error || "Failed to extract content");
-
-      const wrappedContent = `
-                <div class="markdown-content">
-                    <h1>${title}</h1>
-                    ${content}
-                </div>
-            `;
-
-      // Initialize Turndown with current settings
-      const turndownService = this.createTurndownService();
-      let markdown = turndownService.turndown(wrappedContent);
-
-      // Post-processing: Collapse multiple newlines (3+) into max 2
-      markdown = markdown.replace(/\n{3,}/g, "\n\n").trim();
-
-      // Add Frontmatter if enabled
-      if (this.settings.frontmatter) {
-        const date = new Date().toISOString().split("T")[0];
-        const frontmatter = `---
-title: "${title.replace(/"/g, '\\"')}"
-url: "${url}"
-date: ${date}
----
-
-`;
-        markdown = frontmatter + markdown;
+  function createConvertingView() {
+    return {
+      render: function () {
+        var container = el('div', { className: 'view-home' });
+        var spinner = el('div', { className: 'spinner', style: 'margin: var(--space-6) auto' });
+        container.appendChild(spinner);
+        container.appendChild(el('p', { className: 'text-muted text-center', textContent: t('toast.converting') }));
+        return container;
+      },
+      init: function () {
+        document.getElementById('btn-back').classList.add('hidden');
       }
+    };
+  }
 
-      const output = document.getElementById("output");
-      output.value = markdown;
+  function createResultView(data) {
+    return {
+      render: function () {
+        var md = data.markdown || '';
+        var size = formatSize(new Blob([md]).size);
+        var words = md.split(/\s+/).filter(Boolean).length;
+        var container = el('div', { className: 'view-result' });
+        container.appendChild(el('div', { className: 'view-result__status' },
+          el('span', { className: 'text-success', textContent: '\u2713' }),
+          el('span', { className: 'heading-sm', textContent: t('result.success') })
+        ));
+        container.appendChild(el('div', { className: 'view-result__url', textContent: data.url || '' }));
+        container.appendChild(el('pre', { className: 'view-result__preview text-mono', textContent: md }));
+        var actions = el('div', { className: 'view-result__actions' });
+        actions.appendChild(el('button', { className: 'btn btn-secondary', textContent: t('result.copy'), onClick: function () { app.handleCopy(); } }));
+        actions.appendChild(el('button', { className: 'btn btn-secondary', textContent: t('result.download'), onClick: function () { app.handleDownload(); } }));
+        container.appendChild(actions);
+        container.appendChild(el('button', { className: 'btn btn-secondary btn-full mt-3', textContent: t('result.reconvert'), onClick: function () { app.handleConvert(); } }));
+        container.appendChild(el('div', { className: 'view-result__meta text-muted mt-3', textContent: t('result.meta', { size: size, words: words }) }));
+        return container;
+      },
+      init: function () {
+        document.getElementById('header-title').textContent = t('result.title');
+        document.getElementById('btn-back').classList.remove('hidden');
+      }
+    };
+  }
 
-      this.enableActions(true);
-      this.showToast("Conversion successful!", "success");
+  function createErrorView(data) {
+    var type = data.errorType || 'convert';
+    return {
+      render: function () {
+        var container = el('div', { className: 'view-error' });
+        var icon = el('div', { className: 'view-error__icon' });
+        icon.appendChild(createSvgIcon('alert'));
+        container.appendChild(icon);
+        container.appendChild(el('h1', { className: 'heading-lg view-error__title', textContent: t('error.' + type + '.title') }));
+        container.appendChild(el('p', { className: 'view-error__message', textContent: t('error.' + type + '.message') }));
+        container.appendChild(el('button', { className: 'btn btn-primary btn-full', textContent: t('error.retry'), onClick: function () { state.navigate(STATES.IDLE, { lastConversion: app.lastConversion }); } }));
+        var hint = t('error.' + type + '.hint');
+        if (hint && hint !== 'error.' + type + '.hint') {
+          container.appendChild(el('p', { className: 'view-error__hint text-muted', textContent: hint }));
+        }
+        return container;
+      },
+      init: function () {
+        document.getElementById('header-title').textContent = t('error.title');
+        document.getElementById('btn-back').classList.remove('hidden');
+      }
+    };
+  }
 
-      await chrome.storage.local.set({
-        lastConversion: {
-          url: tab.url,
-          markdown: markdown,
-          timestamp: new Date().toISOString(),
-        },
+  function createPreCrawlView(data) {
+    var folderInput, urlTreeCb, assetsCb;
+    var summaryVals = null;
+    var storageListener = null;
+
+    function summaryRow(labelText, valueEl) {
+      return el('div', { className: 'precrawl-settings-summary__row' },
+        el('span', { className: 'precrawl-settings-summary__label', textContent: labelText }),
+        valueEl
+      );
+    }
+
+    function fillSettingsSummary(cap, cr) {
+      if (!summaryVals) return;
+      summaryVals.delay.textContent = precrawlDelayLabel(cap.delay);
+      summaryVals.depth.textContent = precrawlDepthLabel(cr.depth);
+      summaryVals.concurrency.textContent = String(cr.concurrency);
+      summaryVals.maxErrors.textContent = precrawlMaxBlocksLabel(cr.maxBlocks);
+    }
+
+    function applyPrecrawlFromStorage(data) {
+      var cap = Object.assign({}, DEFAULT_CAPTURE_SETTINGS, data.captureSettings || {});
+      var cr = Object.assign({}, DEFAULT_CRAWL_SETTINGS, data.crawlSettings || {});
+      if (urlTreeCb) urlTreeCb.checked = !!cap.urlTree;
+      if (assetsCb) assetsCb.checked = !!cap.saveAssets;
+      fillSettingsSummary(cap, cr);
+    }
+
+    function persistPrecrawlCheckboxes() {
+      chrome.storage.local.get(['captureSettings'], function (store) {
+        var cap = Object.assign({}, DEFAULT_CAPTURE_SETTINGS, store.captureSettings || {});
+        cap.urlTree = !!(urlTreeCb && urlTreeCb.checked);
+        cap.saveAssets = !!(assetsCb && assetsCb.checked);
+        chrome.storage.local.set({ captureSettings: cap });
+        chrome.runtime.sendMessage({
+          type: 'W2M_UPDATE_SESSION',
+          patch: { urlTree: cap.urlTree, saveAssets: cap.saveAssets }
+        }).catch(function () { });
       });
-    } catch (error) {
-      console.error("Conversion error:", error);
-      this.showToast(error.message, "error");
-      this.enableActions(false);
-      document.getElementById("output").value = "";
-    } finally {
-      this.setLoading(false);
     }
+
+    return {
+      render: function () {
+        var container = el('div', { className: 'view-precrawl' });
+        // URL
+        container.appendChild(el('div', { className: 'form-group' },
+          el('label', { className: 'form-label text-muted', textContent: t('precrawl.start') }),
+          el('div', { className: 'heading-sm', textContent: data.url || '' })
+        ));
+        // Folder
+        var host = '';
+        try { host = new URL(data.url || '').hostname.replace(/[^a-z0-9]/gi, '-'); } catch (e) { /* ignore */ }
+        var defaultFolder = 'w2m-' + host.substring(0, 20) + '-' + new Date().toISOString().slice(0, 10);
+        folderInput = el('input', { className: 'form-input', type: 'text', value: defaultFolder });
+        container.appendChild(el('div', { className: 'form-group' },
+          el('label', { className: 'form-label', textContent: t('precrawl.folder') }),
+          folderInput
+        ));
+        // Checkboxes
+        var cbGroup = el('div', { className: 'form-group' });
+        urlTreeCb = el('input', { type: 'checkbox', className: 'form-checkbox', checked: '' });
+        var utLabel = el('label', { className: 'form-checkbox-label' });
+        utLabel.appendChild(urlTreeCb);
+        utLabel.appendChild(document.createTextNode(' ' + t('precrawl.organize')));
+        cbGroup.appendChild(utLabel);
+        assetsCb = el('input', { type: 'checkbox', className: 'form-checkbox', checked: '' });
+        var asLabel = el('label', { className: 'form-checkbox-label' });
+        asLabel.appendChild(assetsCb);
+        asLabel.appendChild(document.createTextNode(' ' + t('precrawl.assets')));
+        cbGroup.appendChild(asLabel);
+        container.appendChild(cbGroup);
+
+        summaryVals = {
+          delay: el('span', { className: 'precrawl-settings-summary__value' }),
+          depth: el('span', { className: 'precrawl-settings-summary__value' }),
+          concurrency: el('span', { className: 'precrawl-settings-summary__value' }),
+          maxErrors: el('span', { className: 'precrawl-settings-summary__value' })
+        };
+        var summary = el('div', { className: 'precrawl-settings-summary' },
+          el('div', { className: 'precrawl-settings-summary__title', textContent: t('precrawl.activeSettings') }),
+          summaryRow(t('settings.delay'), summaryVals.delay),
+          summaryRow(t('settings.depth'), summaryVals.depth),
+          summaryRow(t('settings.concurrency'), summaryVals.concurrency),
+          summaryRow(t('settings.maxerrors'), summaryVals.maxErrors),
+          el('p', { className: 'precrawl-settings-summary__hint text-muted', textContent: t('precrawl.settingsFootnote') })
+        );
+        container.appendChild(summary);
+
+        // CTA
+        container.appendChild(el('div', { className: 'mt-5' },
+          el('button', {
+            className: 'btn btn-primary btn-full', textContent: t('precrawl.cta'), onClick: function () {
+              app.handleStartCrawl({
+                folder: folderInput.value,
+                urlTree: urlTreeCb.checked,
+                saveAssets: assetsCb.checked
+              });
+            }
+          })
+        ));
+        return container;
+      },
+      init: function () {
+        document.getElementById('header-title').textContent = t('precrawl.title');
+        document.getElementById('btn-back').classList.remove('hidden');
+        var cap0 = Object.assign({}, DEFAULT_CAPTURE_SETTINGS);
+        var cr0 = Object.assign({}, DEFAULT_CRAWL_SETTINGS);
+        fillSettingsSummary(cap0, cr0);
+        chrome.storage.local.get(['captureSettings', 'crawlSettings'], function (data) {
+          applyPrecrawlFromStorage(data);
+        });
+        if (urlTreeCb) urlTreeCb.addEventListener('change', persistPrecrawlCheckboxes);
+        if (assetsCb) assetsCb.addEventListener('change', persistPrecrawlCheckboxes);
+        storageListener = function (changes, area) {
+          if (area !== 'local') return;
+          if (!changes.captureSettings && !changes.crawlSettings) return;
+          chrome.storage.local.get(['captureSettings', 'crawlSettings'], applyPrecrawlFromStorage);
+        };
+        chrome.storage.onChanged.addListener(storageListener);
+      },
+      cleanup: function () {
+        if (storageListener) {
+          chrome.storage.onChanged.removeListener(storageListener);
+          storageListener = null;
+        }
+      }
+    };
   }
 
-  async copyToClipboard() {
-    const output = document.getElementById("output");
-    if (!output.value) return;
+  function createProgressView(data) {
+    var progressFill, statCaptured, statQueued, statErrors, speedEl, elapsedEl, activityList;
+    var startTime = Date.now();
 
-    try {
-      await navigator.clipboard.writeText(output.value);
-      this.showToast("Copied to clipboard!", "success");
-    } catch (error) {
-      this.showToast("Failed to copy", "error");
-    }
+    return {
+      render: function () {
+        var container = el('div', { className: 'view-progress' });
+        container.appendChild(el('div', { className: 'heading-sm mb-3', textContent: data.url || '' }));
+        var bar = el('div', { className: 'progress-bar' });
+        progressFill = el('div', { className: 'progress-fill', style: 'width:0%' });
+        bar.appendChild(progressFill);
+        container.appendChild(bar);
+
+        var stats = el('div', { className: 'stat-grid mt-3' });
+        statCaptured = el('div', { className: 'stat-value', textContent: '0' });
+        stats.appendChild(el('div', { className: 'stat-card stat-card--success' }, statCaptured, el('div', { className: 'stat-label', textContent: t('progress.done') })));
+        statQueued = el('div', { className: 'stat-value', textContent: '0' });
+        stats.appendChild(el('div', { className: 'stat-card stat-card--info' }, statQueued, el('div', { className: 'stat-label', textContent: t('progress.waiting') })));
+        statErrors = el('div', { className: 'stat-value', textContent: '0' });
+        stats.appendChild(el('div', { className: 'stat-card stat-card--error' }, statErrors, el('div', { className: 'stat-label', textContent: t('progress.errors') })));
+        container.appendChild(stats);
+
+        speedEl = el('div', { className: 'text-muted mt-3', textContent: t('progress.speed', { speed: 0 }) });
+        elapsedEl = el('div', { className: 'text-muted', textContent: t('progress.elapsed', { time: '0s' }) });
+        container.appendChild(speedEl);
+        container.appendChild(elapsedEl);
+
+        container.appendChild(el('div', { className: 'section-label mt-4', textContent: t('progress.recent') }));
+        activityList = el('div', { className: 'activity-list' });
+        container.appendChild(activityList);
+
+        var footer = el('div', { className: 'mt-4', style: 'display:flex;gap:var(--space-3)' });
+        footer.appendChild(el('button', { className: 'btn btn-secondary', id: 'btn-pause', textContent: t('progress.pause'), style: 'flex:1', onClick: function () { app.handlePause(); } }));
+        footer.appendChild(el('button', { className: 'btn btn-danger', textContent: t('progress.stop'), style: 'flex:1', onClick: function () { app.handleStop(); } }));
+        container.appendChild(footer);
+
+        container.appendChild(el('div', { className: 'text-center mt-3' },
+          el('a', { href: '#', className: 'text-secondary', textContent: t('progress.detail'), onClick: function (e) { e.preventDefault(); app.openDashboard(); } })
+        ));
+        return container;
+      },
+      init: function () {
+        document.getElementById('header-title').textContent = t('progress.title');
+        document.getElementById('btn-back').classList.add('hidden');
+        startTime = Date.now();
+      },
+      update: function (d) {
+        if (statCaptured) statCaptured.textContent = d.captured || 0;
+        if (statQueued) statQueued.textContent = d.queued || 0;
+        if (statErrors) statErrors.textContent = d.blocked || 0;
+        if (progressFill) {
+          var total = (d.captured || 0) + (d.queued || 0);
+          progressFill.style.width = (total > 0 ? Math.round((d.captured || 0) / total * 100) : 0) + '%';
+        }
+        if (speedEl && d.speed !== undefined) speedEl.textContent = t('progress.speed', { speed: d.speed });
+        if (elapsedEl) elapsedEl.textContent = t('progress.elapsed', { time: formatDuration(Date.now() - startTime) });
+        if (d.lastPage && activityList) {
+          var iconChar = d.lastPage.success ? '\u2713' : '\u2717';
+          var cls = d.lastPage.success ? 'activity-icon--success' : 'activity-icon--error';
+          var item = el('div', { className: 'activity-item' },
+            el('span', { className: 'activity-time', textContent: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }),
+            el('span', { className: 'activity-icon ' + cls, textContent: iconChar }),
+            el('span', { className: 'activity-url', textContent: d.lastPage.url })
+          );
+          if (activityList.firstChild) activityList.insertBefore(item, activityList.firstChild);
+          else activityList.appendChild(item);
+          while (activityList.children.length > 20) activityList.removeChild(activityList.lastChild);
+        }
+        // Update pause button text
+        var pauseBtn = document.getElementById('btn-pause');
+        if (pauseBtn) {
+          var isPaused = state.getState() === STATES.PAUSED;
+          pauseBtn.textContent = isPaused ? t('progress.resume') : t('progress.pause');
+        }
+      },
+      cleanup: function () { }
+    };
   }
 
-  downloadMarkdown() {
-    const output = document.getElementById("output");
-    if (!output.value) return;
+  function createCrawlResultView(data) {
+    return {
+      render: function () {
+        var hasErr = (data.blocked || 0) > 0;
+        var container = el('div', { className: 'view-crawl-result' });
+        container.appendChild(el('div', { className: 'view-crawl-result__summary' },
+          el('div', { className: 'view-result__status' },
+            el('span', { className: hasErr ? 'text-warning' : 'text-success', textContent: '\u2713' }),
+            el('span', { className: 'heading-lg', textContent: t('crawlresult.pages', { count: data.captured || 0 }) })
+          ),
+          el('div', { className: 'text-muted', textContent: (hasErr ? t('crawlresult.errors', { count: data.blocked }) + ' \u00B7 ' : '') + t('crawlresult.images', { count: data.images || 0 }) })
+        ));
+        var stats = el('div', { className: 'view-crawl-result__stats mt-3' });
+        if (data.folder) stats.appendChild(el('div', { textContent: t('crawlresult.folder', { folder: data.folder }) }));
+        if (data.duration) stats.appendChild(el('div', { textContent: t('crawlresult.duration', { time: formatDuration(data.duration) }) }));
+        if (data.totalSize) stats.appendChild(el('div', { textContent: t('crawlresult.size', { size: formatSize(data.totalSize) }) }));
+        container.appendChild(stats);
 
-    try {
-      const blob = new Blob([output.value], { type: "text/markdown" });
-      const url = URL.createObjectURL(blob);
-      const timestamp = new Date()
-        .toISOString()
-        .slice(0, 19)
-        .replace(/[:T]/g, "-");
+        if (hasErr && data.blockedUrls) {
+          container.appendChild(el('div', { className: 'section-label', textContent: t('crawlresult.errors.section', { count: data.blocked }) }));
+          var errList = el('div', { className: 'view-crawl-result__errors' });
+          (data.blockedUrls || []).forEach(function (err) {
+            errList.appendChild(el('div', { className: 'error-item' },
+              el('div', { className: 'error-item__url', textContent: err.url }),
+              el('div', { className: 'error-item__reason text-muted', textContent: err.reason || '' }),
+              el('div', { className: 'error-item__actions' },
+                el('button', { className: 'btn btn-sm', textContent: t('crawlresult.retry'), onClick: function () { app.handleRetry(err.url); } })
+              )
+            ));
+          });
+          container.appendChild(errList);
+        }
 
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `page-${timestamp}.md`;
-      a.click();
-
-      URL.revokeObjectURL(url);
-      this.showToast("Download started", "success");
-    } catch (error) {
-      this.showToast("Download failed", "error");
-    }
+        container.appendChild(el('div', { className: 'mt-4' },
+          el('button', { className: 'btn btn-primary btn-full', textContent: t('crawlresult.download'), onClick: function () { app.showToast(t('toast.downloaded'), 'success'); } })
+        ));
+        container.appendChild(el('div', { className: 'mt-3' },
+          el('button', { className: 'btn btn-secondary btn-full', textContent: t('crawlresult.new'), onClick: function () { state.navigate(STATES.IDLE); } })
+        ));
+        return container;
+      },
+      init: function () {
+        document.getElementById('header-title').textContent = t('crawlresult.title');
+        document.getElementById('btn-back').classList.remove('hidden');
+      }
+    };
   }
 
-  setLoading(isLoading) {
-    const btn = document.getElementById("convert");
-    if (isLoading) {
-      btn.disabled = true;
-      btn.innerHTML = `<svg class="animate-spin" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg> Converting...`;
+  // =============================================
+  // APP CONTROLLER
+  // =============================================
+  var state = new AppState();
+  var app;
+
+  function App() {
+    this.converter = new MarkdownConverter();
+    this.currentUrl = '';
+    this.currentTitle = '';
+    this.currentMarkdown = '';
+    this.crawlPort = null;
+    this.lastConversion = null;
+    this.toastTimeout = null;
+    this.isDark = false;
+    this.elapsedInterval = null;
+  }
+
+  App.prototype.init = function () {
+    var self = this;
+
+    // Initialize locale
+    W2M.i18n.initLocale().then(function () {
+      self._setupViews();
+      self._setupHeader();
+      self._setupTheme();
+      self._getCurrentTab(function () {
+        self._restoreLastState();
+        self.converter.loadSettings(function () {
+          self._checkExistingSession();
+        });
+      });
+    }).catch(function () {
+      // Fallback if initLocale fails
+      self._setupViews();
+      self._setupHeader();
+      self._setupTheme();
+      self._getCurrentTab(function () {
+        self._restoreLastState();
+        self.converter.loadSettings(function () {
+          self._checkExistingSession();
+        });
+      });
+    });
+  };
+
+  App.prototype._setupViews = function () {
+    state.setContainer(document.getElementById('app-body'));
+
+    state.registerView(STATES.IDLE, function (data) { return createHomeView(data); });
+    state.registerView(STATES.CONVERTING, function (data) { return createConvertingView(data); });
+    state.registerView(STATES.SUCCESS, function (data) { return createResultView(data); });
+    state.registerView(STATES.ERROR, function (data) { return createErrorView(data); });
+    state.registerView(STATES.UNAVAILABLE, function (data) { return createErrorView(Object.assign({ errorType: 'unavailable' }, data)); });
+    state.registerView(STATES.PRECRAWL, function (data) { return createPreCrawlView(data); });
+    state.registerView(STATES.RUNNING, function (data) { return createProgressView(data); });
+    state.registerView(STATES.PAUSED, function (data) { return createProgressView(data); });
+    state.registerView(STATES.CRAWL_SUCCESS, function (data) { return createCrawlResultView(data); });
+    state.registerView(STATES.CRAWL_PARTIAL, function (data) { return createCrawlResultView(data); });
+
+    state.navigate(STATES.IDLE, {});
+  };
+
+  App.prototype._setupHeader = function () {
+    var self = this;
+
+    document.getElementById('btn-back').addEventListener('click', function () {
+      var current = state.getState();
+      if (current === STATES.SUCCESS || current === STATES.ERROR || current === STATES.UNAVAILABLE) {
+        state.navigate(STATES.IDLE, { lastConversion: self.lastConversion });
+      } else if (current === STATES.PRECRAWL) {
+        state.navigate(STATES.IDLE, { lastConversion: self.lastConversion });
+      } else if (current === STATES.CRAWL_SUCCESS || current === STATES.CRAWL_PARTIAL) {
+        state.navigate(STATES.IDLE, { lastConversion: self.lastConversion });
+      }
+    });
+
+    document.getElementById('btn-settings').addEventListener('click', function () {
+      // Open side panel directly (needs user gesture context)
+      chrome.windows.getCurrent(function (win) {
+        chrome.sidePanel.open({ windowId: win.id }, function () {
+          // Tell dashboard to show settings view
+          setTimeout(function () {
+            chrome.runtime.sendMessage({ type: 'W2M_SHOW_SETTINGS' }).catch(function () { });
+          }, 300);
+        });
+      });
+    });
+
+    // Listen for capture count updates
+    chrome.runtime.onMessage.addListener(function (message) {
+      if (message.type === 'W2M_CAPTURE_COUNT') {
+        var current = state.getState();
+        if (current === STATES.RUNNING || current === STATES.PAUSED) {
+          state.updateData({ captured: message.count });
+        }
+      }
+    });
+  };
+
+  App.prototype._setupTheme = function () {
+    var self = this;
+    var themeBtn = document.getElementById('btn-theme');
+    var iconTheme = document.getElementById('icon-theme');
+
+    // Load saved theme from chrome.storage.local
+    chrome.storage.local.get('theme', function (result) {
+      var systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      var isDark = result.theme === 'dark' || (!result.theme && systemDark);
+      self._applyTheme(isDark);
+    });
+
+    themeBtn.addEventListener('click', function () {
+      self.isDark = !self.isDark;
+      self._applyTheme(self.isDark);
+      chrome.storage.local.set({ theme: self.isDark ? 'dark' : 'light' });
+    });
+
+    // Sync theme when changed from another page (e.g. dashboard)
+    chrome.storage.onChanged.addListener(function (changes, area) {
+      if (area === 'local' && changes.theme) {
+        self._applyTheme(changes.theme.newValue === 'dark');
+      }
+    });
+  };
+
+  App.prototype._applyTheme = function (isDark) {
+    this.isDark = isDark;
+    if (isDark) {
+      document.documentElement.setAttribute('data-theme', 'dark');
     } else {
-      btn.disabled = false;
-      btn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline></svg> Convert Page to Markdown`;
+      document.documentElement.removeAttribute('data-theme');
     }
-  }
+    // The theme icon in the header changes based on data-theme via CSS
+    // but we keep a sun icon always; the button toggles the theme
+  };
 
-  enableActions(enabled) {
-    document.getElementById("copy").disabled = !enabled;
-    document.getElementById("download").disabled = !enabled;
-  }
+  App.prototype._getCurrentTab = function (callback) {
+    var self = this;
+    chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
+      var tab = tabs && tabs[0];
+      if (tab) {
+        self.currentUrl = tab.url || '';
+        self.currentTitle = tab.title || '';
+      }
+      callback();
+    });
+  };
 
-  showToast(message, type = "info") {
-    const toast = document.getElementById("toast");
-    toast.textContent = message;
-    toast.className = `toast show ${type}`;
+  App.prototype._restoreLastState = function () {
+    var self = this;
+    chrome.storage.local.get('lastConversion', function (data) {
+      if (data.lastConversion) {
+        self.lastConversion = data.lastConversion;
+        // Update the home view if we are still on it
+        if (state.getState() === STATES.IDLE) {
+          state.navigate(STATES.IDLE, { lastConversion: self.lastConversion });
+        }
+      }
+    });
+  };
+
+  App.prototype._checkExistingSession = function () {
+    var self = this;
+    chrome.runtime.sendMessage({ type: 'W2M_GET_SESSION' }, function (session) {
+      if (chrome.runtime.lastError) return;
+      if (session && session.active) {
+        // A session is active, show crawl progress
+        if (session.crawling) {
+          state.navigate(STATES.RUNNING, { url: session.startUrl || self.currentUrl });
+          self.connectCrawlPort();
+        }
+      }
+    });
+  };
+
+  // =============================================
+  // HANDLERS
+  // =============================================
+
+  App.prototype.handleConvert = function () {
+    var self = this;
+    state.navigate(STATES.CONVERTING, {});
+
+    this.converter.convert(function (err, result) {
+      if (err) {
+        var errorType = 'convert';
+        if (err.message.indexOf('system pages') !== -1 || err.message.indexOf('Web Store') !== -1) {
+          errorType = 'unavailable';
+        }
+        state.navigate(STATES.ERROR, { errorType: errorType, message: err.message });
+        return;
+      }
+
+      self.currentMarkdown = result.markdown;
+      self.currentUrl = result.url;
+      self.currentTitle = result.title;
+      self.lastConversion = { url: result.url, timestamp: Date.now() };
+
+      state.navigate(STATES.SUCCESS, {
+        markdown: result.markdown,
+        url: result.url,
+        title: result.title
+      });
+    });
+  };
+
+  App.prototype.handleCopy = function () {
+    var self = this;
+    if (!this.currentMarkdown) return;
+
+    navigator.clipboard.writeText(this.currentMarkdown).then(function () {
+      self.showToast(t('toast.copied'), 'success');
+    }).catch(function () {
+      self.showToast(t('toast.error'), 'error');
+    });
+  };
+
+  App.prototype.handleDownload = function () {
+    var self = this;
+    if (!this.currentMarkdown) return;
+    chrome.runtime.sendMessage({
+      type: 'W2M_DOWNLOAD_MARKDOWN',
+      markdown: this.currentMarkdown,
+      title: this.currentTitle || 'page'
+    }, function (res) {
+      if (chrome.runtime.lastError || !res || !res.ok) {
+        self.showToast(t('toast.error'), 'error');
+        return;
+      }
+      self.showToast(t('toast.downloaded'), 'success');
+    });
+  };
+
+  App.prototype.handleStartCrawl = function (options) {
+    var self = this;
+    var folder = options.folder || '';
+
+    chrome.storage.local.get(['captureSettings', 'crawlSettings'], function (data) {
+      var cap = Object.assign({}, DEFAULT_CAPTURE_SETTINGS, data.captureSettings || {});
+      var cr = Object.assign({}, DEFAULT_CRAWL_SETTINGS, data.crawlSettings || {});
+      cap.urlTree = !!options.urlTree;
+      cap.saveAssets = !!options.saveAssets;
+      chrome.storage.local.set({ captureSettings: cap });
+      chrome.runtime.sendMessage({
+        type: 'W2M_UPDATE_SESSION',
+        patch: { urlTree: cap.urlTree, saveAssets: cap.saveAssets }
+      }).catch(function () { });
+      var delay = cap.delay;
+      var depthNum = Number(cr.depth);
+      var depth = Number.isFinite(depthNum) ? depthNum : DEFAULT_CRAWL_SETTINGS.depth;
+      var concurrency = Number(cr.concurrency) || DEFAULT_CRAWL_SETTINGS.concurrency;
+      var maxBlocksRaw = cr.maxBlocks;
+      var maxBlocks = DEFAULT_CRAWL_SETTINGS.maxBlocks;
+      if (maxBlocksRaw !== undefined && maxBlocksRaw !== null) {
+        var mb = Number(maxBlocksRaw);
+        if (Number.isFinite(mb)) maxBlocks = mb;
+      }
+
+      chrome.runtime.sendMessage({
+        type: 'W2M_CRAWL_START',
+        startUrl: self.currentUrl,
+        folder: folder,
+        delay: delay,
+        urlTree: options.urlTree,
+        saveAssets: options.saveAssets,
+        concurrency: concurrency,
+        maxBlocks: maxBlocks,
+        depth: depth
+      }, function (res) {
+        if (chrome.runtime.lastError) {
+          state.navigate(STATES.ERROR, { errorType: 'network' });
+          return;
+        }
+        if (res && res.ok) {
+          self.openDashboard();
+          state.navigate(STATES.RUNNING, { url: self.currentUrl, folder: folder });
+          self.connectCrawlPort();
+        } else {
+          state.navigate(STATES.ERROR, { errorType: 'convert', message: (res && res.error) || 'Failed to start' });
+        }
+      });
+    });
+  };
+
+  App.prototype.handlePause = function () {
+    var current = state.getState();
+    if (current === STATES.RUNNING) {
+      // Pause
+      chrome.runtime.sendMessage({ type: 'W2M_CRAWL_PAUSE' });
+      state.navigate(STATES.PAUSED, state.getData());
+    } else if (current === STATES.PAUSED) {
+      // Resume
+      chrome.runtime.sendMessage({ type: 'W2M_CRAWL_RESUME' });
+      state.navigate(STATES.RUNNING, state.getData());
+    }
+  };
+
+  App.prototype.handleStop = function () {
+    var self = this;
+    chrome.runtime.sendMessage({ type: 'W2M_CRAWL_STOP' }, function () {
+      if (self.crawlPort) {
+        self.crawlPort.disconnect();
+        self.crawlPort = null;
+      }
+      var data = state.getData();
+      state.navigate(STATES.CRAWL_SUCCESS, {
+        captured: data.captured || 0,
+        blocked: data.blocked || 0,
+        images: data.images || 0,
+        folder: data.folder || '',
+        duration: Date.now() - (data.startTime || Date.now()),
+        totalSize: data.totalSize || 0,
+        blockedUrls: data.blockedUrls || []
+      });
+    });
+  };
+
+  App.prototype.handleRetry = function (url) {
+    var self = this;
+    chrome.runtime.sendMessage({ type: 'W2M_CRAWL_RETRY', url: url }, function () {
+      self.showToast(t('crawlresult.retry') + ': ' + url, 'info');
+    });
+  };
+
+  App.prototype.connectCrawlPort = function () {
+    var self = this;
+    if (this.crawlPort) return;
+
+    this.crawlPort = chrome.runtime.connect({ name: 'crawl' });
+    this.crawlPort.onMessage.addListener(function (msg) {
+      if (msg.type === 'crawl:status') {
+        var stats = msg.stats || {};
+        var cur = state.getState();
+        if (msg.status === 'stopped' && (cur === STATES.RUNNING || cur === STATES.PAUSED)) {
+          var d = state.getData();
+          var startMs = stats.startTime != null ? stats.startTime : Date.now();
+          var blocked = stats.blocked != null ? stats.blocked : (d.blocked || 0);
+          var hasErrors = blocked > 0;
+          var targetState = hasErrors ? STATES.CRAWL_PARTIAL : STATES.CRAWL_SUCCESS;
+          state.navigate(targetState, {
+            captured: stats.captured != null ? stats.captured : (d.captured || 0),
+            blocked: blocked,
+            images: stats.images != null ? stats.images : (d.images || 0),
+            folder: d.folder || '',
+            duration: Date.now() - startMs,
+            totalSize: stats.totalSize != null ? stats.totalSize : (d.totalSize || 0),
+            blockedUrls: msg.blockedUrls || d.blockedUrls || []
+          });
+          if (self.crawlPort) {
+            self.crawlPort.disconnect();
+            self.crawlPort = null;
+          }
+          return;
+        }
+        state.updateData({
+          captured: stats.captured || 0,
+          queued: stats.queued || 0,
+          blocked: stats.blocked || 0,
+          images: stats.images || 0,
+          speed: stats.speed || 0,
+          totalSize: stats.totalSize || 0,
+          blockedUrls: stats.blockedUrls || [],
+          lastPage: stats.lastPage || null
+        });
+      }
+      if (msg.type === 'crawl:done') {
+        var d = state.getData();
+        var hasErrors = (d.blocked || 0) > 0;
+        var targetState = hasErrors ? STATES.CRAWL_PARTIAL : STATES.CRAWL_SUCCESS;
+        state.navigate(targetState, {
+          captured: d.captured || 0,
+          blocked: d.blocked || 0,
+          images: d.images || 0,
+          folder: d.folder || '',
+          duration: msg.duration || 0,
+          totalSize: d.totalSize || 0,
+          blockedUrls: d.blockedUrls || []
+        });
+        if (self.crawlPort) {
+          self.crawlPort.disconnect();
+          self.crawlPort = null;
+        }
+      }
+    });
+    this.crawlPort.onDisconnect.addListener(function () {
+      self.crawlPort = null;
+    });
+  };
+
+  App.prototype.openDashboard = function () {
+    chrome.windows.getCurrent(function (win) {
+      chrome.sidePanel.open({ windowId: win.id }, function () {
+        // Side panel opened
+      });
+    });
+  };
+
+  App.prototype.showToast = function (message, type) {
+    type = type || 'info';
+    var container = document.getElementById('toast-container');
+    var toast = el('div', { className: 'toast toast--' + type, textContent: message });
+    container.appendChild(toast);
+
+    // Trigger enter animation
+    requestAnimationFrame(function () {
+      toast.classList.add('toast--visible');
+    });
 
     if (this.toastTimeout) clearTimeout(this.toastTimeout);
+    this.toastTimeout = setTimeout(function () {
+      toast.classList.remove('toast--visible');
+      toast.addEventListener('transitionend', function () {
+        if (toast.parentNode) toast.parentNode.removeChild(toast);
+      });
+    }, 2000);
+  };
 
-    this.toastTimeout = setTimeout(() => {
-      toast.className = "toast hidden";
-    }, 1500);
-  }
-}
-
-document.addEventListener("DOMContentLoaded", () => {
-  new MarkdownConverter();
-});
+  // =============================================
+  // INIT
+  // =============================================
+  document.addEventListener('DOMContentLoaded', function () {
+    app = new App();
+    app.init();
+  });
+})();
