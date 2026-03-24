@@ -122,11 +122,135 @@ function convertToMarkdown(title, content) {
       return ruleContent;
     },
   });
+  // Constrain small images to their rendered size via HTML <img> tag
+  service.addRule("constrainSmallImages", {
+    filter: (node) => {
+      if (node.nodeName !== "IMG") return false;
+      const w = parseInt(node.getAttribute("width") || "0", 10);
+      const h = parseInt(node.getAttribute("height") || "0", 10);
+      return (w > 0 && w < 200) || (h > 0 && h < 200);
+    },
+    replacement: (content, node) => {
+      const alt = node.getAttribute("alt") || "";
+      const src = node.getAttribute("src") || "";
+      if (!src) return "";
+      const w = parseInt(node.getAttribute("width") || "0", 10);
+      const maxW = w > 0 ? w : 64;
+      return `<img src="${src}" alt="${alt}" style="max-width:${maxW}px; height:auto;">`;
+    },
+  });
 
   const wrappedContent = `<div class="markdown-content"><h1>${title}</h1>${content}</div>`;
   let markdown = service.turndown(wrappedContent);
-  markdown = markdown.replace(/\n{3,}/g, "\n\n").trim();
+  markdown = cleanupMarkdown(markdown);
   return markdown;
+}
+
+function cleanupMarkdown(markdown) {
+  let out = markdown || "";
+
+  // Compact links that Turndown may render on multiple lines:
+  // [
+  //   ...label...
+  // ](url)
+  out = out.replace(
+    /\[\s*\n+([\s\S]*?)\n+\s*\]\(([^)\n]+)\)/g,
+    (_m, label, href) => `[${label.trim()}](${href.trim()})`,
+  );
+
+  // Recover headings rendered as:
+  // ##
+  //
+  // Heading text...
+  const lines = out.split("\n");
+  for (let i = 0; i < lines.length; i++) {
+    const match = lines[i].match(/^[ \t]{0,3}(#{1,6})[ \t]*$/);
+    if (!match) continue;
+
+    let j = i + 1;
+    while (j < lines.length && lines[j].trim() === "") j++;
+
+    if (j < lines.length) {
+      const nextLine = lines[j].trim();
+      const isPlainHeadingText =
+        nextLine.length > 0 &&
+        !/^(?:#{1,6}\s|>\s|```|`|[-+*]\s|\d+\.\s|\[|!\[)/.test(nextLine);
+
+      if (isPlainHeadingText) {
+        lines[i] = `${match[1]} ${nextLine}`;
+        lines.splice(i + 1, j - i);
+        continue;
+      }
+    }
+
+    // Drop truly empty headings.
+    lines[i] = "";
+  }
+
+  // X/Twitter cleanup: remove synthetic page title and promote post title under hero image.
+  const firstContentIndex = lines.findIndex((line) => line.trim() !== "");
+  if (firstContentIndex !== -1 && lines[firstContentIndex].trim() === "# X") {
+    lines[firstContentIndex] = "";
+  }
+  for (let i = 0; i < Math.min(lines.length, 20); i++) {
+    const current = lines[i].trim();
+    if (!/^\[!\[[^\]]*\]\([^)]+\)\]\([^)]+\)$/.test(current)) continue;
+
+    let j = i + 1;
+    while (j < lines.length && lines[j].trim() === "") j++;
+    if (j >= lines.length) break;
+
+    const candidate = lines[j].trim();
+    const canPromote =
+      candidate.length >= 16 &&
+      !/^(?:#{1,6}\s|>\s|```|`|[-+*]\s|\d+\.\s|\[|!\[)/.test(candidate);
+
+    if (canPromote) {
+      lines[j] = `## ${candidate}`;
+    }
+    break;
+  }
+
+  // Remove social/UI noise: orphan metadata blocks.
+  // Detects sequences of 4+ consecutive very short non-markdown lines
+  // (profile names, handles, dates, engagement counts, dots).
+  const isOrphanNoise = (line) => {
+    const t = line.trim();
+    if (t.length === 0) return false; // blank lines handled separately
+    if (t.length >= 30) return false; // too long to be UI noise
+    // Skip markdown constructs
+    if (/^(?:#{1,6}\s|>\s|```|[-+*]\s|\d+\.\s|\[|!\[|---|\*{3}|_{3})/.test(t))
+      return false;
+    return true;
+  };
+  for (let k = 0; k < lines.length;) {
+    if (!isOrphanNoise(lines[k])) {
+      k++;
+      continue;
+    }
+    let end = k;
+    let noiseCount = 0;
+    while (end < lines.length) {
+      if (isOrphanNoise(lines[end])) {
+        noiseCount++;
+        end++;
+      } else if (lines[end].trim() === "") {
+        end++; // skip blank lines between noise
+      } else {
+        break;
+      }
+    }
+    if (noiseCount >= 4) {
+      for (let m = k; m < end; m++) lines[m] = "";
+    }
+    k = end;
+  }
+
+  out = lines.join("\n");
+
+  // Normalize extra spacing after cleanup.
+  out = out.replace(/\n{3,}/g, "\n\n").trim();
+  return out;
 }
 
 // ─── Téléchargement via chrome.downloads ────────────────────────────────────
@@ -147,6 +271,7 @@ async function downloadMarkdown(markdown, title) {
     url: dataUrl,
     filename: filename,
     saveAs: false,
+    conflictAction: "overwrite",
   });
 }
 
@@ -299,26 +424,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           ) {
             // Vérifier si la page est déjà capturée
             if (capturedUrls.has(tab.url)) {
-              chrome.scripting.executeScript({
-                target: { tabId: tab.id },
-                func: () => {
-                  const o = document.createElement("div");
-                  o.style.cssText =
-                    "position:fixed;inset:0;z-index:2147483647;pointer-events:none;display:flex;align-items:center;justify-content:center;background:rgba(251,191,36,0.10);transition:opacity 0.4s ease;font-family:system-ui,sans-serif";
-                  const b = document.createElement("div");
-                  b.style.cssText =
-                    "background:rgba(245,158,11,0.92);color:#fff;padding:10px 22px;border-radius:12px;font-size:14px;font-weight:600;box-shadow:0 4px 20px rgba(0,0,0,0.2);display:flex;align-items:center;gap:8px";
-                  b.textContent = "Déjà capturée";
-                  o.appendChild(b);
-                  document.body.appendChild(o);
-                  setTimeout(() => {
-                    o.style.opacity = "0";
-                  }, 800);
-                  setTimeout(() => {
-                    o.remove();
-                  }, 1200);
-                },
-              });
+              return;
             } else {
               await chrome.scripting.executeScript({
                 target: { tabId: tab.id },
@@ -341,40 +447,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                     type: "W2M_CAPTURE_COUNT",
                     count: capturedUrls.size,
                   })
-                  .catch(() => {});
+                  .catch(() => { });
                 await chrome.storage.local.set({
                   lastConversion: {
                     url: tab.url,
                     markdown,
                     timestamp: new Date().toISOString(),
                   },
-                });
-                chrome.scripting.executeScript({
-                  target: { tabId: tab.id },
-                  func: (t) => {
-                    const o = document.createElement("div");
-                    o.style.cssText =
-                      "position:fixed;inset:0;z-index:2147483647;pointer-events:none;display:flex;align-items:center;justify-content:center;background:rgba(34,197,94,0.12);transition:opacity 0.4s ease;font-family:system-ui,sans-serif";
-                    const i = document.createElement("span");
-                    i.style.cssText = "font-size:20px;margin-right:8px";
-                    i.textContent = "✓";
-                    const tx = document.createElement("span");
-                    tx.textContent = "Captured: " + t;
-                    const b = document.createElement("div");
-                    b.style.cssText =
-                      "background:rgba(34,197,94,0.92);color:#fff;padding:12px 24px;border-radius:12px;font-size:15px;font-weight:600;box-shadow:0 4px 20px rgba(0,0,0,0.2);display:flex;align-items:center";
-                    b.appendChild(i);
-                    b.appendChild(tx);
-                    o.appendChild(b);
-                    document.body.appendChild(o);
-                    setTimeout(() => {
-                      o.style.opacity = "0";
-                    }, 1200);
-                    setTimeout(() => {
-                      o.remove();
-                    }, 1600);
-                  },
-                  args: [results[0].result.title],
                 });
               }
             } // fin else (pas déjà capturée)
@@ -399,6 +478,110 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     setSession(message.patch)
       .then((session) => sendResponse({ ok: true, session }))
       .catch((err) => sendResponse({ ok: false, error: err.message }));
+    return true;
+  }
+  if (message.type === "W2M_DOWNLOAD_MARKDOWN") {
+    (async () => {
+      try {
+        if (!message.markdown) throw new Error("Missing markdown");
+        await downloadMarkdown(message.markdown, message.title);
+        sendResponse({ ok: true });
+      } catch (err) {
+        sendResponse({ ok: false, error: err.message });
+      }
+    })();
+    return true;
+  }
+  if (message.type === "W2M_CRAWL_START") {
+    (async () => {
+      let crawlSessionCommitted = false;
+      try {
+        await ensureOffscreen();
+        const folder = message.folder || makeSessionFolder();
+        const delay = message.delay ?? 2000;
+        const urlTree = message.urlTree ?? true;
+        const saveAssets = message.saveAssets ?? true;
+        await setSession({ active: true, folder, delay, urlTree, saveAssets, crawling: true });
+        crawlSessionCommitted = true;
+        updateBadge(true);
+        await crawlEngine.start(message.startUrl, {
+          concurrency: message.concurrency || 3,
+          depth: message.depth ?? 0,
+          maxConsecutiveBlocks:
+            message.maxBlocks !== undefined && message.maxBlocks !== null
+              ? message.maxBlocks
+              : 5,
+          delay: message.crawlDelay || 1000,
+        });
+        try {
+          const w = await chrome.windows.getLastFocused({
+            windowTypes: ["normal"],
+          });
+          if (w?.id != null) {
+            await chrome.sidePanel.open({ windowId: w.id });
+          }
+        } catch {
+          /* May require user gesture; popup already calls openDashboard */
+        }
+        sendResponse({ ok: true });
+      } catch (err) {
+        try {
+          await crawlEngine.stop();
+        } catch {
+          /* ignore */
+        }
+        if (crawlSessionCommitted) {
+          try {
+            await setSession({ active: false, crawling: false });
+          } catch {
+            /* ignore */
+          }
+        }
+        updateBadge(false);
+        sendResponse({ ok: false, error: err.message });
+      }
+    })();
+    return true;
+  }
+  if (message.type === "W2M_CRAWL_STOP") {
+    (async () => {
+      try {
+        await crawlEngine.stop();
+      } catch (e) {
+        console.warn("[W2M] W2M_CRAWL_STOP:", e);
+        await w2mOnCrawlSessionEnded();
+      }
+      sendResponse({ ok: true });
+    })();
+    return true;
+  }
+  if (message.type === "W2M_CRAWL_GET_STATUS") {
+    sendResponse(crawlEngine.getStatusPayload());
+    return true;
+  }
+  if (message.type === "W2M_CRAWL_DISMISS") {
+    if (message.url) {
+      crawlEngine.dismissBlocked(message.url);
+    }
+    sendResponse({ ok: true });
+    return true;
+  }
+  if (message.type === "W2M_OPEN_DASHBOARD") {
+    (async () => {
+      try {
+        const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+        await chrome.sidePanel.open({ windowId: tab?.windowId });
+        // If a specific view was requested, broadcast it to the dashboard
+        if (message.view) {
+          setTimeout(() => {
+            chrome.runtime.sendMessage({ type: "W2M_SHOW_SETTINGS" }).catch(() => { });
+          }, 300); // small delay to let the side panel load
+        }
+        sendResponse({ ok: true });
+      } catch (e) {
+        sendResponse({ ok: false, error: e.message });
+      }
+    })();
     return true;
   }
 });
@@ -443,29 +626,9 @@ chrome.webNavigation.onCompleted.addListener(async (details) => {
   )
     return;
 
-  // URL déjà capturée : flash orange pour informer l'utilisateur
+  // URL déjà capturée
   if (capturedUrls.has(url)) {
     console.log("[W2M] Already captured, skipping:", url);
-    chrome.scripting.executeScript({
-      target: { tabId: details.tabId },
-      func: () => {
-        const o = document.createElement("div");
-        o.style.cssText =
-          "position:fixed;inset:0;z-index:2147483647;pointer-events:none;display:flex;align-items:center;justify-content:center;background:rgba(251,191,36,0.10);transition:opacity 0.4s ease;font-family:system-ui,sans-serif";
-        const b = document.createElement("div");
-        b.style.cssText =
-          "background:rgba(245,158,11,0.92);color:#fff;padding:10px 22px;border-radius:12px;font-size:14px;font-weight:600;box-shadow:0 4px 20px rgba(0,0,0,0.2);display:flex;align-items:center;gap:8px";
-        b.textContent = "Déjà capturée";
-        o.appendChild(b);
-        document.body.appendChild(o);
-        setTimeout(() => {
-          o.style.opacity = "0";
-        }, 800);
-        setTimeout(() => {
-          o.remove();
-        }, 1200);
-      },
-    });
     return;
   }
 
@@ -542,62 +705,12 @@ chrome.webNavigation.onCompleted.addListener(async (details) => {
           type: "W2M_CAPTURE_COUNT",
           count: capturedUrls.size,
         })
-        .catch(() => {});
+        .catch(() => { });
 
       await chrome.storage.local.set({
         lastConversion: { url, markdown, timestamp: new Date().toISOString() },
       });
 
-      chrome.scripting.executeScript({
-        target: { tabId: details.tabId },
-        func: (pageTitle) => {
-          const overlay = document.createElement("div");
-          overlay.style.cssText = [
-            "position:fixed",
-            "inset:0",
-            "z-index:2147483647",
-            "pointer-events:none",
-            "display:flex",
-            "align-items:center",
-            "justify-content:center",
-            "background:rgba(34,197,94,0.12)",
-            "transition:opacity 0.4s ease",
-            "font-family:system-ui,sans-serif",
-          ].join(";");
-
-          const icon = document.createElement("span");
-          icon.style.cssText = "font-size:20px;margin-right:8px";
-          icon.textContent = "✓";
-
-          const text = document.createElement("span");
-          text.textContent = "Captured: " + pageTitle;
-
-          const badge = document.createElement("div");
-          badge.style.cssText = [
-            "background:rgba(34,197,94,0.92)",
-            "color:#fff",
-            "padding:12px 24px",
-            "border-radius:12px",
-            "font-size:15px",
-            "font-weight:600",
-            "box-shadow:0 4px 20px rgba(0,0,0,0.2)",
-            "display:flex",
-            "align-items:center",
-          ].join(";");
-          badge.appendChild(icon);
-          badge.appendChild(text);
-          overlay.appendChild(badge);
-          document.body.appendChild(overlay);
-
-          setTimeout(() => {
-            overlay.style.opacity = "0";
-          }, 1200);
-          setTimeout(() => {
-            overlay.remove();
-          }, 1600);
-        },
-        args: [title],
-      });
     } catch (err) {
       console.error("[W2M] Auto-capture error:", err);
     }
@@ -657,7 +770,7 @@ function extractAndConvert() {
         ) {
           try {
             img.setAttribute("src", new URL(effectiveSrc, baseUrl).href);
-          } catch (e) {}
+          } catch (e) { }
         }
       });
     bodyClone.querySelectorAll("a[href]").forEach((a) => {
@@ -670,7 +783,7 @@ function extractAndConvert() {
       ) {
         try {
           a.setAttribute("href", new URL(href, baseUrl).href);
-        } catch (e) {}
+        } catch (e) { }
       }
     });
 
@@ -719,6 +832,82 @@ function extractAndConvert() {
     }
     if (iframeContents.length > 0)
       html += "<h2>Embedded Content</h2>" + iframeContents.join("<hr>");
+
+    // ─── Clean HTML of non-content elements before Turndown ───────────
+    // Uses a detached DOM container (never inserted into page) to strip
+    // interactive controls, hidden decorations, and social widgets that
+    // produce noise lines in the Markdown output.
+    const _clean = document.createElement("div");
+    _clean.innerHTML = html; // safe: html comes from Readability / same-origin DOM
+
+    // Remove interactive controls (buttons, forms, toolbars)
+    _clean
+      .querySelectorAll(
+        'button, [role="button"], [role="toolbar"], [role="group"], ' +
+        '[role="menubar"], [role="menu"], [role="menuitem"], ' +
+        "input, select, textarea, form",
+      )
+      .forEach((el) => el.remove());
+
+    // Remove hidden/decorative elements (tooltips, screen-reader duplicates)
+    _clean
+      .querySelectorAll("[aria-hidden=\"true\"]")
+      .forEach((el) => el.remove());
+
+    // Convert embedded tweets to clean blockquotes (for non-Twitter pages)
+    _clean
+      .querySelectorAll(
+        'blockquote.twitter-tweet, blockquote[class*="twitter"], ' +
+        "[data-tweet-id], .twitter-tweet-rendered",
+      )
+      .forEach((el) => {
+        const ps = el.querySelectorAll("p");
+        const text = ps.length
+          ? Array.from(ps)
+            .map((p) => p.textContent.trim())
+            .filter(Boolean)
+            .join("\n")
+          : el.textContent.trim();
+        const tweetLinks = el.querySelectorAll(
+          'a[href*="twitter.com/"], a[href*="x.com/"]',
+        );
+        const src = tweetLinks.length
+          ? tweetLinks[tweetLinks.length - 1].href
+          : "";
+        el.innerHTML = `<p>${text}</p>${src ? `<p><a href="${src}">Source</a></p>` : ""}`;
+      });
+
+    // Remove social share/follow widgets by class patterns
+    _clean
+      .querySelectorAll(
+        '[class*="share-button"], [class*="social-share"], [class*="share-buttons"], ' +
+        '[class*="follow-btn"], [class*="follow-button"], [class*="social-widget"], ' +
+        '[class*="social-links"], [class*="social-icons"]',
+      )
+      .forEach((el) => el.remove());
+
+    // Stamp rendered dimensions from live DOM onto _clean images,
+    // so the Turndown rule can constrain them to their CSS-rendered size.
+    const imgSizes = new Map();
+    try {
+      document.querySelectorAll("img").forEach((img) => {
+        const rect = img.getBoundingClientRect();
+        if (rect.width > 0) {
+          imgSizes.set(img.getAttribute("src") || "", Math.round(rect.width));
+          imgSizes.set(img.src, Math.round(rect.width)); // resolved URL too
+        }
+      });
+    } catch (_) { }
+    _clean.querySelectorAll("img").forEach((img) => {
+      const src = img.getAttribute("src") || "";
+      const w = imgSizes.get(src);
+      if (w && w < 200) {
+        img.setAttribute("data-w2m-width", w);
+      }
+    });
+
+    html = _clean.innerHTML;
+    // ─── End HTML cleanup ─────────────────────────────────────────────
 
     const title = document.title || "Untitled Page";
     const service = new TurndownService({
@@ -788,9 +977,25 @@ function extractAndConvert() {
         return src ? `![${alt}](${src})` : "";
       },
     });
+    // Constrain small images to their rendered size via HTML <img> tag
+    service.addRule("constrainSmallImages", {
+      filter: (node) => {
+        if (node.nodeName !== "IMG") return false;
+        const rw = parseInt(node.getAttribute("data-w2m-width") || "0", 10);
+        return rw > 0 && rw < 200;
+      },
+      replacement: (content, node) => {
+        const alt = node.getAttribute("alt") || "";
+        const src = node.getAttribute("src") || "";
+        if (!src) return "";
+        const rw = parseInt(node.getAttribute("data-w2m-width") || "0", 10);
+        const maxW = rw > 0 ? rw : 64;
+        return `<img src="${src}" alt="${alt}" style="max-width:${maxW}px; height:auto;">`;
+      },
+    });
 
     let markdown = service.turndown(`<div><h1>${title}</h1>${html}</div>`);
-    markdown = markdown.replace(/\n{3,}/g, "\n\n").trim();
+    markdown = cleanupMarkdown(markdown);
 
     return { success: true, markdown, title };
   } catch (err) {
@@ -849,16 +1054,35 @@ async function downloadInSession(markdown, title, folder, pageUrl) {
     url: `data:text/markdown;charset=utf-8,${encoded}`,
     filename: `${folder}/${mdPath}`,
     saveAs: false,
+    conflictAction: "overwrite",
   });
 }
 
-// Télécharge les images référencées dans le markdown et remplace les URLs
-// par des chemins relatifs locaux (./assets/nom-fichier.ext)
-async function downloadAssets(markdown, folder, mdPath) {
-  // Extraire toutes les URLs d'images du markdown : ![alt](url)
-  const imgRegex = /!\[([^\]]*)\]\((https?:\/\/[^)\s]+)\)/g;
-  const matches = [...markdown.matchAll(imgRegex)];
-  if (matches.length === 0) return markdown;
+// Identifiant stable et court à partir de l’URL complète (évite collisions type image.png).
+function w2mAssetIdFromUrl(urlString) {
+  let h = 2166136261 >>> 0;
+  for (let i = 0; i < urlString.length; i++) {
+    h ^= urlString.charCodeAt(i);
+    h = Math.imul(h, 16777619) >>> 0;
+  }
+  return h.toString(16).padStart(8, "0");
+}
+
+function w2mEscapeRegExp(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+// Télécharge les images (syntaxe ![…](url) et balises <img src="url">) puis réécrit
+// vers ./assets/nom — même dossier parent que le .md (visionneuses / sandbox macOS).
+async function downloadAssets(markdown, folder, mdPath, options = {}) {
+  const mdImgRegex = /!\[([^\]]*)\]\((https?:\/\/[^)\s]+)\)/g;
+  const htmlImgSrcRegex =
+    /<img\b[^>]*?\bsrc\s*=\s*(["'])(https?:\/\/[^"']+)\1[^>]*>/gi;
+
+  const urls = new Set();
+  for (const m of markdown.matchAll(mdImgRegex)) urls.add(m[2]);
+  for (const m of markdown.matchAll(htmlImgSrcRegex)) urls.add(m[2]);
+  if (urls.size === 0) return markdown;
 
   // Dossier assets : même niveau que le fichier .md
   const mdDir = mdPath.includes("/")
@@ -866,47 +1090,144 @@ async function downloadAssets(markdown, folder, mdPath) {
     : "";
   const assetsDir = mdDir ? `${folder}/${mdDir}/assets` : `${folder}/assets`;
 
-  let result = markdown;
-  const downloaded = new Map(); // url → filename local
+  const downloaded = new Map(); // url absolue → nom fichier local
+  const usedLocalNames = new Set();
 
-  for (const match of matches) {
-    const [, , imgUrl] = match;
-    if (downloaded.has(imgUrl)) continue;
-
+  for (const imgUrl of urls) {
     try {
-      // Extraire un nom de fichier propre depuis l'URL
       const urlObj = new URL(imgUrl);
       const rawName = urlObj.pathname.split("/").pop() || "image";
-      // Garder uniquement l'extension et sanitiser
       const dotIdx = rawName.lastIndexOf(".");
       const ext =
         dotIdx > -1
           ? rawName.slice(dotIdx).split("?")[0].toLowerCase()
           : ".jpg";
-      const baseName = rawName
+      let stem = rawName
         .slice(0, dotIdx > -1 ? dotIdx : undefined)
         .replace(/[^a-z0-9\-_]/gi, "-")
-        .slice(0, 40);
-      const localName = `${baseName}${ext}`;
+        .replace(/^-+|-+$/g, "")
+        .slice(0, 28);
+      if (!stem) stem = "img";
+      const id = w2mAssetIdFromUrl(imgUrl);
+      let localName = `${stem}-${id}${ext}`.replace(/[/\\:*?"<>|]/g, "-");
+      let n = 0;
+      while (usedLocalNames.has(localName)) {
+        n++;
+        localName = `${stem}-${id}-${n}${ext}`.replace(/[/\\:*?"<>|]/g, "-");
+      }
+      usedLocalNames.add(localName);
 
       await chrome.downloads.download({
         url: imgUrl,
         filename: `${assetsDir}/${localName}`,
         saveAs: false,
+        conflictAction: "overwrite",
       });
 
       downloaded.set(imgUrl, localName);
+
+      if (typeof options.onAssetSaved === "function") {
+        try {
+          options.onAssetSaved({
+            localName,
+            imgUrl,
+            pageUrl: options.pageUrl,
+            pageLabel: options.pageLabel,
+          });
+        } catch (_) {
+          /* ignore */
+        }
+      }
     } catch (err) {
       console.warn("[W2M] Asset download failed:", imgUrl, err);
     }
   }
 
-  // Remplacer les URLs dans le markdown par des chemins relatifs
-  result = result.replace(imgRegex, (full, alt, imgUrl) => {
-    const localName = downloaded.get(imgUrl);
-    if (!localName) return full;
-    return `![${alt}](assets/${localName})`;
-  });
+  if (downloaded.size === 0) return markdown;
+
+  let result = markdown;
+  const pairs = [...downloaded.entries()].sort((a, b) => b[0].length - a[0].length);
+  for (const [imgUrl, localName] of pairs) {
+    const rel = `./assets/${localName}`;
+    const esc = w2mEscapeRegExp(imgUrl);
+    result = result.replace(
+      new RegExp(`!\\[([^\\]]*)\\]\\(${esc}\\)`, "g"),
+      `![$1](${rel})`,
+    );
+    result = result.replace(
+      new RegExp(`(src\\s*=\\s*)(["'])${esc}\\2`, "gi"),
+      `$1$2${rel}$2`,
+    );
+  }
 
   return result;
 }
+
+// ─── Offscreen document lifecycle ─────────────────────────────────
+let offscreenReady = false;
+
+async function ensureOffscreen() {
+  const exists = await chrome.offscreen.hasDocument();
+  if (exists) { offscreenReady = true; return; }
+  try {
+    await chrome.offscreen.createDocument({
+      url: "offscreen.html",
+      reasons: [chrome.offscreen.Reason.DOM_PARSER],
+      justification: "Parse HTML for crawl: Readability + link extraction + Turndown",
+    });
+    offscreenReady = true;
+  } catch (e) {
+    if (e.message?.includes("Only a single offscreen")) {
+      offscreenReady = true;
+    } else {
+      console.error("[W2M] Offscreen creation failed:", e);
+    }
+  }
+}
+
+async function closeOffscreen() {
+  try {
+    await chrome.offscreen.closeDocument();
+    offscreenReady = false;
+  } catch (e) { /* not open */ }
+}
+
+// ─── Port-based messaging for crawl ──────────────────────
+chrome.runtime.onConnect.addListener((port) => {
+  if (port.name === "crawl") {
+    crawlEngine.addPort(port);
+  }
+});
+
+// ─── Keepalive alarm for crawl ───────────────────────────
+chrome.alarms.onAlarm.addListener((alarm) => {
+  crawlEngine.onAlarm(alarm);
+  if (alarm.name === "crawl-keepalive") {
+    crawlEngine.checkStorageQuota();
+  }
+});
+
+// ─── Crawl engine (must be after all function definitions) ────────────
+/** Clear extension session UI when a crawl ends (stop, dashboard stop, or natural completion). */
+async function w2mOnCrawlSessionEnded() {
+  try {
+    await closeOffscreen();
+  } catch {
+    /* ignore */
+  }
+  try {
+    await setSession({ active: false, crawling: false });
+  } catch (e) {
+    console.warn("[W2M] setSession after crawl end:", e);
+  }
+  try {
+    await updateBadge(false);
+  } catch {
+    /* ignore */
+  }
+}
+
+importScripts("/js/crawl-engine.js");
+
+const crawlEngine = new CrawlEngine({ onSessionEnded: w2mOnCrawlSessionEnded });
+crawlEngine.restoreState();
