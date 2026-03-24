@@ -331,6 +331,7 @@ class CrawlEngine {
     if (this.status === "running") {
       this.spawnWorkers();
     }
+    this.broadcastStatus();
   }
 
   dismissBlocked(url) {
