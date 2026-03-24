@@ -1085,15 +1085,26 @@
         self.crawlPort = null;
       }
       var data = state.getData();
-      state.navigate(STATES.CRAWL_SUCCESS, {
-        captured: data.captured || 0,
-        blocked: data.blocked || 0,
-        images: data.images || 0,
-        folder: data.folder || '',
-        duration: Date.now() - (data.startTime || Date.now()),
-        totalSize: data.totalSize || 0,
-        blockedUrls: data.blockedUrls || []
-      });
+      function goToSuccess(startMs) {
+        var sm = startMs != null ? startMs : Date.now();
+        state.navigate(STATES.CRAWL_SUCCESS, {
+          captured: data.captured || 0,
+          blocked: data.blocked || 0,
+          images: data.images || 0,
+          folder: data.folder || '',
+          duration: Date.now() - sm,
+          totalSize: data.totalSize || 0,
+          blockedUrls: data.blockedUrls || []
+        });
+      }
+      if (data.startTime != null) {
+        goToSuccess(data.startTime);
+      } else {
+        chrome.runtime.sendMessage({ type: 'W2M_CRAWL_GET_STATUS' }, function (res) {
+          var st = res && res.stats && res.stats.startTime;
+          goToSuccess(st != null ? st : Date.now());
+        });
+      }
     });
   };
 
@@ -1132,7 +1143,7 @@
           }
           return;
         }
-        state.updateData({
+        var crawlPatch = {
           captured: stats.captured || 0,
           queued: stats.queued || 0,
           blocked: stats.blocked || 0,
@@ -1141,7 +1152,9 @@
           totalSize: stats.totalSize || 0,
           blockedUrls: stats.blockedUrls || [],
           lastPage: stats.lastPage || null
-        });
+        };
+        if (stats.startTime != null) crawlPatch.startTime = stats.startTime;
+        state.updateData(crawlPatch);
       }
       if (msg.type === 'crawl:done') {
         var d = state.getData();
