@@ -1049,15 +1049,30 @@
     });
   };
 
+  /**
+   * Same control path as dashboard: prefer crawl port → CrawlEngine; fall back to
+   * runtime messages if the port died (e.g. service worker restart).
+   */
+  App.prototype.sendCrawlControl = function (portType, fallbackType, extra) {
+    var payload = Object.assign({ type: portType }, extra || {});
+    if (this.crawlPort) {
+      try {
+        this.crawlPort.postMessage(payload);
+        return;
+      } catch (e) {
+        this.crawlPort = null;
+      }
+    }
+    chrome.runtime.sendMessage(Object.assign({ type: fallbackType }, extra || {}));
+  };
+
   App.prototype.handlePause = function () {
     var current = state.getState();
     if (current === STATES.RUNNING) {
-      // Pause
-      chrome.runtime.sendMessage({ type: 'W2M_CRAWL_PAUSE' });
+      this.sendCrawlControl('crawl:pause', 'W2M_CRAWL_PAUSE');
       state.navigate(STATES.PAUSED, state.getData());
     } else if (current === STATES.PAUSED) {
-      // Resume
-      chrome.runtime.sendMessage({ type: 'W2M_CRAWL_RESUME' });
+      this.sendCrawlControl('crawl:resume', 'W2M_CRAWL_RESUME');
       state.navigate(STATES.RUNNING, state.getData());
     }
   };
@@ -1083,10 +1098,8 @@
   };
 
   App.prototype.handleRetry = function (url) {
-    var self = this;
-    chrome.runtime.sendMessage({ type: 'W2M_CRAWL_RETRY', url: url }, function () {
-      self.showToast(t('crawlresult.retry') + ': ' + url, 'info');
-    });
+    this.sendCrawlControl('crawl:retry', 'W2M_CRAWL_RETRY', { url: url });
+    this.showToast(t('crawlresult.retry') + ': ' + url, 'info');
   };
 
   App.prototype.connectCrawlPort = function () {

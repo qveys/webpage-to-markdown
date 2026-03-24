@@ -511,7 +511,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             message.maxBlocks !== undefined && message.maxBlocks !== null
               ? message.maxBlocks
               : 5,
-          delay: message.crawlDelay || 1000,
+          // Same `delay` as session + popup W2M_CRAWL_START (ms between fetches)
+          delay,
         });
         try {
           const w = await chrome.windows.getLastFocused({
@@ -553,6 +554,37 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       }
       sendResponse({ ok: true });
     })();
+    return true;
+  }
+  if (message.type === "W2M_CRAWL_PAUSE") {
+    (async () => {
+      try {
+        await crawlEngine.pause();
+        sendResponse({ ok: true });
+      } catch (e) {
+        sendResponse({ ok: false, error: e.message });
+      }
+    })();
+    return true;
+  }
+  if (message.type === "W2M_CRAWL_RESUME") {
+    (async () => {
+      try {
+        await crawlEngine.resume();
+        sendResponse({ ok: true });
+      } catch (e) {
+        sendResponse({ ok: false, error: e.message });
+      }
+    })();
+    return true;
+  }
+  if (message.type === "W2M_CRAWL_RETRY") {
+    try {
+      if (message.url) crawlEngine.retryBlocked(message.url);
+      sendResponse({ ok: true });
+    } catch (e) {
+      sendResponse({ ok: false, error: e.message });
+    }
     return true;
   }
   if (message.type === "W2M_CRAWL_GET_STATUS") {
