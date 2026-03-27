@@ -307,7 +307,8 @@ function convertToMarkdown(title, html) {
       if (!src) return "";
       const rw = parseInt(node.getAttribute("data-w2m-width") || "0", 10);
       const maxW = rw > 0 ? rw : 64;
-      return `<img src="${src}" alt="${alt}" style="max-width:${maxW}px; height:auto;">`;
+      const escAttr = (s) => String(s).replace(/"/g, '&quot;');
+      return `<img src="${escAttr(src)}" alt="${escAttr(alt)}" style="max-width:${maxW}px; height:auto;">`;
     },
   });
 
@@ -317,108 +318,5 @@ function convertToMarkdown(title, html) {
   return markdown;
 }
 
-function cleanupMarkdown(markdown) {
-  let out = markdown || "";
-
-  // Compact links that Turndown may render on multiple lines:
-  // [
-  //   ...label...
-  // ](url)
-  out = out.replace(
-    /\[\s*\n+([\s\S]*?)\n+\s*\]\(([^)\n]+)\)/g,
-    (_m, label, href) => `[${label.trim()}](${href.trim()})`,
-  );
-
-  // Recover headings rendered as:
-  // ##
-  //
-  // Heading text...
-  const lines = out.split("\n");
-  for (let i = 0; i < lines.length; i++) {
-    const match = lines[i].match(/^[ \t]{0,3}(#{1,6})[ \t]*$/);
-    if (!match) continue;
-
-    let j = i + 1;
-    while (j < lines.length && lines[j].trim() === "") j++;
-
-    if (j < lines.length) {
-      const nextLine = lines[j].trim();
-      const isPlainHeadingText =
-        nextLine.length > 0 &&
-        !/^(?:#{1,6}\s|>\s|```|`|[-+*]\s|\d+\.\s|\[|!\[)/.test(nextLine);
-
-      if (isPlainHeadingText) {
-        lines[i] = `${match[1]} ${nextLine}`;
-        lines.splice(i + 1, j - i);
-        continue;
-      }
-    }
-
-    // Drop truly empty headings.
-    lines[i] = "";
-  }
-
-  // X/Twitter cleanup: remove synthetic page title and promote post title under hero image.
-  const firstContentIndex = lines.findIndex((line) => line.trim() !== "");
-  if (firstContentIndex !== -1 && lines[firstContentIndex].trim() === "# X") {
-    lines[firstContentIndex] = "";
-  }
-  for (let i = 0; i < Math.min(lines.length, 20); i++) {
-    const current = lines[i].trim();
-    if (!/^\[!\[[^\]]*\]\([^)]+\)\]\([^)]+\)$/.test(current)) continue;
-
-    let j = i + 1;
-    while (j < lines.length && lines[j].trim() === "") j++;
-    if (j >= lines.length) break;
-
-    const candidate = lines[j].trim();
-    const canPromote =
-      candidate.length >= 16 &&
-      !/^(?:#{1,6}\s|>\s|```|`|[-+*]\s|\d+\.\s|\[|!\[)/.test(candidate);
-
-    if (canPromote) {
-      lines[j] = `## ${candidate}`;
-    }
-    break;
-  }
-
-  // Remove social/UI noise: orphan metadata blocks.
-  // Detects sequences of 4+ consecutive very short non-markdown lines
-  // (profile names, handles, dates, engagement counts, dots).
-  const isOrphanNoise = (line) => {
-    const t = line.trim();
-    if (t.length === 0) return false;
-    if (t.length >= 30) return false;
-    if (/^(?:#{1,6}\s|>\s|```|[-+*]\s|\d+\.\s|\[|!\[|---|\*{3}|_{3})/.test(t))
-      return false;
-    return true;
-  };
-  for (let k = 0; k < lines.length; ) {
-    if (!isOrphanNoise(lines[k])) {
-      k++;
-      continue;
-    }
-    let end = k;
-    let noiseCount = 0;
-    while (end < lines.length) {
-      if (isOrphanNoise(lines[end])) {
-        noiseCount++;
-        end++;
-      } else if (lines[end].trim() === "") {
-        end++;
-      } else {
-        break;
-      }
-    }
-    if (noiseCount >= 4) {
-      for (let m = k; m < end; m++) lines[m] = "";
-    }
-    k = end;
-  }
-
-  out = lines.join("\n");
-
-  // Normalize extra spacing after cleanup.
-  out = out.replace(/\n{3,}/g, "\n\n").trim();
-  return out;
-}
+// cleanupMarkdown is provided by /js/cleanup-markdown.js (loaded via <script> in offscreen.html)
+var cleanupMarkdown = (window.W2M && window.W2M.cleanupMarkdown) || self.cleanupMarkdown;
