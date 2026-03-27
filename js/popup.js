@@ -1006,6 +1006,14 @@
           state.navigate(STATES.RUNNING, { url: session.startUrl || self.currentUrl });
           self.connectCrawlPort();
         }
+      } else if (session && session.lastCrawlResult) {
+        // Le crawl vient de se terminer (stop depuis le dashboard) — afficher les résultats
+        var result = session.lastCrawlResult;
+        // Ne montrer que si le résultat est récent (< 5 min)
+        if (Date.now() - result.timestamp < 300000) {
+          chrome.runtime.sendMessage({ type: 'W2M_UPDATE_SESSION', patch: { lastCrawlResult: null } });
+          self._finalizeCrawl(result.stats, result.blockedUrls);
+        }
       }
     });
   };
