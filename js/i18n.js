@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  const translations = {
+  var translations = {
     fr: {
       'app.title': 'Webpage to Markdown',
       'home.title': 'Convertir cette page\nen Markdown',
@@ -284,7 +284,7 @@
     }
   };
 
-  let currentLocale = 'fr';
+  var currentLocale = 'fr';
 
   function t(key, params) {
     params = params || {};
@@ -307,9 +307,8 @@
 
   function getLocale() { return currentLocale; }
 
-  async function initLocale() {
-    try {
-      var result = await chrome.storage.local.get('locale');
+  function initLocale() {
+    return chrome.storage.local.get('locale').then(function (result) {
       if (result.locale && translations[result.locale]) {
         currentLocale = result.locale;
       } else {
@@ -317,7 +316,7 @@
         currentLocale = translations[lang] ? lang : 'fr';
       }
       document.documentElement.setAttribute('lang', currentLocale);
-    } catch (e) { currentLocale = 'fr'; }
+    }).catch(function () { currentLocale = 'fr'; });
   }
 
   function formatDuration(ms) {
