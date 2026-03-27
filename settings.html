@@ -1,9 +1,10 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="fr" data-theme="dark">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Settings</title>
+  <script src="js/theme-init.js"></script>
   <link rel="stylesheet" href="styles.css">
   <style>body { max-width: 500px; margin: 0 auto; }</style>
 </head>
@@ -25,22 +26,6 @@
   <script src="js/i18n.js"></script>
   <script src="js/app-state.js"></script>
   <script src="js/settings.js"></script>
-  <script>
-    (function() {
-      W2M.i18n.initLocale().then(function() {
-        document.getElementById('settings-title').textContent = W2M.i18n.t('settings.title');
-      });
-      chrome.storage.local.get('theme', function(r) {
-        var theme = r.theme || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-        document.documentElement.setAttribute('data-theme', theme);
-      });
-      document.getElementById('settings-theme-btn').addEventListener('click', function() {
-        var cur = document.documentElement.getAttribute('data-theme');
-        var next = cur === 'dark' ? 'light' : 'dark';
-        document.documentElement.setAttribute('data-theme', next);
-        chrome.storage.local.set({ theme: next });
-      });
-    })();
-  </script>
+  <script src="js/settings-page.js"></script>
 </body>
 </html>
