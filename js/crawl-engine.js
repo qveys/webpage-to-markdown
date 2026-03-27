@@ -39,6 +39,7 @@ class CrawlEngine {
     this.logBuffer = [];
     this.downloadedAssets = new Map();
     this._broadcastTimer = null;
+    this._abortController = null;
     /** @type {(() => Promise<void>) | null} */
     this._onSessionEnded =
       typeof options.onSessionEnded === "function"
@@ -296,7 +297,7 @@ class CrawlEngine {
       // Parse via offscreen document
       const result = await this.parseInOffscreen(url, html);
       if (!result || !result.markdown) {
-        this.log("error", `Parse failed for: ${url}`);
+        this.log("error", `Parse failed for: ${url} (${result?.error || 'unknown'})`);
         return;
       }
 
@@ -601,25 +602,34 @@ class CrawlEngine {
   // ─── State persistence ─────────────────────────────────────────────────────
 
   async saveState() {
-    await chrome.storage.local.set({
-      crawlState: {
-        status: this.status,
-        stats: this.stats,
-        capturedUrls: [...this.capturedUrls],
-        blockedUrls: this.blockedUrls,
-        config: this.config,
-        scope: this.scope,
-      },
-    });
-
-    await chrome.storage.session.set({
-      crawlQueue: this.discoveryQueue,
-    });
+    try {
+      await chrome.storage.local.set({
+        crawlState: {
+          status: this.status,
+          stats: this.stats,
+          capturedUrls: [...this.capturedUrls],
+          blockedUrls: this.blockedUrls,
+          config: this.config,
+          scope: this.scope,
+        },
+      });
+      await chrome.storage.session.set({
+        crawlQueue: this.discoveryQueue,
+      });
+    } catch (err) {
+      this.log("error", `State save failed: ${err.message}`);
+    }
   }
 
   async restoreState() {
-    const { crawlState } = await chrome.storage.local.get("crawlState");
-    const { crawlQueue } = await chrome.storage.session.get("crawlQueue");
+    let crawlState, crawlQueue;
+    try {
+      ({ crawlState } = await chrome.storage.local.get("crawlState"));
+      ({ crawlQueue } = await chrome.storage.session.get("crawlQueue"));
+    } catch (err) {
+      this.log("error", `State restore failed: ${err.message}`);
+      return false;
+    }
 
     if (!crawlState) return false;
 
