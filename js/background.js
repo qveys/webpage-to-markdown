@@ -265,6 +265,45 @@ function cleanupMarkdown(markdown) {
   return out;
 }
 
+// ─── Force-skip "save as" dialog ─────────────────────────────────────────────
+// Chrome ignores saveAs:false when "Ask where to save" is enabled in settings.
+// We track pending downloads and use onDeterminingFilename to force the filename.
+
+const _pendingDownloads = new Map(); // downloadId → filename
+let _downloadQueue = Promise.resolve(); // serialise chrome.downloads calls
+
+chrome.downloads.onDeterminingFilename.addListener((item, suggest) => {
+  if (_pendingDownloads.has(item.id)) {
+    suggest({ filename: _pendingDownloads.get(item.id), conflictAction: "overwrite" });
+    _pendingDownloads.delete(item.id);
+  }
+});
+
+async function w2mDownload(options) {
+  // Serialise downloads so onDeterminingFilename always finds the pending entry
+  const ticket = _downloadQueue;
+  let release;
+  _downloadQueue = new Promise((r) => { release = r; });
+  await ticket;
+
+  try {
+    const id = await new Promise((resolve, reject) => {
+      chrome.downloads.download(options, (downloadId) => {
+        if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+        else {
+          // Register INSIDE the callback, before the microtask boundary,
+          // so onDeterminingFilename always finds the entry.
+          if (options.filename) _pendingDownloads.set(downloadId, options.filename);
+          resolve(downloadId);
+        }
+      });
+    });
+    return id;
+  } finally {
+    release();
+  }
+}
+
 // ─── Téléchargement via chrome.downloads ────────────────────────────────────
 // Les service workers n'ont pas accès à Blob/URL.createObjectURL.
 // On encode le markdown en data URL pour chrome.downloads.download().
@@ -279,7 +318,7 @@ async function downloadMarkdown(markdown, title) {
   const encoded = encodeURIComponent(markdown);
   const dataUrl = `data:text/markdown;charset=utf-8,${encoded}`;
 
-  await chrome.downloads.download({
+  await w2mDownload({
     url: dataUrl,
     filename: filename,
     saveAs: false,
@@ -287,66 +326,6 @@ async function downloadMarkdown(markdown, title) {
   });
 }
 
-// ─── Listener externe ─────────────────────────────────────────────────────────
-
-chrome.runtime.onMessageExternal.addListener(
-  (message, sender, sendResponse) => {
-    if (message?.type !== "W2M_CONVERT_AND_DOWNLOAD") return false;
-
-    console.log("[W2M] External command:", message);
-
-    (async () => {
-      try {
-        const [tab] = await chrome.tabs.query({
-          active: true,
-          lastFocusedWindow: true,
-        });
-        if (!tab || !tab.id) throw new Error("No active tab found");
-
-        if (
-          tab.url.startsWith("chrome://") ||
-          tab.url.startsWith("chrome-extension://") ||
-          tab.url.startsWith("edge://") ||
-          tab.url.startsWith("about:") ||
-          tab.url.includes("chrome.google.com/webstore")
-        ) {
-          throw new Error("Cannot convert system pages or Web Store");
-        }
-
-        const results = await chrome.scripting.executeScript({
-          target: { tabId: tab.id },
-          func: extractPageContent,
-        });
-
-        if (!results?.[0]?.result)
-          throw new Error("Failed to get page content");
-
-        const { success, content, title, url, error } = results[0].result;
-        if (!success) throw new Error(error || "Failed to extract content");
-
-        const markdown = convertToMarkdown(title, content);
-
-        await downloadMarkdown(markdown, title);
-
-        await chrome.storage.local.set({
-          lastConversion: {
-            url: tab.url,
-            markdown,
-            timestamp: new Date().toISOString(),
-          },
-        });
-
-        sendResponse({ ok: true });
-      } catch (err) {
-        console.error("[W2M] Error:", err);
-        sendResponse({ ok: false, error: err.message });
-      }
-    })();
-
-    // OBLIGATOIRE : indique à Chrome que sendResponse sera appelé de façon asynchrone
-    return true;
-  },
-);
 
 // ─── Auto-capture session ──────────────────────────────────────────────────
 
@@ -375,8 +354,11 @@ async function setSession(patch) {
   return updated;
 }
 
-async function updateBadge(active) {
-  if (active) {
+async function updateBadge(status) {
+  if (status === "paused") {
+    await chrome.action.setBadgeText({ text: "❚❚" });
+    await chrome.action.setBadgeBackgroundColor({ color: "#f59e0b" });
+  } else if (status === true || status === "running") {
     await chrome.action.setBadgeText({ text: "●" });
     await chrome.action.setBadgeBackgroundColor({ color: "#22c55e" });
   } else {
@@ -487,6 +469,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
   if (message.type === "W2M_UPDATE_SESSION") {
+    if (crawlEngine && crawlEngine.status !== "stopped") {
+      crawlEngine.updateConfig(message.patch);
+    }
     setSession(message.patch)
       .then((session) => sendResponse({ ok: true, session }))
       .catch((err) => sendResponse({ ok: false, error: err.message }));
@@ -513,7 +498,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         const delay = message.delay ?? 2000;
         const urlTree = message.urlTree ?? true;
         const saveAssets = message.saveAssets ?? true;
-        await setSession({ active: true, folder, delay, urlTree, saveAssets, crawling: true });
+        await setSession({ active: true, folder, delay, urlTree, saveAssets, crawling: true, startUrl: message.startUrl });
         crawlSessionCommitted = true;
         updateBadge(true);
         await crawlEngine.start(message.startUrl, {
@@ -1050,20 +1035,20 @@ function extractAndConvert() {
 function urlToPath(pageUrl) {
   try {
     const u = new URL(pageUrl);
+    const clean = (s) =>
+      s.replace(/[^a-z0-9\-_.]/gi, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
     // Nettoyer le hostname
-    const host = u.hostname.replace(/[^a-z0-9.\-]/gi, "-");
+    const host = clean(u.hostname);
     // Découper le pathname en segments, nettoyer chaque segment
-    const segments = u.pathname
-      .split("/")
-      .map((s) =>
-        s
-          .replace(/[^a-z0-9\-_.]/gi, "-")
-          .replace(/-+/g, "-")
-          .replace(/^-|-$/g, ""),
-      )
-      .filter(Boolean);
+    const segments = u.pathname.split("/").map(clean).filter(Boolean);
     // Le dernier segment devient le nom de fichier (.md), les autres sont des dossiers
-    const filename = segments.pop() || "index";
+    let filename = segments.pop() || "index";
+    // Inclure les query params dans le nom pour éviter les collisions
+    // ex: ?tab=ios → mullvad-exit-nodes--tab-ios.md
+    if (u.search) {
+      const suffix = clean(u.search.slice(1)); // drop the leading '?'
+      if (suffix) filename += "--" + suffix;
+    }
     return { dirs: [host, ...segments], filename };
   } catch (e) {
     return { dirs: [], filename: "page" };
@@ -1094,7 +1079,7 @@ async function downloadInSession(markdown, title, folder, pageUrl) {
   }
 
   const encoded = encodeURIComponent(markdown);
-  await chrome.downloads.download({
+  await w2mDownload({
     url: `data:text/markdown;charset=utf-8,${encoded}`,
     filename: `${folder}/${mdPath}`,
     saveAs: false,
@@ -1161,14 +1146,22 @@ async function downloadAssets(markdown, folder, mdPath, options = {}) {
       }
       usedLocalNames.add(localName);
 
-      await chrome.downloads.download({
+      // Skip if already downloaded in this session (e.g. shared across pages)
+      const downloadedAssets = options.downloadedAssets;
+      if (downloadedAssets && downloadedAssets.has(imgUrl)) {
+        downloaded.set(imgUrl, downloadedAssets.get(imgUrl));
+        continue;
+      }
+
+      await w2mDownload({
         url: imgUrl,
         filename: `${assetsDir}/${localName}`,
         saveAs: false,
-        conflictAction: "overwrite",
+        conflictAction: "uniquify",
       });
 
       downloaded.set(imgUrl, localName);
+      if (downloadedAssets) downloadedAssets.set(imgUrl, localName);
 
       if (typeof options.onAssetSaved === "function") {
         try {
@@ -1273,5 +1266,14 @@ async function w2mOnCrawlSessionEnded() {
 
 importScripts("/js/crawl-engine.js");
 
-const crawlEngine = new CrawlEngine({ onSessionEnded: w2mOnCrawlSessionEnded });
+const crawlEngine = new CrawlEngine({
+  onSessionEnded: w2mOnCrawlSessionEnded,
+  onStatusChange: (status) => {
+    updateBadge(status);
+    if (status === "stopped" || status === "done") {
+      const payload = crawlEngine.getStatusPayload();
+      chrome.runtime.sendMessage({ type: "W2M_CRAWL_STATUS", ...payload }).catch(() => {});
+    }
+  },
+});
 crawlEngine.restoreState();
