@@ -894,12 +894,13 @@
       var cur = state.getState();
       if (cur === STATES.RUNNING || cur === STATES.PAUSED) {
         // During crawl, open side panel in settings view
-        chrome.windows.getCurrent(function (win) {
-          chrome.sidePanel.open({ windowId: win.id }, function () {
-            setTimeout(function () {
+        // Set flag first so dashboard shows settings even if it's just loading
+        chrome.storage.local.set({ showSettingsOnOpen: true }, function () {
+          chrome.windows.getCurrent(function (win) {
+            chrome.sidePanel.open({ windowId: win.id }, function () {
               chrome.runtime.sendMessage({ type: 'W2M_SHOW_SETTINGS' }).catch(function () {});
-            }, 300);
-            window.close();
+              window.close();
+            });
           });
         });
       } else {

@@ -84,6 +84,7 @@
       self._listenForMessages();
       self._connectPort();
       self._loadSession();
+      self._checkShowSettings();
       self._initDebugMode();
     });
   };
@@ -678,6 +679,20 @@
       if (this.$settingsBtn) this.$settingsBtn.classList.remove('hidden');
       this._loadSession();
     }
+  };
+
+  // --- Check if popup requested settings view on open ---
+
+  Dashboard.prototype._checkShowSettings = function () {
+    var self = this;
+    chrome.storage.local.get('showSettingsOnOpen', function (r) {
+      if (r.showSettingsOnOpen) {
+        chrome.storage.local.remove('showSettingsOnOpen');
+        if (!self.settingsVisible) {
+          self._toggleSettings();
+        }
+      }
+    });
   };
 
   // --- Message listener ---
