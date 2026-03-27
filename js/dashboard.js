@@ -106,8 +106,10 @@
     this.$footer = document.getElementById('dash-footer');
     this.$pauseBtn = document.getElementById('dash-pause');
     this.$stopBtn = document.getElementById('dash-stop');
+    this.$resetBtn = document.getElementById('dash-reset');
     this.$retryAllBtn = document.getElementById('dash-retry-all');
     this.$settingsBtn = document.getElementById('dash-settings-btn');
+    this.$backBtn = document.getElementById('dash-back-btn');
     this.$themeBtn = document.getElementById('dash-theme-btn');
     this.$debug = document.getElementById('dash-debug');
   };
@@ -285,7 +287,9 @@
       type: entry.type || 'info',
       url: entry.message || '',
       fileName: entry.fileName || '',
+      assetUrl: entry.assetUrl || '',
       pageUrl: entry.pageUrl || '',
+      pageLabel: entry.pageLabel || '',
       timestamp: entry.timestamp || Date.now()
     };
 
@@ -336,18 +340,19 @@
     var isStopped = newStatus === 'stopped';
     if (this.$pauseBtn) this.$pauseBtn.disabled = isStopped;
     if (this.$stopBtn) this.$stopBtn.disabled = isStopped;
+    if (this.$resetBtn) this.$resetBtn.disabled = !isStopped;
   };
 
   Dashboard.prototype._updatePauseIcon = function () {
     if (!this.$pauseBtn) return;
     while (this.$pauseBtn.firstChild) this.$pauseBtn.removeChild(this.$pauseBtn.firstChild);
 
-    if (this.status === 'paused') {
-      this.$pauseBtn.appendChild(createSvgIcon(ICON_PLAY, 16, 16, 'currentColor'));
-      this.$pauseBtn.setAttribute('aria-label', t('progress.resume'));
-    } else {
+    if (this.status === 'running') {
       this.$pauseBtn.appendChild(createSvgIcon(ICON_PAUSE, 16, 16, 'currentColor'));
       this.$pauseBtn.setAttribute('aria-label', t('progress.pause'));
+    } else {
+      this.$pauseBtn.appendChild(createSvgIcon(ICON_PLAY, 16, 16, 'currentColor'));
+      this.$pauseBtn.setAttribute('aria-label', t('progress.resume'));
     }
   };
 
@@ -452,10 +457,21 @@
 
     var textCell;
     if (item.type === 'asset' && item.fileName) {
-      var shownAssetUrl = this._displayPath(item.url);
+      var assetChildren = [
+        el('div', { className: 'activity-url activity-item__page', textContent: item.fileName, title: item.assetUrl || item.fileName })
+      ];
+      if (item.assetUrl) {
+        assetChildren.push(el('div', { className: 'activity-item__detail text-muted', textContent: 'URL: ' + this._displayPath(item.assetUrl), title: item.assetUrl }));
+      }
+      if (item.pageLabel) {
+        assetChildren.push(el('div', { className: 'activity-item__detail text-muted', textContent: 'Page: ' + item.pageLabel, title: item.pageUrl }));
+      }
+      textCell = el('div', { className: 'activity-item__stack' });
+      for (var i = 0; i < assetChildren.length; i++) textCell.appendChild(assetChildren[i]);
+    } else if (item.type === 'capture' && item.pageUrl) {
       textCell = el('div', { className: 'activity-item__stack' },
-        el('div', { className: 'activity-url activity-item__page', textContent: shownAssetUrl, title: item.pageUrl || item.url }),
-        el('div', { className: 'activity-item__asset text-muted', textContent: t('dashboard.activity.asset', { name: item.fileName }) })
+        el('div', { className: 'activity-url activity-item__page', textContent: this._displayPath(item.pageUrl), title: item.pageUrl }),
+        el('div', { className: 'activity-item__detail text-muted', textContent: 'Title: ' + item.url, title: item.url })
       );
     } else {
       var shownUrl = this._displayPath(item.url);
@@ -576,8 +592,18 @@
       this.$retryAllBtn.addEventListener('click', function () { self._retryAll(); });
     }
 
+    if (this.$resetBtn) {
+      this.$resetBtn.addEventListener('click', function () { self._resetDashboard(); });
+    }
+
     if (this.$settingsBtn) {
       this.$settingsBtn.addEventListener('click', function () { self._toggleSettings(); });
+    }
+
+    if (this.$backBtn) {
+      this.$backBtn.addEventListener('click', function () {
+        if (self.settingsVisible) self._toggleSettings();
+      });
     }
   };
 
@@ -593,6 +619,37 @@
   Dashboard.prototype._stopCrawl = function () {
     if (!this.port) return;
     this.port.postMessage({ type: 'crawl:stop' });
+  };
+
+  Dashboard.prototype._resetDashboard = function () {
+    // Clear stats
+    this.stats = { captured: 0, queued: 0, blocked: 0, startTime: 0 };
+    this.blockedUrls = [];
+    this._updateUI();
+    this._renderErrors();
+
+    // Clear activity list
+    if (this.$activity) {
+      while (this.$activity.firstChild) this.$activity.removeChild(this.$activity.firstChild);
+    }
+
+    // Clear debug
+    if (this.$debug) {
+      this._debugBuilt = false;
+      while (this.$debug.firstChild) this.$debug.removeChild(this.$debug.firstChild);
+    }
+
+    // Reset progress
+    if (this.$progressFill) this.$progressFill.style.width = '0%';
+    if (this.$speed) this.$speed.textContent = '';
+    if (this.$elapsed) this.$elapsed.textContent = '';
+
+    // Tell background to clear crawl state
+    if (this.port) {
+      this.port.postMessage({ type: 'crawl:reset' });
+    }
+
+    this._loadSession();
   };
 
   Dashboard.prototype._retryUrl = function (url) {
@@ -638,10 +695,14 @@
       if (this.$footer) this.$footer.classList.add('hidden');
       if (this.$settingsView) this.$settingsView.classList.remove('hidden');
       if (this.$site) this.$site.textContent = t('settings.title');
+      if (this.$backBtn) this.$backBtn.classList.remove('hidden');
+      if (this.$settingsBtn) this.$settingsBtn.classList.add('hidden');
     } else {
       if (this.$monitor) this.$monitor.classList.remove('hidden');
       if (this.$footer) this.$footer.classList.remove('hidden');
       if (this.$settingsView) this.$settingsView.classList.add('hidden');
+      if (this.$backBtn) this.$backBtn.classList.add('hidden');
+      if (this.$settingsBtn) this.$settingsBtn.classList.remove('hidden');
       this._loadSession();
     }
   };
@@ -691,7 +752,8 @@
     var self = this;
 
     var warn = el('div', { className: 'dash-debug__warn text-muted' }, t('debug.warn'));
-    var title = el('div', { className: 'dash-debug__title section-label' }, t('debug.title'));
+    var chevron = el('span', { className: 'dash-debug__chevron' }, '\u25BC');
+    var title = el('div', { className: 'dash-debug__title section-label', style: 'cursor:pointer;display:flex;align-items:center;gap:6px;user-select:none' }, chevron, t('debug.title'));
 
     var meta = el('div', { className: 'dash-debug__meta text-muted' });
     var syncBadge = el('span', { className: 'dash-debug__sync dash-debug__sync--bad hidden' });
@@ -736,13 +798,21 @@
     var filterRow = el('div', { className: 'dash-debug__filter-row' }, filterInput, logSelect);
     var content = el('div', { className: 'dash-debug__content' });
 
+    var body = el('div', { className: 'dash-debug__body' });
+    body.appendChild(warn);
+    body.appendChild(el('div', { className: 'dash-debug__meta-row' }, meta, syncBadge));
+    body.appendChild(toolbar);
+    body.appendChild(tabs);
+    body.appendChild(filterRow);
+    body.appendChild(content);
+
+    title.addEventListener('click', function () {
+      var collapsed = body.classList.toggle('hidden');
+      chevron.textContent = collapsed ? '\u25B6' : '\u25BC';
+    });
+
     this.$debug.appendChild(title);
-    this.$debug.appendChild(warn);
-    this.$debug.appendChild(el('div', { className: 'dash-debug__meta-row' }, meta, syncBadge));
-    this.$debug.appendChild(toolbar);
-    this.$debug.appendChild(tabs);
-    this.$debug.appendChild(filterRow);
-    this.$debug.appendChild(content);
+    this.$debug.appendChild(body);
 
     this._debugEls = { meta: meta, syncBadge: syncBadge, filterInput: filterInput, logSelect: logSelect, content: content, tabs: tabs };
     this._setDebugTab('done');
