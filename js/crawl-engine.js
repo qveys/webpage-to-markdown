@@ -146,7 +146,7 @@ class CrawlEngine {
     this._abortController = new AbortController();
     this.status = "running";
     this.log("info", `Crawl started: ${startUrl}`);
-    this.broadcastStatus();
+    this.broadcastStatus(true);
     this.spawnWorkers();
   }
 
@@ -159,7 +159,7 @@ class CrawlEngine {
     }
     this.log("info", "Crawl paused");
     await this.saveState();
-    this.broadcastStatus();
+    this.broadcastStatus(true);
   }
 
   async resume() {
@@ -175,7 +175,7 @@ class CrawlEngine {
     this.status = "running";
     this.consecutiveBlocks = 0;
     this.log("info", "Crawl resumed");
-    this.broadcastStatus();
+    this.broadcastStatus(true);
     this.spawnWorkers();
   }
 
@@ -190,7 +190,7 @@ class CrawlEngine {
     try { chrome.downloads.setUiOptions({ enabled: true }); } catch (_) {}
     this.log("info", "Crawl stopped");
     await this.saveState();
-    this.broadcastStatus();
+    this.broadcastStatus(true);
     if (wasActive) await this._invokeSessionEnded();
   }
 
@@ -205,7 +205,7 @@ class CrawlEngine {
     this.logBuffer = [];
     this.stats = { captured: 0, queued: 0, blocked: 0, startTime: 0 };
     await this.saveState();
-    this.broadcastStatus();
+    this.broadcastStatus(true);
   }
 
   // ─── Workers ────────────────────────────────────────────────────────────────
@@ -247,7 +247,7 @@ class CrawlEngine {
           this.status = "stopped";
           chrome.alarms.clear("crawl-keepalive");
           await this.saveState();
-          this.broadcastStatus();
+          this.broadcastStatus(true);
           await this._invokeSessionEnded();
         }
       }
@@ -314,7 +314,9 @@ class CrawlEngine {
       }
 
       this.broadcastStatus();
-      await this.saveState();
+      // Throttle persistence: the keepalive alarm already saves every 24 s;
+      // we only force-save every 5 captures so workers aren't blocked on storage I/O.
+      if (this.stats.captured % 5 === 0) await this.saveState();
     } catch (err) {
       if (err.name === "AbortError") {
         // Paused/stopped — re-queue the URL so it's retried on resume
@@ -345,15 +347,11 @@ class CrawlEngine {
   // ─── Anti-bot ───────────────────────────────────────────────────────────────
 
   looksLikeCaptcha(html) {
-    const lower = html.toLowerCase();
-    const indicators = [
-      "captcha",
-      "cf-challenge",
-      "hcaptcha",
-      "recaptcha",
-      "challenge-platform",
-    ];
-    return indicators.some((term) => lower.includes(term));
+    // Only check the first 4 KB (where challenge scripts live) to avoid
+    // allocating a lowercased copy of the entire response body.
+    return /captcha|cf-challenge|hcaptcha|recaptcha|challenge-platform/i.test(
+      html.slice(0, 4096)
+    );
   }
 
   handleBlocked(url, reason) {
@@ -546,7 +544,23 @@ class CrawlEngine {
     };
   }
 
-  broadcastStatus() {
+  broadcastStatus(immediate = false) {
+    if (immediate) {
+      clearTimeout(this._broadcastTimer);
+      this._broadcastTimer = null;
+      this._broadcastNow();
+      return;
+    }
+    // Coalesce rapid-fire calls into one broadcast per 200 ms
+    if (this._broadcastTimer) return;
+    this._broadcastTimer = setTimeout(() => {
+      this._broadcastTimer = null;
+      this._broadcastNow();
+    }, 200);
+  }
+
+  _broadcastNow() {
+    if (this.ports.size === 0 && !this._onStatusChange) return;
     const payload = this.getStatusPayload();
     for (const port of this.ports) {
       try {
