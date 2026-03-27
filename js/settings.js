@@ -32,6 +32,8 @@
         if (area !== 'local') return;
         if (!changes.captureSettings && !changes.crawlSettings && !changes.markdownSettings) return;
         if (!self.container || !document.body.contains(self.container)) return;
+        // Skip re-render for our own saves
+        if (self._ownSave) return;
         self.loadSettings();
       });
     }
@@ -328,12 +330,14 @@
       depth: depthVal
     };
 
+    this._ownSave = true;
+    var self = this;
     chrome.storage.local.set({
       markdownSettings: markdownSettings,
       captureSettings: captureSettings,
       crawlSettings: crawlSettings,
       debugCrawlPanel: this._refs.debugCrawl ? this._refs.debugCrawl.checked : this.debugCrawlPanel
-    });
+    }, function () { self._ownSave = false; });
 
     chrome.runtime.sendMessage({
       type: 'W2M_UPDATE_SESSION',
