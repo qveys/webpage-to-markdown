@@ -650,6 +650,10 @@
         bar.appendChild(progressFill);
         container.appendChild(bar);
 
+        speedEl = el('span', { className: 'text-muted', textContent: t('progress.speed', { speed: 0 }) });
+        elapsedEl = el('span', { className: 'text-muted', textContent: t('progress.elapsed', { time: '0s' }) });
+        container.appendChild(el('div', { className: 'progress-info mt-3' }, speedEl, elapsedEl));
+
         var stats = el('div', { className: 'stat-grid mt-3' });
         statCaptured = el('div', { className: 'stat-value', textContent: '0' });
         stats.appendChild(el('div', { className: 'stat-card stat-card--success' }, statCaptured, el('div', { className: 'stat-label', textContent: t('progress.done') })));
@@ -658,11 +662,6 @@
         statErrors = el('div', { className: 'stat-value', textContent: '0' });
         stats.appendChild(el('div', { className: 'stat-card stat-card--error' }, statErrors, el('div', { className: 'stat-label', textContent: t('progress.errors') })));
         container.appendChild(stats);
-
-        speedEl = el('div', { className: 'text-muted mt-3', textContent: t('progress.speed', { speed: 0 }) });
-        elapsedEl = el('div', { className: 'text-muted', textContent: t('progress.elapsed', { time: '0s' }) });
-        container.appendChild(speedEl);
-        container.appendChild(elapsedEl);
 
         container.appendChild(el('div', { className: 'section-label mt-4', textContent: t('progress.recent') }));
         activityList = el('div', { className: 'activity-list' });
@@ -720,22 +719,74 @@
     return {
       render: function () {
         var hasErr = (data.blocked || 0) > 0;
+        var captured = data.captured || 0;
+        var blocked = data.blocked || 0;
+        var images = data.images || 0;
         var container = el('div', { className: 'view-crawl-result' });
-        container.appendChild(el('div', { className: 'view-crawl-result__summary' },
-          el('div', { className: 'view-result__status' },
-            el('span', { className: hasErr ? 'text-warning' : 'text-success', textContent: '\u2713' }),
-            el('span', { className: 'heading-lg', textContent: t('crawlresult.pages', { count: data.captured || 0 }) })
-          ),
-          el('div', { className: 'text-muted', textContent: (hasErr ? t('crawlresult.errors', { count: data.blocked }) + ' \u00B7 ' : '') + t('crawlresult.images', { count: data.images || 0 }) })
-        ));
-        var stats = el('div', { className: 'view-crawl-result__stats mt-3' });
-        if (data.folder) stats.appendChild(el('div', { textContent: t('crawlresult.folder', { folder: data.folder }) }));
-        if (data.duration) stats.appendChild(el('div', { textContent: t('crawlresult.duration', { time: formatDuration(data.duration) }) }));
-        if (data.totalSize) stats.appendChild(el('div', { textContent: t('crawlresult.size', { size: formatSize(data.totalSize) }) }));
-        container.appendChild(stats);
 
+        // Hero status
+        var iconClass = hasErr ? 'crawl-hero--warning' : 'crawl-hero--success';
+        var iconChar = hasErr ? '\u26A0' : '\u2713';
+        container.appendChild(el('div', { className: 'crawl-hero ' + iconClass },
+          el('div', { className: 'crawl-hero__icon', textContent: iconChar }),
+          el('div', { className: 'crawl-hero__title', textContent: t('crawlresult.pages', { count: captured }) }),
+          hasErr
+            ? el('div', { className: 'crawl-hero__sub', textContent: t('crawlresult.errors', { count: blocked }) })
+            : el('div', { className: 'crawl-hero__sub', textContent: t('crawlresult.title') })
+        ));
+
+        // Stats row
+        var statsGrid = el('div', { className: 'stat-grid mt-4' });
+        statsGrid.appendChild(el('div', { className: 'stat-card stat-card--success' },
+          el('div', { className: 'stat-value', textContent: String(captured) }),
+          el('div', { className: 'stat-label', textContent: t('progress.done') })
+        ));
+        statsGrid.appendChild(el('div', { className: 'stat-card stat-card--error' },
+          el('div', { className: 'stat-value', textContent: String(blocked) }),
+          el('div', { className: 'stat-label', textContent: t('progress.errors') })
+        ));
+        statsGrid.appendChild(el('div', { className: 'stat-card stat-card--info' },
+          el('div', { className: 'stat-value', textContent: String(images) }),
+          el('div', { className: 'stat-label', textContent: 'Images' })
+        ));
+        container.appendChild(statsGrid);
+
+        // Details card
+        var detailRows = [];
+        if (data.folder) {
+          detailRows.push(el('div', { className: 'crawl-detail__row' },
+            el('span', { className: 'crawl-detail__label', textContent: t('crawlresult.folder', { folder: '' }).replace(':', '').trim() }),
+            el('span', { className: 'crawl-detail__value monospace', textContent: data.folder })
+          ));
+        }
+        if (data.duration) {
+          detailRows.push(el('div', { className: 'crawl-detail__row' },
+            el('span', { className: 'crawl-detail__label', textContent: t('crawlresult.duration', { time: '' }).replace(':', '').trim() }),
+            el('span', { className: 'crawl-detail__value', textContent: formatDuration(data.duration) })
+          ));
+        }
+        if (captured > 0 && data.duration > 0) {
+          var pagesPerMin = Math.round((captured / data.duration) * 60000);
+          detailRows.push(el('div', { className: 'crawl-detail__row' },
+            el('span', { className: 'crawl-detail__label', textContent: t('progress.speed', { speed: '' }).replace(':', '').replace('~', '').trim() }),
+            el('span', { className: 'crawl-detail__value', textContent: '~' + pagesPerMin + ' pages/min' })
+          ));
+        }
+        if (data.totalSize) {
+          detailRows.push(el('div', { className: 'crawl-detail__row' },
+            el('span', { className: 'crawl-detail__label', textContent: t('crawlresult.size', { size: '' }).replace(':', '').trim() }),
+            el('span', { className: 'crawl-detail__value', textContent: formatSize(data.totalSize) })
+          ));
+        }
+        if (detailRows.length > 0) {
+          var detailCard = el('div', { className: 'card crawl-detail mt-4' });
+          detailRows.forEach(function (row) { detailCard.appendChild(row); });
+          container.appendChild(detailCard);
+        }
+
+        // Errors list
         if (hasErr && data.blockedUrls) {
-          container.appendChild(el('div', { className: 'section-label', textContent: t('crawlresult.errors.section', { count: data.blocked }) }));
+          container.appendChild(el('div', { className: 'section-label mt-4', textContent: t('crawlresult.errors.section', { count: blocked }) }));
           var errList = el('div', { className: 'view-crawl-result__errors' });
           (data.blockedUrls || []).forEach(function (err) {
             errList.appendChild(el('div', { className: 'error-item' },
@@ -749,11 +800,9 @@
           container.appendChild(errList);
         }
 
+        // Actions
         container.appendChild(el('div', { className: 'mt-4' },
-          el('button', { className: 'btn btn-primary btn-full', textContent: t('crawlresult.download'), onClick: function () { app.showToast(t('toast.downloaded'), 'success'); } })
-        ));
-        container.appendChild(el('div', { className: 'mt-3' },
-          el('button', { className: 'btn btn-secondary btn-full', textContent: t('crawlresult.new'), onClick: function () { state.navigate(STATES.IDLE); } })
+          el('button', { className: 'btn btn-primary btn-full', textContent: t('crawlresult.new'), onClick: function () { state.navigate(STATES.IDLE); } })
         ));
         return container;
       },
@@ -842,23 +891,53 @@
     });
 
     document.getElementById('btn-settings').addEventListener('click', function () {
-      // Open side panel directly (needs user gesture context)
-      chrome.windows.getCurrent(function (win) {
-        chrome.sidePanel.open({ windowId: win.id }, function () {
-          // Tell dashboard to show settings view
-          setTimeout(function () {
-            chrome.runtime.sendMessage({ type: 'W2M_SHOW_SETTINGS' }).catch(function () { });
-          }, 300);
+      var cur = state.getState();
+      if (cur === STATES.RUNNING || cur === STATES.PAUSED) {
+        // During crawl, open side panel in settings view
+        chrome.windows.getCurrent(function (win) {
+          chrome.sidePanel.open({ windowId: win.id }, function () {
+            setTimeout(function () {
+              chrome.runtime.sendMessage({ type: 'W2M_SHOW_SETTINGS' }).catch(function () {});
+            }, 300);
+            window.close();
+          });
         });
-      });
+      } else {
+        chrome.runtime.openOptionsPage();
+        window.close();
+      }
     });
 
-    // Listen for capture count updates
+    // Listen for capture count updates and crawl status broadcasts
     chrome.runtime.onMessage.addListener(function (message) {
       if (message.type === 'W2M_CAPTURE_COUNT') {
         var current = state.getState();
         if (current === STATES.RUNNING || current === STATES.PAUSED) {
           state.updateData({ captured: message.count });
+        }
+      }
+      if (message.type === 'W2M_CRAWL_STATUS' && message.status === 'stopped') {
+        var cur = state.getState();
+        if (cur === STATES.RUNNING || cur === STATES.PAUSED) {
+          var stats = message.stats || {};
+          var d = state.getData();
+          var startMs = stats.startTime != null ? stats.startTime : Date.now();
+          var blocked = stats.blocked != null ? stats.blocked : (d.blocked || 0);
+          var hasErrors = blocked > 0;
+          var targetState = hasErrors ? STATES.CRAWL_PARTIAL : STATES.CRAWL_SUCCESS;
+          state.navigate(targetState, {
+            captured: stats.captured != null ? stats.captured : (d.captured || 0),
+            blocked: blocked,
+            images: stats.images != null ? stats.images : (d.images || 0),
+            folder: d.folder || '',
+            duration: Date.now() - startMs,
+            totalSize: stats.totalSize != null ? stats.totalSize : (d.totalSize || 0),
+            blockedUrls: message.blockedUrls || d.blockedUrls || []
+          });
+          if (self.crawlPort) {
+            self.crawlPort.disconnect();
+            self.crawlPort = null;
+          }
         }
       }
     });
@@ -897,8 +976,42 @@
     } else {
       document.documentElement.removeAttribute('data-theme');
     }
-    // The theme icon in the header changes based on data-theme via CSS
-    // but we keep a sun icon always; the button toggles the theme
+    this._updateThemeIcon(isDark);
+  };
+
+  App.prototype._updateThemeIcon = function (isDark) {
+    var btn = document.getElementById('btn-theme');
+    if (!btn) return;
+    while (btn.firstChild) btn.removeChild(btn.firstChild);
+    var NS = 'http://www.w3.org/2000/svg';
+    var svg = document.createElementNS(NS, 'svg');
+    svg.id = 'icon-theme';
+    svg.setAttribute('width', '18');
+    svg.setAttribute('height', '18');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('fill', 'none');
+    svg.setAttribute('stroke', 'currentColor');
+    svg.setAttribute('stroke-width', '2');
+    svg.setAttribute('stroke-linecap', 'round');
+    svg.setAttribute('stroke-linejoin', 'round');
+    if (isDark) {
+      var path = document.createElementNS(NS, 'path');
+      path.setAttribute('d', 'M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z');
+      svg.appendChild(path);
+    } else {
+      var circle = document.createElementNS(NS, 'circle');
+      circle.setAttribute('cx', '12');
+      circle.setAttribute('cy', '12');
+      circle.setAttribute('r', '5');
+      svg.appendChild(circle);
+      [['12','1','12','3'],['12','21','12','23'],['4.22','4.22','5.64','5.64'],['18.36','18.36','19.78','19.78'],['1','12','3','12'],['21','12','23','12'],['4.22','19.78','5.64','18.36'],['18.36','5.64','19.78','4.22']].forEach(function (r) {
+        var line = document.createElementNS(NS, 'line');
+        line.setAttribute('x1', r[0]); line.setAttribute('y1', r[1]);
+        line.setAttribute('x2', r[2]); line.setAttribute('y2', r[3]);
+        svg.appendChild(line);
+      });
+    }
+    btn.appendChild(svg);
   };
 
   App.prototype._getCurrentTab = function (callback) {
@@ -1039,7 +1152,6 @@
           return;
         }
         if (res && res.ok) {
-          self.openDashboard();
           state.navigate(STATES.RUNNING, { url: self.currentUrl, folder: folder });
           self.connectCrawlPort();
         } else {
@@ -1183,7 +1295,7 @@
   App.prototype.openDashboard = function () {
     chrome.windows.getCurrent(function (win) {
       chrome.sidePanel.open({ windowId: win.id }, function () {
-        // Side panel opened
+        window.close();
       });
     });
   };
