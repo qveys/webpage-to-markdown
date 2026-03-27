@@ -70,6 +70,7 @@
     this._debugBuilt = false;
     this._debugEls = null;
     this._debugFilterTimer = null;
+    this._lastBlockedKey = '';
 
     this._initLocale();
   }
@@ -854,7 +855,7 @@
 
   Dashboard.prototype._debugRowUrl = function (url, extraNode) {
     var shownUrl = this._displayPath(url);
-    var openBtn = el('button', { className: 'btn btn-secondary btn-sm', type: 'button', textContent: t('dashboard.open'), onClick: function () { chrome.tabs.create({ url: url }); } });
+    var openBtn = el('button', { className: 'btn btn-secondary btn-sm', type: 'button', textContent: t('dashboard.open'), onClick: function () { if (/^https?:/.test(url)) chrome.tabs.create({ url: url }); } });
     var row = el('div', { className: 'dash-debug__row' },
       el('div', { className: 'dash-debug__url monospace', textContent: shownUrl, title: url })
     );

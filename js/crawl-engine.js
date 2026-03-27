@@ -207,7 +207,7 @@ class CrawlEngine {
     this.downloadedAssets = new Map();
     this.lastPage = null;
     this.logBuffer = [];
-    this.stats = { captured: 0, queued: 0, blocked: 0, startTime: 0 };
+    this.stats = { captured: 0, queued: 0, blocked: 0, startTime: null };
     await this.saveState();
     this.broadcastStatus(true);
   }
