@@ -37,6 +37,8 @@ class CrawlEngine {
     this.consecutiveBlocks = 0;
     this.ports = new Set();
     this.logBuffer = [];
+    this.downloadedAssets = new Map();
+    this._broadcastTimer = null;
     /** @type {(() => Promise<void>) | null} */
     this._onSessionEnded =
       typeof options.onSessionEnded === "function"
@@ -188,6 +190,8 @@ class CrawlEngine {
     chrome.alarms.clear("crawl-keepalive");
     // Re-enable Chrome download UI
     try { chrome.downloads.setUiOptions({ enabled: true }); } catch (_) {}
+    clearTimeout(this._broadcastTimer);
+    this._broadcastTimer = null;
     this.log("info", "Crawl stopped");
     await this.saveState();
     this.broadcastStatus(true);
@@ -539,8 +543,6 @@ class CrawlEngine {
       status: this.status,
       stats: { ...this.stats, speed, lastPage: this.lastPage || null },
       blockedUrls: [...this.blockedUrls],
-      capturedCount: this.capturedUrls.size,
-      queueLength: this.discoveryQueue.length,
     };
   }
 
@@ -569,9 +571,7 @@ class CrawlEngine {
         this.ports.delete(port);
       }
     }
-    if (this._onStatusChange) {
-      try { this._onStatusChange(this.status); } catch (_) { /* ignore */ }
-    }
+    try { this._onStatusChange?.(this.status); } catch (_) { /* ignore */ }
   }
 
   // ─── Logging ────────────────────────────────────────────────────────────────
