@@ -342,7 +342,11 @@
     chrome.runtime.sendMessage({
       type: 'W2M_UPDATE_SESSION',
       patch: Object.assign({}, captureSettings, crawlSettings)
-    }).catch(function () { });
+    }).catch(function (err) {
+      if (err.message && err.message.indexOf('Receiving end does not exist') === -1) {
+        console.warn('[W2M] sendMessage:', err.message);
+      }
+    });
   };
 
   // --- Auto-init on DOMContentLoaded ---

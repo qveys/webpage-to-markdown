@@ -71,6 +71,7 @@
     this._debugEls = null;
     this._debugFilterTimer = null;
     this._lastBlockedKey = '';
+    this._reconnectAttempts = 0;
 
     this._initLocale();
   }
@@ -186,14 +187,23 @@
     var self = this;
     try {
       this.port = chrome.runtime.connect({ name: 'crawl' });
+      self._reconnectAttempts = 0;
 
       this.port.onMessage.addListener(function (msg) {
+        self._reconnectAttempts = 0;
         self._onMessage(msg);
       });
 
       this.port.onDisconnect.addListener(function () {
         self.port = null;
-        setTimeout(function () { self._connectPort(); }, 1000);
+        self._reconnectAttempts++;
+        if (self._reconnectAttempts > 10) {
+          console.error('[Dashboard] Max reconnect attempts reached (' + self._reconnectAttempts + '). Giving up.');
+          return;
+        }
+        var delay = Math.min(1000 * Math.pow(2, self._reconnectAttempts), 30000);
+        console.warn('[Dashboard] Port disconnected. Reconnecting in ' + delay + 'ms (attempt ' + self._reconnectAttempts + '/10)');
+        setTimeout(function () { self._connectPort(); }, delay);
       });
 
       this.port.postMessage({ type: 'crawl:get-status' });
@@ -201,7 +211,14 @@
         this.port.postMessage({ type: 'crawl:get-debug-snapshot' });
       }
     } catch (e) {
-      setTimeout(function () { self._connectPort(); }, 1000);
+      self._reconnectAttempts++;
+      if (self._reconnectAttempts > 10) {
+        console.error('[Dashboard] Max reconnect attempts reached (' + self._reconnectAttempts + '). Giving up.');
+        return;
+      }
+      var delay = Math.min(1000 * Math.pow(2, self._reconnectAttempts), 30000);
+      console.warn('[Dashboard] Connection error. Reconnecting in ' + delay + 'ms (attempt ' + self._reconnectAttempts + '/10)');
+      setTimeout(function () { self._connectPort(); }, delay);
     }
   };
 
@@ -656,7 +673,11 @@
     if (this.port) {
       this.port.postMessage({ type: 'crawl:dismiss-blocked', url: url });
     } else {
-      chrome.runtime.sendMessage({ type: 'W2M_CRAWL_DISMISS', url: url }, function () { });
+      chrome.runtime.sendMessage({ type: 'W2M_CRAWL_DISMISS', url: url }, function () {
+        if (chrome.runtime.lastError && chrome.runtime.lastError.message.indexOf('Receiving end does not exist') === -1) {
+          console.warn('[W2M] sendMessage:', chrome.runtime.lastError.message);
+        }
+      });
     }
   };
 
@@ -971,7 +992,9 @@
     var self = this;
     navigator.clipboard.writeText(text).then(function () {
       self._showToast(t('toast.copied'));
-    }).catch(function () { });
+    }).catch(function (err) {
+      console.warn('[W2M] clipboard write:', err.message);
+    });
   };
 
   Dashboard.prototype._debugDownloadJson = function () {

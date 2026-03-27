@@ -441,7 +441,11 @@
         chrome.runtime.sendMessage({
           type: 'W2M_UPDATE_SESSION',
           patch: { urlTree: cap.urlTree, saveAssets: cap.saveAssets }
-        }).catch(function () { });
+        }).catch(function (err) {
+          if (err.message && err.message.indexOf('Receiving end does not exist') === -1) {
+            console.warn('[W2M] sendMessage:', err.message);
+          }
+        });
       });
     }
 
@@ -741,7 +745,8 @@
           self._checkExistingSession();
         });
       });
-    }).catch(function () {
+    }).catch(function (err) {
+      console.warn('[W2M] initLocale failed, using fallback:', err && err.message);
       // Fallback if initLocale fails
       self._setupViews();
       self._setupHeader();
@@ -794,7 +799,11 @@
         chrome.storage.local.set({ showSettingsOnOpen: true }, function () {
           chrome.windows.getCurrent(function (win) {
             chrome.sidePanel.open({ windowId: win.id }, function () {
-              chrome.runtime.sendMessage({ type: 'W2M_SHOW_SETTINGS' }).catch(function () {});
+              chrome.runtime.sendMessage({ type: 'W2M_SHOW_SETTINGS' }).catch(function (err) {
+                if (err.message && err.message.indexOf('Receiving end does not exist') === -1) {
+                  console.warn('[W2M] sendMessage:', err.message);
+                }
+              });
               window.close();
             });
           });
@@ -951,7 +960,8 @@
 
     navigator.clipboard.writeText(this.currentMarkdown).then(function () {
       self.showToast(t('toast.copied'), 'success');
-    }).catch(function () {
+    }).catch(function (err) {
+      console.warn('[W2M] clipboard write:', err && err.message);
       self.showToast(t('toast.error'), 'error');
     });
   };
@@ -985,7 +995,11 @@
       chrome.runtime.sendMessage({
         type: 'W2M_UPDATE_SESSION',
         patch: { urlTree: cap.urlTree, saveAssets: cap.saveAssets }
-      }).catch(function () { });
+      }).catch(function (err) {
+        if (err.message && err.message.indexOf('Receiving end does not exist') === -1) {
+          console.warn('[W2M] sendMessage:', err.message);
+        }
+      });
       var delay = cap.delay;
       var depthNum = Number(cr.depth);
       var depth = Number.isFinite(depthNum) ? depthNum : DEFAULT_CRAWL_SETTINGS.depth;

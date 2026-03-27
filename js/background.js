@@ -338,7 +338,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                     type: "W2M_CAPTURE_COUNT",
                     count: capturedUrls.size,
                   })
-                  .catch(() => { });
+                  .catch((err) => {
+                    if (!err.message?.includes('Receiving end does not exist')) {
+                      console.warn('[W2M] sendMessage:', err.message);
+                    }
+                  });
                 await chrome.storage.local.set({
                   lastConversion: {
                     url: tab.url,
@@ -415,21 +419,21 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           if (w?.id != null) {
             await chrome.sidePanel.open({ windowId: w.id });
           }
-        } catch {
-          /* May require user gesture; popup already calls openDashboard */
+        } catch (e) {
+          console.warn('[W2M] sidePanel.open:', e.message);
         }
         sendResponse({ ok: true });
       } catch (err) {
         try {
           await crawlEngine.stop();
-        } catch {
-          /* ignore */
+        } catch (e2) {
+          console.warn('[W2M] crawlEngine.stop on error:', e2.message);
         }
         if (crawlSessionCommitted) {
           try {
             await setSession({ active: false, crawling: false });
-          } catch {
-            /* ignore */
+          } catch (e3) {
+            console.warn('[W2M] setSession cleanup:', e3.message);
           }
         }
         updateBadge(false);
@@ -500,7 +504,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         // If a specific view was requested, broadcast it to the dashboard
         if (message.view) {
           setTimeout(() => {
-            chrome.runtime.sendMessage({ type: "W2M_SHOW_SETTINGS" }).catch(() => { });
+            chrome.runtime.sendMessage({ type: "W2M_SHOW_SETTINGS" }).catch((err) => {
+              if (!err.message?.includes('Receiving end does not exist')) {
+                console.warn('[W2M] sendMessage:', err.message);
+              }
+            });
           }, 300); // small delay to let the side panel load
         }
         sendResponse({ ok: true });
@@ -631,7 +639,11 @@ chrome.webNavigation.onCompleted.addListener(async (details) => {
           type: "W2M_CAPTURE_COUNT",
           count: capturedUrls.size,
         })
-        .catch(() => { });
+        .catch((err) => {
+          if (!err.message?.includes('Receiving end does not exist')) {
+            console.warn('[W2M] sendMessage:', err.message);
+          }
+        });
 
       await chrome.storage.local.set({
         lastConversion: { url, markdown, timestamp: new Date().toISOString() },
@@ -696,7 +708,7 @@ function extractAndConvert() {
         ) {
           try {
             img.setAttribute("src", new URL(effectiveSrc, baseUrl).href);
-          } catch (e) { }
+          } catch (e) { console.warn('[W2M] invalid img src:', effectiveSrc); }
         }
       });
     bodyClone.querySelectorAll("a[href]").forEach((a) => {
@@ -709,7 +721,7 @@ function extractAndConvert() {
       ) {
         try {
           a.setAttribute("href", new URL(href, baseUrl).href);
-        } catch (e) { }
+        } catch (e) { console.warn('[W2M] invalid href:', href); }
       }
     });
 
@@ -823,7 +835,7 @@ function extractAndConvert() {
           imgSizes.set(img.src, Math.round(rect.width)); // resolved URL too
         }
       });
-    } catch (_) { }
+    } catch (e) { console.warn('[W2M] imgSizes collection:', e.message); }
     _clean.querySelectorAll("img").forEach((img) => {
       const src = img.getAttribute("src") || "";
       const w = imgSizes.get(src);
@@ -1069,8 +1081,8 @@ async function downloadAssets(markdown, folder, mdPath, options = {}) {
             pageUrl: options.pageUrl,
             pageLabel: options.pageLabel,
           });
-        } catch (_) {
-          /* ignore */
+        } catch (e) {
+          console.warn('[W2M] onAssetSaved callback:', e.message);
         }
       }
     } catch (err) {
@@ -1123,8 +1135,10 @@ async function ensureOffscreen() {
 async function closeOffscreen() {
   try {
     await chrome.offscreen.closeDocument();
-    offscreenReady = false;
-  } catch (e) { /* not open */ }
+  } catch (e) {
+    if (!e.message?.includes('not open')) console.warn('[W2M] closeOffscreen:', e.message);
+  }
+  offscreenReady = false;
 }
 
 // ─── Port-based messaging for crawl ──────────────────────
@@ -1147,8 +1161,8 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 async function w2mOnCrawlSessionEnded() {
   try {
     await closeOffscreen();
-  } catch {
-    /* ignore */
+  } catch (e) {
+    console.warn('[W2M] closeOffscreen on session end:', e.message);
   }
   // Sauvegarde les stats finales pour que le popup puisse afficher les résultats
   const finalStats = crawlEngine ? crawlEngine.getStatusPayload() : null;
@@ -1167,8 +1181,8 @@ async function w2mOnCrawlSessionEnded() {
   }
   try {
     await updateBadge(false);
-  } catch {
-    /* ignore */
+  } catch (e) {
+    console.warn('[W2M] updateBadge on session end:', e.message);
   }
 }
 
@@ -1180,7 +1194,11 @@ const crawlEngine = new CrawlEngine({
     updateBadge(status);
     if (status === "stopped" || status === "done") {
       const payload = crawlEngine.getStatusPayload();
-      chrome.runtime.sendMessage({ type: "W2M_CRAWL_STATUS", ...payload }).catch(() => {});
+      chrome.runtime.sendMessage({ type: "W2M_CRAWL_STATUS", ...payload }).catch((err) => {
+        if (!err.message?.includes('Receiving end does not exist')) {
+          console.warn('[W2M] sendMessage:', err.message);
+        }
+      });
     }
   },
 });

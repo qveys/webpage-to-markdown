@@ -145,7 +145,7 @@ class CrawlEngine {
     this.enqueue(startUrl, 0);
     chrome.alarms.create("crawl-keepalive", { periodInMinutes: 0.4 });
     // Hide Chrome download UI during crawl
-    try { chrome.downloads.setUiOptions({ enabled: false }); } catch (_) {}
+    try { chrome.downloads.setUiOptions({ enabled: false }); } catch (e) { console.warn('[W2M] setUiOptions:', e.message); }
     this._abortController = new AbortController();
     this.status = "running";
     this.log("info", `Crawl started: ${startUrl}`);
@@ -190,7 +190,7 @@ class CrawlEngine {
     this.stats.queued = 0;
     chrome.alarms.clear("crawl-keepalive");
     // Re-enable Chrome download UI
-    try { chrome.downloads.setUiOptions({ enabled: true }); } catch (_) {}
+    try { chrome.downloads.setUiOptions({ enabled: true }); } catch (e) { console.warn('[W2M] setUiOptions:', e.message); }
     clearTimeout(this._broadcastTimer);
     this._broadcastTimer = null;
     this.log("info", "Crawl stopped");
@@ -568,11 +568,12 @@ class CrawlEngine {
     for (const port of this.ports) {
       try {
         port.postMessage(payload);
-      } catch {
+      } catch (err) {
+        if (!err.message?.includes('disconnected')) console.warn('[W2M]', err.message);
         this.ports.delete(port);
       }
     }
-    try { this._onStatusChange?.(this.status); } catch (_) { /* ignore */ }
+    try { this._onStatusChange?.(this.status); } catch (e) { console.warn('[W2M] onStatusChange:', e.message); }
   }
 
   // ─── Logging ────────────────────────────────────────────────────────────────
@@ -591,7 +592,8 @@ class CrawlEngine {
     for (const port of this.ports) {
       try {
         port.postMessage({ type: "crawl:log", log: entry });
-      } catch {
+      } catch (err) {
+        if (!err.message?.includes('disconnected')) console.warn('[W2M]', err.message);
         this.ports.delete(port);
       }
     }
