@@ -100,8 +100,13 @@ class CrawlEngine {
 
   // ─── Queue ──────────────────────────────────────────────────────────────────
 
+  static looksLikeAsset(url) {
+    return /\.(png|jpe?g|gif|svg|webp|ico|avif|bmp|css|js|woff2?|ttf|eot|otf|mp[34]|webm|ogg|wav|flac|pdf|zip|tar|gz|rar)(\?|#|$)/i.test(url);
+  }
+
   enqueue(url, depth) {
     if (!CrawlEngine.isFetchableHttpUrl(url)) return;
+    if (CrawlEngine.looksLikeAsset(url)) return;
     if (this.seenUrls.has(url)) return;
     if (!this.isInScope(url)) return;
     if (this.config.depth > 0 && depth > this.config.depth) return;

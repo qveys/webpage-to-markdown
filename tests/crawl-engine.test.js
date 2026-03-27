@@ -82,6 +82,21 @@ describe('CrawlEngine scope and queue', () => {
     engine.enqueue('https://example.com/docs/page1', 3);
     expect(engine.discoveryQueue).toHaveLength(0);
   });
+
+  test('enqueue skips asset URLs (images, fonts, etc.)', () => {
+    engine.enqueue('https://example.com/img/logo.png', 0);
+    engine.enqueue('https://example.com/style.css', 0);
+    engine.enqueue('https://example.com/font.woff2', 0);
+    engine.enqueue('https://example.com/photo.jpeg?w=200', 0);
+    engine.enqueue('https://example.com/file.pdf', 0);
+    expect(engine.discoveryQueue).toHaveLength(0);
+  });
+
+  test('looksLikeAsset accepts HTML-like URLs', () => {
+    expect(CrawlEngine.looksLikeAsset('https://example.com/docs/page')).toBe(false);
+    expect(CrawlEngine.looksLikeAsset('https://example.com/docs/page.html')).toBe(false);
+    expect(CrawlEngine.looksLikeAsset('https://example.com/')).toBe(false);
+  });
 });
 
 describe('CrawlEngine anti-bot', () => {
