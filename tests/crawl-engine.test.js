@@ -88,13 +88,30 @@ describe('CrawlEngine anti-bot', () => {
   let engine;
   beforeEach(() => { engine = new CrawlEngine(); });
 
-  test('looksLikeCaptcha detects captcha keywords', () => {
+  test('looksLikeCaptcha detects captcha on short challenge pages', () => {
     expect(engine.looksLikeCaptcha('<div class="cf-challenge">challenge</div>')).toBe(true);
     expect(engine.looksLikeCaptcha('<script src="hcaptcha.js"></script>')).toBe(true);
   });
 
   test('looksLikeCaptcha returns false on clean HTML', () => {
     expect(engine.looksLikeCaptcha('<html><body><h1>Hello</h1></body></html>')).toBe(false);
+  });
+
+  test('looksLikeCaptcha returns false when page has substantial content despite captcha keyword', () => {
+    var real = '<html><head><script src="recaptcha.js"></script></head><body>'
+      + '<main><h1>Welcome</h1><p>Content here</p></main></body></html>';
+    expect(engine.looksLikeCaptcha(real)).toBe(false);
+  });
+
+  test('looksLikeCaptcha returns false with 3+ paragraphs despite captcha keyword', () => {
+    var html = '<html><head><script src="cf-challenge.js"></script></head><body>'
+      + '<p>One</p><p>Two</p><p>Three</p></body></html>';
+    expect(engine.looksLikeCaptcha(html)).toBe(false);
+  });
+
+  test('looksLikeCaptcha returns true when captcha keyword and no real content', () => {
+    var challenge = '<html><body><div class="cf-challenge"><p>Verify you are human</p></div></body></html>';
+    expect(engine.looksLikeCaptcha(challenge)).toBe(true);
   });
 
   test('handleBlocked increments counter and adds to list', () => {

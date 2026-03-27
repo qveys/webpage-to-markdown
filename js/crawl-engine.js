@@ -352,11 +352,22 @@ class CrawlEngine {
   // ─── Anti-bot ───────────────────────────────────────────────────────────────
 
   looksLikeCaptcha(html) {
-    // Only check the first 4 KB (where challenge scripts live) to avoid
-    // allocating a lowercased copy of the entire response body.
-    return /captcha|cf-challenge|hcaptcha|recaptcha|challenge-platform/i.test(
-      html.slice(0, 4096)
-    );
+    var head = html.slice(0, 4096);
+    if (!/captcha|cf-challenge|hcaptcha|recaptcha|challenge-platform/i.test(head)) {
+      return false;
+    }
+    // Keyword found — but real CAPTCHA/challenge pages are short interstitials
+    // with no meaningful content.  If the page has substantial body content,
+    // it is a real page that merely references a captcha script (e.g. Cloudflare
+    // JS SDK loaded preventively).  Check the first 50 KB to stay cheap.
+    var sample = html.slice(0, 51200);
+    var hasContent = /<(main|article|section)\b/i.test(sample);
+    if (!hasContent) {
+      // Count <p> tags as a secondary signal — challenge pages rarely have many.
+      var pCount = (sample.match(/<p[\s>]/gi) || []).length;
+      hasContent = pCount >= 3;
+    }
+    return !hasContent;
   }
 
   handleBlocked(url, reason) {
