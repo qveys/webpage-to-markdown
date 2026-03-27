@@ -1,11 +1,11 @@
-// js/background.js — Service Worker pour Webpage to Markdown
-// Gère la conversion single-page, le crawl multi-page, et les sessions de capture automatique.
+// js/background.js — Service Worker for Webpage to Markdown
+// Handles single-page conversion, multi-page crawl, and auto-capture sessions.
 
 importScripts("/js/turndown.js");
 importScripts("/js/cleanup-markdown.js");
 
-// Réinitialiser la session à chaque démarrage du SW (rechargement extension inclus)
-// Nouveau folder horodaté à chaque démarrage, délai conservé
+// Reset session on every SW startup (including extension reload)
+// New timestamped folder on each startup, delay preserved
 chrome.storage.local.get("session", ({ session }) => {
   const ts = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
   chrome.storage.local.set({
@@ -13,15 +13,15 @@ chrome.storage.local.get("session", ({ session }) => {
       active: false,
       folder: `w2m-session-${ts}`,
       delay: session?.delay ?? 2000,
-      capturedUrls: [], // Nouvelle session au redémarrage du SW
+      capturedUrls: [], // New session on SW restart
     },
   });
   chrome.action.setBadgeText({ text: "" });
 });
 
 // ─── Extraction du contenu de la page ────────────────────────────────────────
-// Cette fonction est injectée dans l'onglet actif via chrome.scripting.executeScript.
-// Elle ne peut PAS référencer des variables extérieures (closure isolée).
+// This function is injected into the active tab via chrome.scripting.executeScript.
+// It CANNOT reference outer variables (isolated closure).
 
 function extractPageContent() {
   try {
@@ -201,8 +201,8 @@ async function w2mDownload(options) {
   }
 }
 
-// ─── Téléchargement via chrome.downloads ────────────────────────────────────
-// Les service workers n'ont pas accès à Blob/URL.createObjectURL.
+// ─── Download via chrome.downloads ──────────────────────────────────────────
+// Service workers do not have access to Blob/URL.createObjectURL.
 // On encode le markdown en data URL pour chrome.downloads.download().
 
 async function downloadMarkdown(markdown, title) {
@@ -297,7 +297,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       .then(async (session) => {
         updateBadge(true);
         sendResponse({ ok: true, session });
-        // Capturer immédiatement la page active au démarrage
+        // Capture the active page immediately on session start
         try {
           const [tab] = await chrome.tabs.query({
             active: true,
@@ -313,7 +313,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             !tab.url.startsWith("about:") &&
             !tab.url.includes("chrome.google.com/webstore")
           ) {
-            // Vérifier si la page est déjà capturée
+            // Check if the page was already captured
             if (capturedUrls.has(tab.url)) {
               return;
             } else {
@@ -351,7 +351,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                   },
                 });
               }
-            } // fin else (pas déjà capturée)
+            } // end else (not already captured)
           }
         } catch (err) {
           console.error("[W2M] Initial capture error:", err);
@@ -520,12 +520,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 });
 
-// ─── Auto-capture : écoute de la navigation ───────────────────────────────
+// ─── Auto-capture: navigation listener ─────────────────────────────────────
 
 const pendingCaptures = new Map(); // tabId → timeoutId
-let capturedUrls = new Set(); // URLs déjà traitées dans la session courante
+let capturedUrls = new Set(); // URLs already processed in the current session
 
-// Recharger les URLs capturées depuis le storage au démarrage du SW
+// Reload captured URLs from storage on SW startup
 chrome.storage.local.get("session", ({ session }) => {
   if (session?.capturedUrls?.length) {
     capturedUrls = new Set(session.capturedUrls);
@@ -560,7 +560,7 @@ chrome.webNavigation.onCompleted.addListener(async (details) => {
   )
     return;
 
-  // URL déjà capturée
+  // URL already captured
   if (capturedUrls.has(url)) {
     console.log("[W2M] Already captured, skipping:", url);
     return;
@@ -573,7 +573,7 @@ chrome.webNavigation.onCompleted.addListener(async (details) => {
   const timerId = setTimeout(async () => {
     pendingCaptures.delete(details.tabId);
     try {
-      // Injecter Turndown + la fonction de conversion dans l'onglet pour avoir accès au DOM
+      // Inject Turndown + conversion function into the tab for DOM access
       await chrome.scripting.executeScript({
         target: { tabId: details.tabId },
         files: [
@@ -608,7 +608,7 @@ chrome.webNavigation.onCompleted.addListener(async (details) => {
                 childList: true,
                 subtree: true,
               });
-              // Timeout de sécurité : si pas de mutations pendant 500ms, on part
+              // Safety timeout: if no mutations for 500ms, proceed
               timer = setTimeout(() => {
                 observer.disconnect();
                 resolve();
@@ -657,7 +657,7 @@ chrome.webNavigation.onCompleted.addListener(async (details) => {
   pendingCaptures.set(details.tabId, timerId);
 });
 
-// Exécutée dans l'onglet (a accès au DOM et à TurndownService injecté)
+// Executed in the tab (has access to DOM and injected TurndownService)
 function extractAndConvert() {
   try {
     if (!document || !document.body) throw new Error("Document body not found");
@@ -686,7 +686,7 @@ function extractAndConvert() {
       if (c) iframeContents.push(c);
     });
 
-    // Résoudre toutes les URLs relatives en absolues
+    // Resolve all relative URLs to absolute
     const baseUrl = document.location.href;
     bodyClone
       .querySelectorAll("img[src], img[data-src], img[data-lazy-src]")
@@ -696,7 +696,7 @@ function extractAndConvert() {
           img.getAttribute("data-src") ||
           img.getAttribute("data-lazy-src") ||
           img.getAttribute("data-original");
-        // Préférer data-src si src est vide ou un placeholder (base64 court, ou "about:blank")
+        // Prefer data-src if src is empty or a placeholder (short base64, or "about:blank")
         const effectiveSrc =
           dataSrc && (!src || src.startsWith("data:") || src === "about:blank")
             ? dataSrc
@@ -865,7 +865,7 @@ function extractAndConvert() {
         const code = node.querySelector("code");
         const rawCode = code.textContent || "";
 
-        // Détecter le langage depuis plusieurs attributs possibles
+        // Detect language from multiple possible attributes
         const lang =
           // class="language-json" ou class="lang-json"
           (code.className.match(/(?:language-|lang-)(\S+)/) || [])[1] ||
@@ -949,11 +949,11 @@ function urlToPath(pageUrl) {
       s.replace(/[^a-z0-9\-_.]/gi, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
     // Nettoyer le hostname
     const host = clean(u.hostname);
-    // Découper le pathname en segments, nettoyer chaque segment
+    // Split pathname into segments, sanitize each segment
     const segments = u.pathname.split("/").map(clean).filter(Boolean);
     // Le dernier segment devient le nom de fichier (.md), les autres sont des dossiers
     let filename = segments.pop() || "index";
-    // Inclure les query params dans le nom pour éviter les collisions
+    // Include query params in the name to avoid collisions
     // ex: ?tab=ios → mullvad-exit-nodes--tab-ios.md
     if (u.search) {
       const suffix = clean(u.search.slice(1)); // drop the leading '?'
@@ -983,7 +983,7 @@ async function downloadInSession(markdown, title, folder, pageUrl) {
     mdPath = `${safeTitle}-${timestamp}.md`;
   }
 
-  // Télécharger les assets si l'option est activée
+  // Download assets if the option is enabled
   if (session.saveAssets) {
     markdown = await downloadAssets(markdown, folder, mdPath);
   }
@@ -997,7 +997,7 @@ async function downloadInSession(markdown, title, folder, pageUrl) {
   });
 }
 
-// Identifiant stable et court à partir de l’URL complète (évite collisions type image.png).
+// Short stable identifier from the full URL (avoids collisions like image.png).
 function w2mAssetIdFromUrl(urlString) {
   let h = 2166136261 >>> 0;
   for (let i = 0; i < urlString.length; i++) {
@@ -1011,8 +1011,8 @@ function w2mEscapeRegExp(s) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-// Télécharge les images (syntaxe ![…](url) et balises <img src="url">) puis réécrit
-// vers ./assets/nom — même dossier parent que le .md (visionneuses / sandbox macOS).
+// Downloads images (![…](url) and <img src="url">) then rewrites to ./assets/name
+// — same parent folder as the .md file.
 async function downloadAssets(markdown, folder, mdPath, options = {}) {
   const mdImgRegex = /!\[([^\]]*)\]\((https?:\/\/[^)\s]+)\)/g;
   const htmlImgSrcRegex =
@@ -1023,7 +1023,7 @@ async function downloadAssets(markdown, folder, mdPath, options = {}) {
   for (const m of markdown.matchAll(htmlImgSrcRegex)) urls.add(m[2]);
   if (urls.size === 0) return markdown;
 
-  // Dossier assets : même niveau que le fichier .md
+  // Assets folder: same level as the .md file
   const mdDir = mdPath.includes("/")
     ? mdPath.slice(0, mdPath.lastIndexOf("/"))
     : "";
@@ -1164,7 +1164,7 @@ async function w2mOnCrawlSessionEnded() {
   } catch (e) {
     console.warn('[W2M] closeOffscreen on session end:', e.message);
   }
-  // Sauvegarde les stats finales pour que le popup puisse afficher les résultats
+  // Save final stats so the popup can display the results
   const finalStats = crawlEngine ? crawlEngine.getStatusPayload() : null;
   try {
     await setSession({

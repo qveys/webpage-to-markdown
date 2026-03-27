@@ -4,7 +4,7 @@
 // No Chrome APIs are called at module-parse time.
 
 class CrawlEngine {
-  /** Seuls http: et https: sont chargeables par fetch() dans l’extension. */
+  /** Only http: and https: URLs can be fetched by the extension. */
   static isFetchableHttpUrl(url) {
     try {
       const u = new URL(url);

@@ -55,9 +55,9 @@ Notable: `sidePanel` for dashboard, `offscreen` for DOM parsing, `alarms` for cr
 ## Code Conventions
 
 - **ES5-compatible** in IIFEs: `var`, `function`, prototype methods — no arrow functions
-- Exception: `CrawlEngine` uses ES6 class syntax (runs only in SW context)
+- Exceptions: `CrawlEngine` and `offscreen.js` use ES6 (arrow functions, const/let) — both run in non-UI contexts (SW and offscreen document)
 - Constructor functions: `CapitalCase`. Private methods: `_prefix`
-- Comments in French, identifiers in English
+- Comments and identifiers in English
 - Single `styles.css` with CSS custom properties; themes via `data-theme="light|dark"`
 
 ## Git Conventions
