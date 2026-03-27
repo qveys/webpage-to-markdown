@@ -28,7 +28,6 @@
     "downloads.ui",
     "tabs",
     "webNavigation",
-    "notifications",
     "sidePanel",
     "offscreen",
     "alarms"
