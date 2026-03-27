@@ -17,6 +17,7 @@ class CrawlEngine {
   constructor(options = {}) {
     this.discoveryQueue = [];
     this.capturedUrls = new Set();
+    this.seenUrls = new Set();
     this.blockedUrls = [];
     this.activeWorkers = 0;
     this.config = {
@@ -41,6 +42,10 @@ class CrawlEngine {
       typeof options.onSessionEnded === "function"
         ? options.onSessionEnded
         : null;
+    this._onStatusChange =
+      typeof options.onStatusChange === "function"
+        ? options.onStatusChange
+        : null;
   }
 
   async _invokeSessionEnded() {
@@ -52,14 +57,26 @@ class CrawlEngine {
     }
   }
 
+  // ─── Live config update ─────────────────────────────────────────────────────
+
+  updateConfig(patch) {
+    if (!patch || typeof patch !== "object") return;
+    const map = { delay: "delay", concurrency: "concurrency", maxBlocks: "maxConsecutiveBlocks", depth: "depth" };
+    for (const [key, configKey] of Object.entries(map)) {
+      if (patch[key] !== undefined) this.config[configKey] = patch[key];
+    }
+  }
+
   // ─── Scope ──────────────────────────────────────────────────────────────────
 
   setScope(startUrl) {
     const u = new URL(startUrl);
-    const pathPrefix = u.pathname.substring(
-      0,
-      u.pathname.lastIndexOf("/") + 1
-    );
+    let path = u.pathname;
+    // Treat extension-less paths as directories (e.g. /docs → /docs/)
+    if (!path.endsWith("/") && !path.split("/").pop().includes(".")) {
+      path += "/";
+    }
+    const pathPrefix = path.substring(0, path.lastIndexOf("/") + 1);
     this.scope = { origin: u.origin, pathPrefix };
   }
 
@@ -67,9 +84,11 @@ class CrawlEngine {
     if (!this.scope) return false;
     try {
       const u = new URL(url);
+      const prefix = this.scope.pathPrefix;
       return (
         u.origin === this.scope.origin &&
-        u.pathname.startsWith(this.scope.pathPrefix)
+        (u.pathname.startsWith(prefix) ||
+          u.pathname + "/" === prefix)
       );
     } catch {
       return false;
@@ -80,11 +99,11 @@ class CrawlEngine {
 
   enqueue(url, depth) {
     if (!CrawlEngine.isFetchableHttpUrl(url)) return;
-    if (this.capturedUrls.has(url)) return;
-    if (this.discoveryQueue.some((item) => item.url === url)) return;
+    if (this.seenUrls.has(url)) return;
     if (!this.isInScope(url)) return;
     if (this.config.depth > 0 && depth > this.config.depth) return;
 
+    this.seenUrls.add(url);
     this.discoveryQueue.push({ url, depth });
     this.stats.queued = this.discoveryQueue.length;
   }
@@ -109,7 +128,9 @@ class CrawlEngine {
     // Reset state
     this.discoveryQueue = [];
     this.capturedUrls = new Set();
+    this.seenUrls = new Set();
     this.blockedUrls = [];
+    this.downloadedAssets = new Map();
     this.consecutiveBlocks = 0;
     this.stats = {
       captured: 0,
@@ -120,6 +141,9 @@ class CrawlEngine {
 
     this.enqueue(startUrl, 0);
     chrome.alarms.create("crawl-keepalive", { periodInMinutes: 0.4 });
+    // Hide Chrome download UI during crawl
+    try { chrome.downloads.setUiOptions({ enabled: false }); } catch (_) {}
+    this._abortController = new AbortController();
     this.status = "running";
     this.log("info", `Crawl started: ${startUrl}`);
     this.broadcastStatus();
@@ -128,12 +152,26 @@ class CrawlEngine {
 
   async pause() {
     this.status = "paused";
+    // Abort in-flight fetches so workers stop immediately
+    if (this._abortController) {
+      this._abortController.abort();
+      this._abortController = null;
+    }
     this.log("info", "Crawl paused");
     await this.saveState();
     this.broadcastStatus();
   }
 
   async resume() {
+    // Reload queue from storage in case SW was suspended during pause
+    const { crawlQueue } = await chrome.storage.session.get("crawlQueue");
+    if (crawlQueue && crawlQueue.length && !this.discoveryQueue.length) {
+      this.discoveryQueue = crawlQueue;
+      this.stats.queued = this.discoveryQueue.length;
+      // Rebuild seenUrls to include restored queue
+      for (const item of this.discoveryQueue) this.seenUrls.add(item.url);
+    }
+    this._abortController = new AbortController();
     this.status = "running";
     this.consecutiveBlocks = 0;
     this.log("info", "Crawl resumed");
@@ -148,10 +186,26 @@ class CrawlEngine {
     this.discoveryQueue = [];
     this.stats.queued = 0;
     chrome.alarms.clear("crawl-keepalive");
+    // Re-enable Chrome download UI
+    try { chrome.downloads.setUiOptions({ enabled: true }); } catch (_) {}
     this.log("info", "Crawl stopped");
     await this.saveState();
     this.broadcastStatus();
     if (wasActive) await this._invokeSessionEnded();
+  }
+
+  async reset() {
+    if (this.status !== "stopped") await this.stop();
+    this.discoveryQueue = [];
+    this.capturedUrls = new Set();
+    this.seenUrls = new Set();
+    this.blockedUrls = [];
+    this.downloadedAssets = new Map();
+    this.lastPage = null;
+    this.logBuffer = [];
+    this.stats = { captured: 0, queued: 0, blocked: 0, startTime: 0 };
+    await this.saveState();
+    this.broadcastStatus();
   }
 
   // ─── Workers ────────────────────────────────────────────────────────────────
@@ -207,10 +261,11 @@ class CrawlEngine {
         return;
       }
 
+      const signal = this._abortController ? this._abortController.signal : AbortSignal.timeout(30000);
       const response = await fetch(url, {
         credentials: "omit",
         headers: { Accept: "text/html" },
-        signal: AbortSignal.timeout(30000),
+        signal,
       });
 
       // Check for blocking responses
@@ -248,7 +303,8 @@ class CrawlEngine {
       this.capturedUrls.add(url);
       this.stats.captured++;
       this.consecutiveBlocks = 0;
-      this.log("capture", `Captured: ${result.title || url}`);
+      this.lastPage = { url, title: result.title || url, success: true };
+      this.log("capture", result.title || url, { pageUrl: url });
 
       // Enqueue discovered links
       if (result.links && Array.isArray(result.links)) {
@@ -260,6 +316,13 @@ class CrawlEngine {
       this.broadcastStatus();
       await this.saveState();
     } catch (err) {
+      if (err.name === "AbortError") {
+        // Paused/stopped — re-queue the URL so it's retried on resume
+        this.seenUrls.delete(url);
+        this.discoveryQueue.unshift({ url, depth });
+        this.stats.queued = this.discoveryQueue.length;
+        return;
+      }
       if (err.name === "TimeoutError") {
         this.log("error", `Timeout: ${url}`);
         this.handleBlocked(url, "Timeout");
@@ -297,6 +360,7 @@ class CrawlEngine {
     this.blockedUrls.push({ url, reason, timestamp: Date.now() });
     this.consecutiveBlocks++;
     this.stats.blocked = this.blockedUrls.length;
+    this.lastPage = { url, title: url, success: false };
     this.log("blocked", `${reason}: ${url}`);
 
     if (
@@ -358,17 +422,20 @@ class CrawlEngine {
       finalMarkdown = await downloadAssets(markdown, folder, mdPath, {
         pageUrl,
         pageLabel,
+        downloadedAssets: this.downloadedAssets,
         onAssetSaved: (info) => {
-          this.log("asset", info.pageLabel || pageLabel, {
+          this.log("asset", info.localName, {
             fileName: info.localName,
+            assetUrl: info.imgUrl,
             pageUrl: info.pageUrl || pageUrl,
+            pageLabel: info.pageLabel || pageLabel,
           });
         },
       });
     }
 
     const encoded = encodeURIComponent(finalMarkdown);
-    await chrome.downloads.download({
+    await w2mDownload({
       url: `data:text/markdown;charset=utf-8,${encoded}`,
       filename: `${folder}/${mdPath}`,
       saveAs: false,
@@ -434,6 +501,9 @@ class CrawlEngine {
         case "crawl:stop":
           this.stop();
           break;
+        case "crawl:reset":
+          this.reset();
+          break;
         case "crawl:retry":
           this.retryBlocked(msg.url);
           break;
@@ -444,7 +514,9 @@ class CrawlEngine {
           this.dismissBlocked(msg.url);
           break;
         case "crawl:open-blocked":
-          chrome.tabs.create({ url: msg.url });
+          if (CrawlEngine.isFetchableHttpUrl(msg.url)) {
+            chrome.tabs.create({ url: msg.url });
+          }
           break;
         case "crawl:get-status":
           port.postMessage(this.getStatusPayload());
@@ -460,10 +532,14 @@ class CrawlEngine {
   }
 
   getStatusPayload() {
+    const elapsed = this.stats.startTime
+      ? (Date.now() - this.stats.startTime) / 60000
+      : 0;
+    const speed = elapsed > 0 ? Math.round(this.stats.captured / elapsed) : 0;
     return {
       type: "crawl:status",
       status: this.status,
-      stats: { ...this.stats },
+      stats: { ...this.stats, speed, lastPage: this.lastPage || null },
       blockedUrls: [...this.blockedUrls],
       capturedCount: this.capturedUrls.size,
       queueLength: this.discoveryQueue.length,
@@ -478,6 +554,9 @@ class CrawlEngine {
       } catch {
         this.ports.delete(port);
       }
+    }
+    if (this._onStatusChange) {
+      try { this._onStatusChange(this.status); } catch (_) { /* ignore */ }
     }
   }
 
@@ -538,6 +617,10 @@ class CrawlEngine {
     this.scope = crawlState.scope || null;
     this.discoveryQueue = crawlQueue || [];
     this.stats.queued = this.discoveryQueue.length;
+    // Rebuild seenUrls from captured + queued + blocked URLs
+    this.seenUrls = new Set(this.capturedUrls);
+    for (const item of this.discoveryQueue) this.seenUrls.add(item.url);
+    for (const item of this.blockedUrls) this.seenUrls.add(item.url);
 
     this.log("info", "State restored");
 
