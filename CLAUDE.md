@@ -33,6 +33,12 @@ Service Worker changes require extension reload. Popup/dashboard changes take ef
 - **Theme icon** (`js/theme-icon.js`): shared SVG sun/moon builder (`W2M.buildThemeIcon`)
 - **Theme init** (`js/theme-init.js`): synchronous theme apply in `<head>` to prevent flash
 
+### HTML Pages
+- `popup.html` — toolbar popup (loads `popup.js`)
+- `dashboard.html` — side panel (`side_panel.default_path` in manifest)
+- `settings.html` — options page (loads `settings.js` + `settings-page.js`)
+- `offscreen.html` — headless DOM parsing (loaded programmatically by SW)
+
 Communication: `chrome.runtime.sendMessage` for request/response, `chrome.runtime.connect()` ports for persistent crawl status streaming between SW ↔ popup/dashboard.
 
 ### State Management
