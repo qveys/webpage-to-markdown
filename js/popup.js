@@ -919,25 +919,7 @@
       if (message.type === 'W2M_CRAWL_STATUS' && message.status === 'stopped') {
         var cur = state.getState();
         if (cur === STATES.RUNNING || cur === STATES.PAUSED) {
-          var stats = message.stats || {};
-          var d = state.getData();
-          var startMs = stats.startTime != null ? stats.startTime : Date.now();
-          var blocked = stats.blocked != null ? stats.blocked : (d.blocked || 0);
-          var hasErrors = blocked > 0;
-          var targetState = hasErrors ? STATES.CRAWL_PARTIAL : STATES.CRAWL_SUCCESS;
-          state.navigate(targetState, {
-            captured: stats.captured != null ? stats.captured : (d.captured || 0),
-            blocked: blocked,
-            images: stats.images != null ? stats.images : (d.images || 0),
-            folder: d.folder || '',
-            duration: Date.now() - startMs,
-            totalSize: stats.totalSize != null ? stats.totalSize : (d.totalSize || 0),
-            blockedUrls: message.blockedUrls || d.blockedUrls || []
-          });
-          if (self.crawlPort) {
-            self.crawlPort.disconnect();
-            self.crawlPort = null;
-          }
+          app._finalizeCrawl(message.stats, message.blockedUrls);
         }
       }
     });
@@ -983,34 +965,8 @@
     var btn = document.getElementById('btn-theme');
     if (!btn) return;
     while (btn.firstChild) btn.removeChild(btn.firstChild);
-    var NS = 'http://www.w3.org/2000/svg';
-    var svg = document.createElementNS(NS, 'svg');
+    var svg = W2M.buildThemeIcon(isDark);
     svg.id = 'icon-theme';
-    svg.setAttribute('width', '18');
-    svg.setAttribute('height', '18');
-    svg.setAttribute('viewBox', '0 0 24 24');
-    svg.setAttribute('fill', 'none');
-    svg.setAttribute('stroke', 'currentColor');
-    svg.setAttribute('stroke-width', '2');
-    svg.setAttribute('stroke-linecap', 'round');
-    svg.setAttribute('stroke-linejoin', 'round');
-    if (isDark) {
-      var path = document.createElementNS(NS, 'path');
-      path.setAttribute('d', 'M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z');
-      svg.appendChild(path);
-    } else {
-      var circle = document.createElementNS(NS, 'circle');
-      circle.setAttribute('cx', '12');
-      circle.setAttribute('cy', '12');
-      circle.setAttribute('r', '5');
-      svg.appendChild(circle);
-      [['12','1','12','3'],['12','21','12','23'],['4.22','4.22','5.64','5.64'],['18.36','18.36','19.78','19.78'],['1','12','3','12'],['21','12','23','12'],['4.22','19.78','5.64','18.36'],['18.36','5.64','19.78','4.22']].forEach(function (r) {
-        var line = document.createElementNS(NS, 'line');
-        line.setAttribute('x1', r[0]); line.setAttribute('y1', r[1]);
-        line.setAttribute('x2', r[2]); line.setAttribute('y2', r[3]);
-        svg.appendChild(line);
-      });
-    }
     btn.appendChild(svg);
   };
 
@@ -1189,32 +1145,37 @@
     }
   };
 
+  // Shared helper: navigate to crawl result state from stats + current data
+  App.prototype._finalizeCrawl = function (stats, extraBlockedUrls) {
+    var d = state.getData();
+    var startMs = (stats && stats.startTime != null) ? stats.startTime : (d.startTime != null ? d.startTime : Date.now());
+    var blocked = (stats && stats.blocked != null) ? stats.blocked : (d.blocked || 0);
+    var hasErrors = blocked > 0;
+    var targetState = hasErrors ? STATES.CRAWL_PARTIAL : STATES.CRAWL_SUCCESS;
+    state.navigate(targetState, {
+      captured: (stats && stats.captured != null) ? stats.captured : (d.captured || 0),
+      blocked: blocked,
+      images: (stats && stats.images != null) ? stats.images : (d.images || 0),
+      folder: d.folder || '',
+      duration: Date.now() - startMs,
+      totalSize: (stats && stats.totalSize != null) ? stats.totalSize : (d.totalSize || 0),
+      blockedUrls: extraBlockedUrls || d.blockedUrls || []
+    });
+    if (this.crawlPort) {
+      this.crawlPort.disconnect();
+      this.crawlPort = null;
+    }
+  };
+
   App.prototype.handleStop = function () {
     var self = this;
     chrome.runtime.sendMessage({ type: 'W2M_CRAWL_STOP' }, function () {
-      if (self.crawlPort) {
-        self.crawlPort.disconnect();
-        self.crawlPort = null;
-      }
       var data = state.getData();
-      function goToSuccess(startMs) {
-        var sm = startMs != null ? startMs : Date.now();
-        state.navigate(STATES.CRAWL_SUCCESS, {
-          captured: data.captured || 0,
-          blocked: data.blocked || 0,
-          images: data.images || 0,
-          folder: data.folder || '',
-          duration: Date.now() - sm,
-          totalSize: data.totalSize || 0,
-          blockedUrls: data.blockedUrls || []
-        });
-      }
       if (data.startTime != null) {
-        goToSuccess(data.startTime);
+        self._finalizeCrawl(null);
       } else {
         chrome.runtime.sendMessage({ type: 'W2M_CRAWL_GET_STATUS' }, function (res) {
-          var st = res && res.stats && res.stats.startTime;
-          goToSuccess(st != null ? st : Date.now());
+          self._finalizeCrawl(res && res.stats);
         });
       }
     });
@@ -1235,24 +1196,7 @@
         var stats = msg.stats || {};
         var cur = state.getState();
         if (msg.status === 'stopped' && (cur === STATES.RUNNING || cur === STATES.PAUSED)) {
-          var d = state.getData();
-          var startMs = stats.startTime != null ? stats.startTime : Date.now();
-          var blocked = stats.blocked != null ? stats.blocked : (d.blocked || 0);
-          var hasErrors = blocked > 0;
-          var targetState = hasErrors ? STATES.CRAWL_PARTIAL : STATES.CRAWL_SUCCESS;
-          state.navigate(targetState, {
-            captured: stats.captured != null ? stats.captured : (d.captured || 0),
-            blocked: blocked,
-            images: stats.images != null ? stats.images : (d.images || 0),
-            folder: d.folder || '',
-            duration: Date.now() - startMs,
-            totalSize: stats.totalSize != null ? stats.totalSize : (d.totalSize || 0),
-            blockedUrls: msg.blockedUrls || d.blockedUrls || []
-          });
-          if (self.crawlPort) {
-            self.crawlPort.disconnect();
-            self.crawlPort = null;
-          }
+          self._finalizeCrawl(stats, msg.blockedUrls);
           return;
         }
         var crawlPatch = {
@@ -1269,22 +1213,7 @@
         state.updateData(crawlPatch);
       }
       if (msg.type === 'crawl:done') {
-        var d = state.getData();
-        var hasErrors = (d.blocked || 0) > 0;
-        var targetState = hasErrors ? STATES.CRAWL_PARTIAL : STATES.CRAWL_SUCCESS;
-        state.navigate(targetState, {
-          captured: d.captured || 0,
-          blocked: d.blocked || 0,
-          images: d.images || 0,
-          folder: d.folder || '',
-          duration: msg.duration || 0,
-          totalSize: d.totalSize || 0,
-          blockedUrls: d.blockedUrls || []
-        });
-        if (self.crawlPort) {
-          self.crawlPort.disconnect();
-          self.crawlPort = null;
-        }
+        self._finalizeCrawl(null);
       }
     });
     this.crawlPort.onDisconnect.addListener(function () {

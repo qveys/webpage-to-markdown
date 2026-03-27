@@ -54,7 +54,6 @@
   ];
   var ICON_PAUSE = [{ tag: 'rect', x: '6', y: '4', width: '4', height: '16', fill: 'currentColor' }, { tag: 'rect', x: '14', y: '4', width: '4', height: '16', fill: 'currentColor' }];
   var ICON_PLAY = [{ tag: 'polygon', points: '5 3 19 12 5 21', fill: 'currentColor' }];
-  var ICON_MOON = [{ tag: 'path', d: 'M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z', fill: 'none' }];
 
   function Dashboard() {
     this.port = null;
@@ -163,43 +162,9 @@
     var parent = iconHost.parentNode;
     while (parent.firstChild) parent.removeChild(parent.firstChild);
 
-    if (theme === 'dark') {
-      var moonSvg = createSvgIcon(ICON_MOON, 18, 18, 'none', 'currentColor');
-      moonSvg.setAttribute('stroke-width', '2');
-      moonSvg.setAttribute('stroke-linecap', 'round');
-      moonSvg.setAttribute('stroke-linejoin', 'round');
-      moonSvg.id = 'dash-theme-icon';
-      parent.appendChild(moonSvg);
-    } else {
-      var sunSvg = document.createElementNS(SVG_NS, 'svg');
-      sunSvg.id = 'dash-theme-icon';
-      sunSvg.setAttribute('width', '18');
-      sunSvg.setAttribute('height', '18');
-      sunSvg.setAttribute('viewBox', '0 0 24 24');
-      sunSvg.setAttribute('fill', 'none');
-      sunSvg.setAttribute('stroke', 'currentColor');
-      sunSvg.setAttribute('stroke-width', '2');
-      var sunCircle = document.createElementNS(SVG_NS, 'circle');
-      sunCircle.setAttribute('cx', '12');
-      sunCircle.setAttribute('cy', '12');
-      sunCircle.setAttribute('r', '5');
-      sunSvg.appendChild(sunCircle);
-      var rays = [
-        ['12', '1', '12', '3'], ['12', '21', '12', '23'],
-        ['4.22', '4.22', '5.64', '5.64'], ['18.36', '18.36', '19.78', '19.78'],
-        ['1', '12', '3', '12'], ['21', '12', '23', '12'],
-        ['4.22', '19.78', '5.64', '18.36'], ['18.36', '5.64', '19.78', '4.22']
-      ];
-      rays.forEach(function (r) {
-        var line = document.createElementNS(SVG_NS, 'line');
-        line.setAttribute('x1', r[0]);
-        line.setAttribute('y1', r[1]);
-        line.setAttribute('x2', r[2]);
-        line.setAttribute('y2', r[3]);
-        sunSvg.appendChild(line);
-      });
-      parent.appendChild(sunSvg);
-    }
+    var svg = W2M.buildThemeIcon(theme === 'dark');
+    svg.id = 'dash-theme-icon';
+    parent.appendChild(svg);
   };
 
   // --- Session ---
@@ -532,8 +497,16 @@
     if (!this.blockedUrls || this.blockedUrls.length === 0) {
       this.$lblErrors.classList.add('hidden');
       this.$errors.classList.add('hidden');
+      this._lastBlockedKey = '';
       return;
     }
+
+    // Skip full DOM rebuild if the list hasn't changed
+    var urlKeys = this.blockedUrls.map(function (entry) {
+      return typeof entry === 'string' ? entry : entry.url;
+    }).join('\n');
+    if (urlKeys === this._lastBlockedKey) return;
+    this._lastBlockedKey = urlKeys;
 
     this.$lblErrors.classList.remove('hidden');
     this.$errors.classList.remove('hidden');
