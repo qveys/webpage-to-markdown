@@ -64,6 +64,7 @@
       allowed.indexOf(newState) === -1
     ) {
       console.warn('[AppState] Invalid transition: ' + this.currentState + ' → ' + newState);
+      return;  // Block the invalid transition
     }
     var prev = this.currentState;
     this.currentState = newState;
