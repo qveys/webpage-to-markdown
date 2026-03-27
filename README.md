@@ -5,12 +5,12 @@
 <h1 align="center">🔄 Webpage to Markdown</h1>
 
 <p align="center">
-  <strong>Convert any webpage to clean Markdown — one click or full auto-pilot.</strong>
+  <strong>Convert any webpage to clean Markdown — one click, auto-pilot, or full-site crawl.</strong>
 </p>
 
 <p align="center">
   <a href="#-features">Features</a> •
-  <a href="#-auto-capture">Auto-capture</a> •
+  <a href="#-crawl">Crawl</a> •
   <a href="#-installation">Installation</a> •
   <a href="#-tech-stack">Tech Stack</a> •
   <a href="#-license">License</a>
@@ -24,21 +24,13 @@
 
 ---
 
-> 🍴 Forked from [Webpage to Markdown](https://chromewebstore.google.com/detail/webpage-to-markdown/ajeinonckioeekcfanjndliandidilid) — extended with auto-capture sessions, URL tree downloads, asset saving, and a redesigned UI.
-
----
-
-## 📸 Screenshots
-
-|                 Light Mode                 |                Dark Mode                 |                    Settings                    |
-| :----------------------------------------: | :--------------------------------------: | :--------------------------------------------: |
-| ![Light](docs/screenshots/popup-light.png) | ![Dark](docs/screenshots/popup-dark.png) | ![Settings](docs/screenshots/auto-capture.png) |
+> 🍴 Forked from [Webpage to Markdown](https://chromewebstore.google.com/detail/webpage-to-markdown/ajeinonckioeekcfanjndliandidilid) — extended with auto-capture sessions, multi-page crawl, side-panel dashboard, and a redesigned UI.
 
 ---
 
 ## ✨ Features
 
-### 📝 Manual Conversion
+### 📝 Single-Page Conversion
 
 > Convert the current page to Markdown with a single click.
 
@@ -56,9 +48,8 @@
 ```
 +-----------------------------------------------+
 |  Start session                                |
-|  Folder: my-docs/                             |
-|  Delay: 2000ms                                |
-|  URL tree: ON         Save assets: ON         |
+|  Folder: my-docs/    Delay: 2000ms            |
+|  URL tree: ON        Save assets: ON          |
 +-----------------------------------------------+
                     |
                     v
@@ -72,8 +63,7 @@
                     |
                     v
 +-----------------------------------------------+
-|  Stop session                                 |
-|  12 pages captured                            |
+|  Stop session       12 pages captured         |
 +-----------------------------------------------+
 ```
 
@@ -84,7 +74,57 @@
 | 💾 **Persistent State**    | Stop/restart without re-capturing already-visited pages                        |
 | 🟠 **Duplicate Detection** | Orange flash on already-captured pages, green flash on new ones                |
 | 📊 **Live Counter**        | Real-time count of captured pages in the popup                                 |
-| ⏱️ **Configurable Delay**  | Wait for SPAs to finish loading before capturing (500ms–10s)                   |
+| ⏱️ **Configurable Delay**  | Wait for SPAs to finish loading before capturing (500 ms–10 s)                 |
+
+---
+
+### 🕷️ Crawl
+
+> Give a starting URL, the extension discovers and converts every linked page automatically.
+
+```
++-----------------------------------------------+
+|  Start crawl: https://example.com/docs        |
+|  Concurrency: 3      Depth: unlimited         |
+|  Delay: 1000ms       Max blocks: 5            |
++-----------------------------------------------+
+          |
+          v
+  +--------+---+---+---+---+
+  | Worker |   1   2   3   |  (parallel fetch)
+  +--------+---+---+---+---+
+               |
+    +--------------------------------------------+
+    |  Response                                  |
+    |  200     --> parse links + convert to .md  |
+    |  403     --> add to blocked list           |
+    |  CAPTCHA --> pause crawl                   |
+    +--------------------------------------------+
+          |
+          v
+  +-------+-----------------------------+
+  |  Dashboard (side panel)             |
+  |  |-- Live progress + activity log   |
+  |  |-- Blocked URLs: retry / dismiss  |
+  |  '-- Pause / Resume / Stop          |
+  +-------------------------------------+
+          |
+          v
++-----------------------------------------------+
+|  Crawl done       42 pages · 3 blocked        |
++-----------------------------------------------+
+```
+
+| Feature                      | Description                                                                 |
+| ---------------------------- | --------------------------------------------------------------------------- |
+| 🔗 **Automatic Discovery**   | Follows links within the same scope (domain / path prefix)                  |
+| ⚡ **Concurrent Workers**    | Configurable concurrency (default 3) for parallel page fetching             |
+| 🛡️ **Anti-bot Detection**   | Detects CAPTCHAs and 403/429 blocks, pauses automatically                  |
+| 🔄 **Pause / Resume / Retry** | Full crawl lifecycle controls from popup and dashboard                     |
+| 📊 **Live Dashboard**        | Side-panel with real-time progress, activity log, blocked URL management    |
+| 🔍 **Debug Panel**           | Inspect captured pages, queue state, and crawl engine internals             |
+| 💾 **State Persistence**     | Crawl survives Service Worker restarts via `chrome.storage`                 |
+| 📏 **Depth Control**         | Limit crawl depth (0 = unlimited, or 1–5 levels)                           |
 
 ---
 
@@ -92,12 +132,14 @@
 
 ```mermaid
 graph LR
-    A[🌐 Webpage] --> B{Readability.js}
-    B -->|Success| C[📄 Clean article]
-    B -->|Fail| D[🔍 Heuristic fallback]
-    D --> C
-    C --> E[🔄 Turndown.js]
-    E --> F[📝 Markdown]
+    A[🌐 Webpage] --> B[Offscreen DOM parser]
+    B --> C{Readability.js}
+    C -->|Success| D[📄 Clean article]
+    C -->|Fail| E[🔍 Heuristic fallback]
+    E --> D
+    D --> F[🔄 Turndown.js]
+    F --> G[🧹 cleanupMarkdown]
+    G --> H[📝 Markdown]
 ```
 
 - 📰 **Mozilla Readability.js** — robust article extraction used by Firefox Reader View
@@ -106,15 +148,16 @@ graph LR
 - 💻 Code block language detection from `class` / `data-*` attributes
 - 📂 `<details>`, `<summary>`, and `aria-label` support
 - 🧹 Scripts, styles, and inline SVGs stripped clean
+- 🖼️ Small images constrained to rendered dimensions
 
 ---
 
 ### 🎨 UI
 
-- 🌙 Light / dark theme toggle
-- ✨ Animated settings panel with smooth transitions
+- 🌙 Light / dark theme toggle (shared across popup, dashboard, settings)
+- 📊 Side-panel dashboard for crawl monitoring
+- ⚙️ Dedicated settings page with markdown, capture, and crawl preferences
 - 🔒 Inputs disabled during active session to prevent misconfiguration
-- 🚫 No scrollbar — settings and capture panels swap seamlessly
 
 ---
 
@@ -133,14 +176,18 @@ git clone https://github.com/qveys/webpage-to-markdown.git
 
 ## 🔐 Permissions
 
-|     Permission     | Why?                                  |
-| :----------------: | ------------------------------------- |
-|   🔓 `activeTab`   | Access current page content           |
-|   💉 `scripting`   | Inject extraction scripts into pages  |
-|    💾 `storage`    | Persist settings and session state    |
-|   📥 `downloads`   | Save `.md` files and image assets     |
-|     🔄 `tabs`      | Track tab navigation for auto-capture |
-| 🧭 `webNavigation` | Detect page loads during sessions     |
+|     Permission      | Why?                                                     |
+| :-----------------: | -------------------------------------------------------- |
+|   🔓 `activeTab`    | Access current page content                              |
+|   💉 `scripting`    | Inject extraction scripts into pages                     |
+|    💾 `storage`     | Persist settings, session state, and crawl progress      |
+|   📥 `downloads`    | Save `.md` files and image assets                        |
+|     🔄 `tabs`       | Track tab navigation for auto-capture                    |
+| 🧭 `webNavigation`  | Detect page loads during sessions                        |
+|   📊 `sidePanel`    | Dashboard side-panel for crawl monitoring                |
+|   📄 `offscreen`    | Isolated DOM parsing for link extraction during crawl    |
+|    ⏰ `alarms`      | Keep Service Worker alive during crawl sessions          |
+| 🌐 `<all_urls>`     | Fetch and convert pages from any website during crawl    |
 
 ---
 
@@ -151,7 +198,7 @@ git clone https://github.com/qveys/webpage-to-markdown.git
 | 🧩  | Chrome Extensions Manifest V3                                            | Extension platform            |
 | 🔄  | [Turndown.js](https://github.com/mixmark-io/turndown)                    | HTML → Markdown conversion    |
 | 📊  | [turndown-plugin-gfm](https://github.com/mixmark-io/turndown-plugin-gfm) | GFM tables support            |
-| 📰  | [Readability.js](https://github.com/nicktomlin/nicktomlin.github.io)     | Content extraction            |
+| 📰  | [Readability.js](https://github.com/mozilla/readability)                 | Content extraction            |
 | 🟡  | Vanilla JavaScript                                                       | No framework, no dependencies |
 
 ---
@@ -160,18 +207,32 @@ git clone https://github.com/qveys/webpage-to-markdown.git
 
 ```
 webpage-to-markdown/
-├── 📄 manifest.json          # Extension manifest (V3)
-├── 📄 popup.html             # Popup UI
-├── 🎨 styles.css             # Popup styles (light/dark)
+├── manifest.json              # Extension manifest (V3)
+├── popup.html                 # Popup UI
+├── dashboard.html             # Side-panel crawl dashboard
+├── settings.html              # Options page
+├── offscreen.html             # Offscreen document (DOM parsing)
+├── styles.css                 # Global styles (light/dark themes)
 ├── js/
-│   ├── 🧠 background.js     # Service worker (sessions, downloads)
-│   ├── 🖥️ popup.js           # Popup logic & UI
-│   ├── 🔄 turndown.js        # Turndown.js library
-│   └── 📊 turndown-plugin-gfm.js
+│   ├── background.js          # Service Worker (sessions, downloads, crawl)
+│   ├── popup.js               # Popup logic, state views, markdown converter
+│   ├── dashboard.js           # Crawl dashboard UI and port communication
+│   ├── crawl-engine.js        # CrawlEngine class (discovery, workers, anti-bot)
+│   ├── settings.js            # Settings page controller
+│   ├── settings-page.js       # Settings page bootstrap (theme toggle)
+│   ├── app-state.js           # State machine (STATES, TRANSITIONS, AppState)
+│   ├── i18n.js                # Internationalization (FR/EN)
+│   ├── offscreen.js           # Offscreen DOM parser (link extraction)
+│   ├── cleanup-markdown.js    # Shared markdown post-processing
+│   ├── theme-icon.js          # Shared sun/moon theme icon builder
+│   ├── theme-init.js          # Early theme detection (prevent flash)
+│   ├── turndown.js            # Turndown.js (vendored)
+│   ├── turndown-plugin-gfm.js # GFM plugin (vendored)
+│   └── Readability.js         # Mozilla Readability (vendored)
 ├── img/
-│   └── 🖼️ icon.png           # Extension icon
+│   └── icon.png               # Extension icon
 └── docs/
-    └── screenshots/          # README screenshots
+    └── screenshots/           # README screenshots
 ```
 
 ---
