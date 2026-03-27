@@ -46,6 +46,12 @@ Communication: `chrome.runtime.sendMessage` for request/response, `chrome.runtim
 
 Persistent state in `chrome.storage.local`: `markdownSettings`, `captureSettings`, `crawlSettings`, `session`, `theme`.
 
+## Permissions
+
+`activeTab` `scripting` `storage` `downloads` `downloads.ui` `tabs` `webNavigation` `notifications` `sidePanel` `offscreen` `alarms`
+
+Notable: `sidePanel` for dashboard, `offscreen` for DOM parsing, `alarms` for crawl scheduling, `webNavigation` for crawl URL tracking.
+
 ## Code Conventions
 
 - **ES5-compatible** in IIFEs: `var`, `function`, prototype methods — no arrow functions
