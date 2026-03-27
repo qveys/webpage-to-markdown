@@ -270,6 +270,7 @@ class CrawlEngine {
         this.log("skip", `Unsupported URL scheme: ${url}`);
         return;
       }
+      if (CrawlEngine.looksLikeAsset(url)) return;
 
       const signal = this._abortController ? this._abortController.signal : AbortSignal.timeout(30000);
       const response = await fetch(url, {
@@ -432,9 +433,9 @@ class CrawlEngine {
     const mdPath =
       dirs.length > 0 ? `${dirs.join("/")}/${filename}.md` : `${filename}.md`;
 
-    // Download assets if enabled
+    // Download assets if enabled (skip if paused/stopped mid-crawl)
     let finalMarkdown = markdown;
-    if (session?.saveAssets) {
+    if (session?.saveAssets && this.status === "running") {
       const pageLabel = title || pageUrl;
       finalMarkdown = await downloadAssets(markdown, folder, mdPath, {
         pageUrl,
