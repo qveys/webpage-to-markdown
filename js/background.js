@@ -498,7 +498,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         const delay = message.delay ?? 2000;
         const urlTree = message.urlTree ?? true;
         const saveAssets = message.saveAssets ?? true;
-        await setSession({ active: true, folder, delay, urlTree, saveAssets, crawling: true, startUrl: message.startUrl });
+        await setSession({ active: true, folder, delay, urlTree, saveAssets, crawling: true, startUrl: message.startUrl, lastCrawlResult: null });
         crawlSessionCommitted = true;
         updateBadge(true);
         await crawlEngine.start(message.startUrl, {
@@ -1252,8 +1252,18 @@ async function w2mOnCrawlSessionEnded() {
   } catch {
     /* ignore */
   }
+  // Sauvegarde les stats finales pour que le popup puisse afficher les résultats
+  const finalStats = crawlEngine ? crawlEngine.getStatusPayload() : null;
   try {
-    await setSession({ active: false, crawling: false });
+    await setSession({
+      active: false,
+      crawling: false,
+      lastCrawlResult: finalStats ? {
+        stats: finalStats.stats,
+        blockedUrls: finalStats.blockedUrls,
+        timestamp: Date.now()
+      } : null
+    });
   } catch (e) {
     console.warn("[W2M] setSession after crawl end:", e);
   }
