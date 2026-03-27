@@ -1,6 +1,4 @@
-// Shared theme icon builder — used by popup, dashboard, and settings page.
-// Builds a sun (light) or moon (dark) SVG icon and replaces the content
-// of the given container element.
+// Shared theme icon builder — returns a sun/moon SVG node (W2M.buildThemeIcon).
 (function () {
   var NS = 'http://www.w3.org/2000/svg';
 
