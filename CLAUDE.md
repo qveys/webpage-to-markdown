@@ -29,6 +29,9 @@ Service Worker changes require extension reload. Popup/dashboard changes take ef
 - **Settings** (`js/settings.js`): options page
 - **Offscreen** (`js/offscreen.js`): isolated DOM parsing (DOMParser for link extraction)
 - **CrawlEngine** (`js/crawl-engine.js`): ES6 class for multi-page crawl with concurrency, queue, block detection
+- **Settings page** (`js/settings-page.js`): settings page bootstrap (title + theme toggle)
+- **Theme icon** (`js/theme-icon.js`): shared SVG sun/moon builder (`W2M.buildThemeIcon`)
+- **Theme init** (`js/theme-init.js`): synchronous theme apply in `<head>` to prevent flash
 
 Communication: `chrome.runtime.sendMessage` for request/response, `chrome.runtime.connect()` ports for persistent crawl status streaming between SW ↔ popup/dashboard.
 
