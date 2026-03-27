@@ -109,6 +109,22 @@ describe('CrawlEngine anti-bot', () => {
     expect(engine.looksLikeCaptcha(html)).toBe(false);
   });
 
+  test('looksLikeCaptcha returns false with list/table content despite captcha keyword', () => {
+    var changelog = '<html><head><script src="cf-challenge.js"></script></head><body>'
+      + '<h2>Changelog</h2><ul><li>Fix A</li><li>Fix B</li><li>Fix C</li></ul></body></html>';
+    expect(engine.looksLikeCaptcha(changelog)).toBe(false);
+
+    var table = '<html><head><script src="recaptcha.js"></script></head><body>'
+      + '<nav>Menu</nav><table><tr><td>Data</td></tr></table></body></html>';
+    expect(engine.looksLikeCaptcha(table)).toBe(false);
+  });
+
+  test('looksLikeCaptcha returns false when HTML is large despite captcha keyword', () => {
+    var large = '<html><head><script src="cf-challenge.js"></script></head><body>'
+      + '<div>' + 'x'.repeat(9000) + '</div></body></html>';
+    expect(engine.looksLikeCaptcha(large)).toBe(false);
+  });
+
   test('looksLikeCaptcha returns true when captcha keyword and no real content', () => {
     var challenge = '<html><body><div class="cf-challenge"><p>Verify you are human</p></div></body></html>';
     expect(engine.looksLikeCaptcha(challenge)).toBe(true);

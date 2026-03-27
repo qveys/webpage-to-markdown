@@ -357,17 +357,15 @@ class CrawlEngine {
       return false;
     }
     // Keyword found — but real CAPTCHA/challenge pages are short interstitials
-    // with no meaningful content.  If the page has substantial body content,
+    // with almost no markup.  If the page has substantial body content,
     // it is a real page that merely references a captcha script (e.g. Cloudflare
-    // JS SDK loaded preventively).  Check the first 50 KB to stay cheap.
+    // JS SDK loaded preventively).
+    // Challenge pages are typically < 8 KB; real pages are much larger.
+    if (html.length > 8192) return false;
     var sample = html.slice(0, 51200);
-    var hasContent = /<(main|article|section)\b/i.test(sample);
-    if (!hasContent) {
-      // Count <p> tags as a secondary signal — challenge pages rarely have many.
-      var pCount = (sample.match(/<p[\s>]/gi) || []).length;
-      hasContent = pCount >= 3;
-    }
-    return !hasContent;
+    if (/<(main|article|section|nav|table)\b/i.test(sample)) return false;
+    var tags = (sample.match(/<(p|li|h[1-6]|tr|dt|dd)[\s>]/gi) || []).length;
+    return tags < 3;
   }
 
   handleBlocked(url, reason) {
