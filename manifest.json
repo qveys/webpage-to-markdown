@@ -25,6 +25,7 @@
     "scripting",
     "storage",
     "downloads",
+    "downloads.ui",
     "tabs",
     "webNavigation",
     "notifications",
