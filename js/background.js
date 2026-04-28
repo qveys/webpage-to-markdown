@@ -323,6 +323,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                   "/js/Readability.js",
                   "/js/turndown.js",
                   "/js/turndown-plugin-gfm.js",
+                  "/js/cleanup-markdown.js",
                 ],
               });
               const results = await chrome.scripting.executeScript({
@@ -536,7 +537,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         }
         await chrome.scripting.executeScript({
           target: { tabId: tab.id },
-          files: ["/js/Readability.js", "/js/turndown.js", "/js/turndown-plugin-gfm.js"],
+          files: ["/js/Readability.js", "/js/turndown.js", "/js/turndown-plugin-gfm.js", "/js/cleanup-markdown.js"],
         });
         const results = await chrome.scripting.executeScript({
           target: { tabId: tab.id },
@@ -634,6 +635,7 @@ chrome.webNavigation.onCompleted.addListener(async (details) => {
               "/js/Readability.js",
               "/js/turndown.js",
               "/js/turndown-plugin-gfm.js",
+              "/js/cleanup-markdown.js",
             ],
           });
 
@@ -701,7 +703,7 @@ chrome.webNavigation.onCompleted.addListener(async (details) => {
         try {
           await chrome.scripting.executeScript({
             target: { tabId: details.tabId },
-            files: ["/js/Readability.js", "/js/turndown.js", "/js/turndown-plugin-gfm.js"],
+            files: ["/js/Readability.js", "/js/turndown.js", "/js/turndown-plugin-gfm.js", "/js/cleanup-markdown.js"],
           });
           const results = await chrome.scripting.executeScript({
             target: { tabId: details.tabId },
