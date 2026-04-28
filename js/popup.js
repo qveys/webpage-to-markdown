@@ -323,11 +323,6 @@
         var actions = el('div', { className: 'view-home__actions' });
         actions.appendChild(el('button', { className: 'btn btn-primary btn-full', id: 'btn-convert', textContent: t('home.cta'), onClick: function () { app.handleConvert(); } }));
         actions.appendChild(el('button', { className: 'btn btn-secondary btn-full', textContent: t('home.crawl'), onClick: function () { state.navigate(STATES.PRECRAWL, { url: app.currentUrl }); } }));
-        actions.appendChild(el('button', {
-          className: 'btn btn-secondary btn-full mt-2',
-          textContent: t('home.sidePanelSingle'),
-          onClick: function () { app.openDashboardSinglePage(); }
-        }));
         container.appendChild(actions);
         if (data && data.lastConversion) {
           var hist = el('div', { className: 'view-home__history text-muted' }, t('home.history') + ' ' + data.lastConversion.url + ' — ' + formatTimeAgo(data.lastConversion.timestamp));
@@ -361,21 +356,17 @@
     return {
       render: function () {
         var md = data.markdown || '';
-        var size = formatSize(new Blob([md]).size);
-        var words = md.split(/\s+/).filter(Boolean).length;
         var container = el('div', { className: 'view-result' });
-        container.appendChild(el('div', { className: 'view-result__status' },
-          el('span', { className: 'text-success', textContent: '\u2713' }),
-          el('span', { className: 'heading-sm', textContent: t('result.success') })
-        ));
-        container.appendChild(el('div', { className: 'view-result__url', textContent: data.url || '' }));
-        container.appendChild(el('pre', { className: 'view-result__preview text-mono', textContent: md }));
-        var actions = el('div', { className: 'view-result__actions' });
-        actions.appendChild(el('button', { className: 'btn btn-secondary', textContent: t('result.copy'), onClick: function () { app.handleCopy(); } }));
-        actions.appendChild(el('button', { className: 'btn btn-secondary', textContent: t('result.download'), onClick: function () { app.handleDownload(); } }));
-        container.appendChild(actions);
-        container.appendChild(el('button', { className: 'btn btn-secondary btn-full mt-3', textContent: t('result.reconvert'), onClick: function () { app.handleConvert(); } }));
-        container.appendChild(el('div', { className: 'view-result__meta text-muted mt-3', textContent: t('result.meta', { size: size, words: words }) }));
+        W2M.appendSingleConversionSuccess(container, {
+          bemPrefix: 'view-result',
+          markdown: md,
+          url: data.url || '',
+          showMeta: true,
+          onCopy: function () { app.handleCopy(); },
+          onDownload: function () { app.handleDownload(); },
+          onReconvert: function () { app.handleConvert(); },
+          reconvertButtonClass: 'btn btn-secondary btn-full mt-3'
+        });
         return container;
       },
       init: function () {
@@ -795,6 +786,14 @@
         state.navigate(STATES.IDLE, { lastConversion: self.lastConversion });
       }
     });
+
+    var sidepanelBtn = document.getElementById('btn-sidepanel-single');
+    if (sidepanelBtn) {
+      sidepanelBtn.setAttribute('aria-label', t('home.sidePanelSingle'));
+      sidepanelBtn.addEventListener('click', function () {
+        self.openDashboardSinglePage();
+      });
+    }
 
     document.getElementById('btn-settings').addEventListener('click', function () {
       var cur = state.getState();

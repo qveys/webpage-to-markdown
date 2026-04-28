@@ -225,6 +225,7 @@ webpage-to-markdown/
 │   ├── i18n.js                # Internationalization (FR/EN)
 │   ├── offscreen.js           # Offscreen DOM parser (link extraction)
 │   ├── cleanup-markdown.js    # Shared markdown post-processing
+│   ├── single-conversion-result.js # Shared module for building the single-page conversion result UI (used by both popup and side panel)
 │   ├── theme-icon.js          # Shared sun/moon theme icon builder
 │   ├── theme-init.js          # Early theme detection (prevent flash)
 │   ├── turndown.js            # Turndown.js (vendored)

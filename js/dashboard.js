@@ -122,7 +122,7 @@
         self._result = { markdown: res.markdown, title: res.title, url: res.url };
       } else {
         self._state = 'error';
-        self._errorMsg = (res && res.error) || t('single.error');
+        self._errorMsg = (res && res.error) || '';
       }
       self._render();
     });
@@ -173,36 +173,22 @@
 
     if (this._state === 'success' && this._result) {
       var md = this._result.markdown || '';
-      var preview = md.length > MAX_PREVIEW_LENGTH ? md.slice(0, MAX_PREVIEW_LENGTH) + '\n…' : md;
 
-      panel.appendChild(el('div', { className: 'single-panel__status' },
-        el('span', { className: 'text-success', textContent: '\u2713' }),
-        el('span', { textContent: t('single.success') })
-      ));
-
-      if (this._result.url) {
-        panel.appendChild(el('div', { className: 'single-panel__url', textContent: this._result.url }));
-      }
-
-      panel.appendChild(el('pre', { className: 'single-panel__preview text-mono', textContent: preview }));
-
-      var actions = el('div', { className: 'single-panel__actions' });
-      actions.appendChild(el('button', {
-        className: 'btn btn-secondary',
-        textContent: t('single.copy'),
-        onClick: function () {
+      W2M.appendSingleConversionSuccess(panel, {
+        bemPrefix: 'single-panel',
+        markdown: md,
+        url: this._result.url || '',
+        maxPreviewChars: MAX_PREVIEW_LENGTH,
+        showMeta: true,
+        onCopy: function () {
           navigator.clipboard.writeText(md).then(function () {
             self._showToast(t('toast.copied'));
           }).catch(function (err) {
             console.warn('[W2M] clipboard write:', err.message);
             self._showToast(t('toast.error'));
           });
-        }
-      }));
-      actions.appendChild(el('button', {
-        className: 'btn btn-secondary',
-        textContent: t('single.download'),
-        onClick: function () {
+        },
+        onDownload: function () {
           chrome.runtime.sendMessage({
             type: 'W2M_DOWNLOAD_MARKDOWN',
             markdown: md,
@@ -214,15 +200,10 @@
               self._showToast(t('toast.downloaded'));
             }
           });
-        }
-      }));
-      panel.appendChild(actions);
-
-      panel.appendChild(el('button', {
-        className: 'btn btn-secondary btn-full',
-        textContent: t('single.reconvert'),
-        onClick: function () { self._convert(); }
-      }));
+        },
+        onReconvert: function () { self._convert(); },
+        reconvertButtonClass: 'btn btn-secondary btn-full'
+      });
 
       panel.appendChild(this._buildToggles());
       c.appendChild(panel);
@@ -232,7 +213,7 @@
     if (this._state === 'error') {
       panel.appendChild(el('div', { className: 'single-panel__status' },
         el('span', { className: 'text-error', textContent: '\u2717' }),
-        el('span', { textContent: t('single.error') })
+        el('span', { textContent: t('result.error') })
       ));
       if (this._errorMsg) {
         panel.appendChild(el('p', { className: 'text-muted', textContent: this._errorMsg }));
