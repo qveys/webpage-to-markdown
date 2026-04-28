@@ -13,6 +13,7 @@
    * @param {Object} opts
    * @param {string} opts.bemPrefix - 'view-result' | 'single-panel'
    * @param {string} opts.markdown - full markdown (used for copy + meta; preview may truncate)
+   * @param {string} [opts.previewMarkdown] - if set, used for the preview <pre> only (still copy full markdown)
    * @param {string} [opts.url]
    * @param {number} [opts.maxPreviewChars] - omit or non-positive = full preview
    * @param {boolean} [opts.showMeta=true] - size · word count row
@@ -29,10 +30,11 @@
 
     var bem = opts.bemPrefix || 'view-result';
     var md = opts.markdown || '';
-    var preview = md;
+    var previewSource = opts.previewMarkdown != null ? opts.previewMarkdown : md;
+    var preview = previewSource;
     var maxC = opts.maxPreviewChars;
-    if (typeof maxC === 'number' && maxC > 0 && md.length > maxC) {
-      preview = md.slice(0, maxC) + '\n…';
+    if (typeof maxC === 'number' && maxC > 0 && preview.length > maxC) {
+      preview = preview.slice(0, maxC) + '\n…';
     }
 
     parent.appendChild(el('div', { className: bem + '__status' },

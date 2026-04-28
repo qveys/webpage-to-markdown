@@ -35,7 +35,8 @@
   // =============================================
 
   function MarkdownConverter() {
-    this.defaultSettings = {
+    var mo = W2M.markdownOutput && W2M.markdownOutput.defaults;
+    this.defaultSettings = mo ? Object.assign({}, mo) : {
       frontmatter: false,
       headingStyle: 'atx',
       bulletListMarker: '-',
@@ -227,7 +228,12 @@
         var content = result.content;
         var smallImgSizes = result.smallImgSizes;
 
-        var wrappedContent = '<div class="markdown-content"><h1>' + title + '</h1>' + content + '</div>';
+        function escapeHtmlText(s) {
+          return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        }
+
+        var wrappedContent =
+          '<div class="markdown-content"><h1>' + escapeHtmlText(title) + '</h1>' + content + '</div>';
 
         // Initialize Turndown with current settings
         var turndownService = self.createTurndownService();
@@ -249,11 +255,8 @@
           );
         }
 
-        // Add Frontmatter if enabled
-        if (self.settings.frontmatter) {
-          var date = new Date().toISOString().split('T')[0];
-          var frontmatter = '---\ntitle: "' + title.replace(/"/g, '\\"') + '"\nurl: "' + url + '"\ndate: ' + date + '\n---\n\n';
-          markdown = frontmatter + markdown;
+        if (self.settings.frontmatter && W2M.markdownOutput && W2M.markdownOutput.prependYamlFrontmatter) {
+          markdown = W2M.markdownOutput.prependYamlFrontmatter(markdown, title, url);
         }
 
         callback(null, { markdown: markdown, url: url, title: title });
@@ -574,7 +577,10 @@
         return container;
       },
       init: function () {
-        document.getElementById('header-title').textContent = t('progress.title');
+        var header = document.getElementById('header-title');
+        if (header) {
+          header.textContent = (data && data.folder) ? data.folder : t('progress.title');
+        }
         document.getElementById('btn-back').classList.add('hidden');
         startTime = Date.now();
       },
@@ -912,7 +918,10 @@
       if (session && session.active) {
         // A session is active, show crawl progress
         if (session.crawling) {
-          state.navigate(STATES.RUNNING, { url: session.startUrl || self.currentUrl });
+          state.navigate(STATES.RUNNING, {
+            url: session.startUrl || self.currentUrl,
+            folder: session.folder || ''
+          });
           self.connectCrawlPort();
         }
       } else if (session && session.lastCrawlResult) {
@@ -1031,6 +1040,14 @@
           return;
         }
         if (res && res.ok) {
+          // Keep side panel and popup aligned on Crawl mode when a crawl starts.
+          chrome.storage.local.set({ dashboardMode: 'crawl' }, function () {
+            chrome.runtime.sendMessage({ type: 'W2M_APPLY_DASHBOARD_MODE', mode: 'crawl' }).catch(function (err) {
+              if (err && err.message && err.message.indexOf('Receiving end does not exist') === -1) {
+                console.warn('[W2M] sendMessage:', err.message);
+              }
+            });
+          });
           state.navigate(STATES.RUNNING, { url: self.currentUrl, folder: folder });
           self.connectCrawlPort();
         } else {
