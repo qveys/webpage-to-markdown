@@ -1,0 +1,159 @@
+# Canonical label definitions
+# Sync with GitHub Actions so labels remain consistent across branches/forks.
+# Keep this list intentionally small and focused on the extension's workflow.
+
+- name: "🧩 Area: Auto-Capture"
+  color: "1d76db"
+  description: "Session-based background capture while browsing."
+
+- name: "🧩 Area: Conversion"
+  color: "1d76db"
+  description: "HTML extraction, Markdown conversion, cleanup, or asset rewriting."
+
+- name: "🧩 Area: Crawl"
+  color: "1d76db"
+  description: "Multi-page crawl, discovery, queueing, or anti-bot handling."
+
+- name: "🧩 Area: Platform"
+  color: "1d76db"
+  description: "Manifest, service worker lifecycle, permissions, downloads, or offscreen APIs."
+
+- name: "🧩 Area: UI"
+  color: "1d76db"
+  description: "Popup, dashboard, settings, theme, or shared styles."
+
+- name: "🌐 Browser: Chrome"
+  color: "4285f4"
+  description: "Specific to Google Chrome or Chrome Extension behavior."
+
+- name: "🌍 Scope: Site-Specific"
+  color: "7cb342"
+  description: "Affects one site or a narrow set of websites."
+
+- name: "⏱️ Effort: Large"
+  color: "ef6c00"
+  description: "Significant effort; likely several days."
+
+- name: "⏱️ Effort: Medium"
+  color: "ffca28"
+  description: "Moderate task; likely a day or two."
+
+- name: "⏱️ Effort: Small"
+  color: "66bb6a"
+  description: "Quick fix; likely less than a few hours."
+
+- name: "🟨 Lang: JavaScript"
+  color: "f1e05a"
+  description: "Primarily JavaScript scope."
+
+- name: "🧷 Meta: Good First Issue"
+  color: "7e57c2"
+  description: "Good entry point for newcomers."
+
+- name: "🧷 Meta: Help Wanted"
+  color: "26a69a"
+  description: "Extra attention or external help would be useful."
+
+- name: "🧷 Meta: Needs Discussion"
+  color: "f06292"
+  description: "Requires a product or technical decision before coding."
+
+- name: "🧪 Meta: Needs Repro"
+  color: "fb8c00"
+  description: "Needs a reproducible case, sample URL, or exact steps."
+
+- name: "🔥 Priority: Critical"
+  color: "d32f2f"
+  description: "Urgent; blocks development or breaks core functionality."
+
+- name: "🔥 Priority: High"
+  color: "ffb74d"
+  description: "Important and should be handled soon."
+
+- name: "🔥 Priority: Low"
+  color: "b3e5fc"
+  description: "Can wait; not urgent."
+
+- name: "🔥 Priority: Medium"
+  color: "fff176"
+  description: "Normal priority."
+
+- name: "🚦 Status: Blocked"
+  color: "e53935"
+  description: "Blocked by a dependency, browser limitation, or external constraint."
+
+- name: "🚦 Status: Duplicate"
+  color: "cfd8dc"
+  description: "This issue or PR already exists elsewhere."
+
+- name: "🚦 Status: In Progress"
+  color: "4fc3f7"
+  description: "Currently being worked on."
+
+- name: "🚦 Status: Invalid"
+  color: "eceff1"
+  description: "Not reproducible or outside the project scope."
+
+- name: "🚦 Status: Needs Info"
+  color: "ff8a65"
+  description: "More information is required from the reporter or stakeholder."
+
+- name: "🚦 Status: On Hold"
+  color: "90a4ae"
+  description: "Work is paused for now."
+
+- name: "🚦 Status: Ready"
+  color: "00c853"
+  description: "Ready to merge or close; no additional review expected."
+
+- name: "🚦 Status: Review Needed"
+  color: "ffd54f"
+  description: "Work is done and awaiting review."
+
+- name: "🚦 Status: Won't Fix"
+  color: "ffffff"
+  description: "Will not be worked on by design or decision."
+
+- name: "🏗️ Type: Build"
+  color: "b0bec5"
+  description: "Build, packaging, release, or CI workflow changes."
+
+- name: "🐞 Type: Bug"
+  color: "d32f2f"
+  description: "Something is not working as intended."
+
+- name: "🧹 Type: Chore"
+  color: "cfd8dc"
+  description: "Routine maintenance with no product behavior change."
+
+- name: "📚 Type: Documentation"
+  color: "0288d1"
+  description: "Documentation improvements or additions."
+
+- name: "✨ Type: Enhancement"
+  color: "81c784"
+  description: "Incremental improvement to an existing capability."
+
+- name: "🚀 Type: Feature"
+  color: "388e3c"
+  description: "Major new feature or significant capability."
+
+- name: "⚡ Type: Performance"
+  color: "ffd180"
+  description: "Performance improvements in runtime, responsiveness, or crawling throughput."
+
+- name: "❓ Type: Question"
+  color: "ab47bc"
+  description: "Further information or clarification is requested."
+
+- name: "🧼 Type: Refactor"
+  color: "f48fb1"
+  description: "Code change that neither fixes a bug nor adds a feature."
+
+- name: "🔒 Type: Security"
+  color: "d32f2f"
+  description: "Security fix or hardening change."
+
+- name: "🧪 Type: Test"
+  color: "aed581"
+  description: "Adding, updating, or fixing tests."

@@ -501,6 +501,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     (async () => {
       try {
         const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+        if (message.mode === "single" || message.mode === "crawl") {
+          await chrome.storage.local.set({ dashboardMode: message.mode });
+        }
         await chrome.sidePanel.open({ windowId: tab?.windowId });
         // If a specific view was requested, broadcast it to the dashboard
         if (message.view) {
@@ -511,6 +514,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
               }
             });
           }, 300); // small delay to let the side panel load
+        } else if (message.mode === "single" || message.mode === "crawl") {
+          setTimeout(() => {
+            chrome.runtime
+              .sendMessage({ type: "W2M_APPLY_DASHBOARD_MODE", mode: message.mode })
+              .catch((err) => {
+                if (!err.message?.includes("Receiving end does not exist")) {
+                  console.warn("[W2M] sendMessage:", err.message);
+                }
+              });
+          }, 300);
         }
         sendResponse({ ok: true });
       } catch (e) {
@@ -548,7 +561,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           throw new Error((res && res.error) || "Extraction failed");
         }
         const { singlePageSettings } = await chrome.storage.local.get('singlePageSettings');
-        if (singlePageSettings && singlePageSettings.autoDownload) {
+        if (
+          singlePageSettings &&
+          singlePageSettings.autoDownload &&
+          (await shouldAllowSinglePageAutoDownload())
+        ) {
           try {
             await downloadMarkdown(res.markdown, res.title);
           } catch (dlErr) {
@@ -597,11 +614,8 @@ async function addCapturedUrl(url) {
   await setSession({ capturedUrls: [...capturedUrls] });
 }
 
-chrome.webNavigation.onCompleted.addListener(async (details) => {
-  if (details.frameId !== 0) return;
-
-  const url = details.url;
-  const isRestricted = (
+function navigationUrlIsRestricted(url) {
+  return (
     url.startsWith("chrome://") ||
     url.startsWith("chrome-extension://") ||
     url.startsWith("edge://") ||
@@ -609,15 +623,123 @@ chrome.webNavigation.onCompleted.addListener(async (details) => {
     url.includes("chrome.google.com/webstore") ||
     url.includes("chromewebstore.google.com")
   );
+}
 
-  const [activeTab] = await chrome.tabs.query({
-    active: true,
-    lastFocusedWindow: true,
-  });
+/**
+ * True if this tab is the selected tab in the Chrome window returned by
+ * `chrome.windows.getLastFocused()` (most recently focused browser window — not OS-level focus).
+ */
+async function isForegroundActiveTab(tabId) {
+  try {
+    const tab = await chrome.tabs.get(tabId);
+    if (!tab.active) return false;
+    const focusedWin = await chrome.windows.getLastFocused();
+    return tab.windowId === focusedWin.id;
+  } catch (err) {
+    console.warn("[W2M] isForegroundActiveTab:", err.message);
+    return false;
+  }
+}
+
+async function scheduleSinglePageAutoConvert(tabId, url) {
+  const { singlePageSettings } = await chrome.storage.local.get("singlePageSettings");
+  if (!singlePageSettings?.autoConvert) return;
+
+  if (pendingSingleCaptures.has(tabId)) {
+    clearTimeout(pendingSingleCaptures.get(tabId));
+  }
+  const singleTimerId = setTimeout(async () => {
+    pendingSingleCaptures.delete(tabId);
+    try {
+      const { singlePageSettings: sp } = await chrome.storage.local.get("singlePageSettings");
+      if (!sp?.autoConvert) return;
+
+      const tab = await chrome.tabs.get(tabId).catch(() => null);
+      if (!tab?.id || !tab.url) return;
+      if (navigationUrlIsRestricted(tab.url)) return;
+      if (!(await isForegroundActiveTab(tabId))) return;
+      const currentUrl = tab.url;
+
+      await chrome.scripting.executeScript({
+        target: { tabId },
+        files: [
+          "/js/Readability.js",
+          "/js/turndown.js",
+          "/js/turndown-plugin-gfm.js",
+          "/js/cleanup-markdown.js",
+        ],
+      });
+      const results = await chrome.scripting.executeScript({
+        target: { tabId },
+        func: extractAndConvert,
+      });
+      const res = results?.[0]?.result;
+      if (res && res.success) {
+        let autoDownloaded = false;
+        if (sp.autoDownload && (await shouldAllowSinglePageAutoDownload())) {
+          try {
+            await downloadMarkdown(res.markdown, res.title);
+            autoDownloaded = true;
+          } catch (dlErr) {
+            console.warn("[W2M] Single auto-download failed:", dlErr);
+          }
+        }
+        chrome.runtime
+          .sendMessage({
+            type: "W2M_SINGLE_RESULT",
+            ok: true,
+            markdown: res.markdown,
+            title: res.title,
+            url: currentUrl,
+            autoDownloaded: autoDownloaded,
+          })
+          .catch((err) => {
+            if (!err.message?.includes("Receiving end does not exist")) {
+              console.warn("[W2M] sendMessage:", err.message);
+            }
+          });
+      } else {
+        chrome.runtime
+          .sendMessage({
+            type: "W2M_SINGLE_RESULT",
+            ok: false,
+            error: (res && res.error) || "Extraction failed",
+            url: currentUrl,
+          })
+          .catch((err) => {
+            if (!err.message?.includes("Receiving end does not exist")) {
+              console.warn("[W2M] sendMessage:", err.message);
+            }
+          });
+      }
+    } catch (err) {
+      console.error("[W2M] Single auto-convert error:", err);
+      let failUrl = url;
+      try {
+        const t = await chrome.tabs.get(tabId);
+        if (t?.url) failUrl = t.url;
+      } catch (_e) {
+        /* keep navigation url */
+      }
+      chrome.runtime
+        .sendMessage({ type: "W2M_SINGLE_RESULT", ok: false, error: err.message, url: failUrl })
+        .catch(() => {});
+    }
+  }, SINGLE_CONVERT_DEBOUNCE_MS);
+  pendingSingleCaptures.set(tabId, singleTimerId);
+}
+
+chrome.webNavigation.onCompleted.addListener(async (details) => {
+  if (details.frameId !== 0) return;
+
+  const url = details.url;
+  const isRestricted = navigationUrlIsRestricted(url);
+
+  const foregroundOk = await isForegroundActiveTab(details.tabId);
 
   // ─── Session auto-capture (existing behaviour) ──────────────────────────
   const session = await getSession();
-  if (session.active && !isRestricted && activeTab && activeTab.id === details.tabId) {
+  if (session.active && !isRestricted && foregroundOk) {
     // URL already captured
     if (capturedUrls.has(url)) {
       console.log("[W2M] Already captured, skipping:", url);
@@ -691,68 +813,28 @@ chrome.webNavigation.onCompleted.addListener(async (details) => {
     }
   }
 
-  // ─── Single-page auto-convert ────────────────────────────────────────────
-  if (!isRestricted && activeTab && activeTab.id === details.tabId) {
-    const { singlePageSettings } = await chrome.storage.local.get('singlePageSettings');
-    if (singlePageSettings && singlePageSettings.autoConvert) {
-      if (pendingSingleCaptures.has(details.tabId)) {
-        clearTimeout(pendingSingleCaptures.get(details.tabId));
-      }
-      const singleTimerId = setTimeout(async () => {
-        pendingSingleCaptures.delete(details.tabId);
-        try {
-          await chrome.scripting.executeScript({
-            target: { tabId: details.tabId },
-            files: ["/js/Readability.js", "/js/turndown.js", "/js/turndown-plugin-gfm.js", "/js/cleanup-markdown.js"],
-          });
-          const results = await chrome.scripting.executeScript({
-            target: { tabId: details.tabId },
-            func: extractAndConvert,
-          });
-          const res = results?.[0]?.result;
-          if (res && res.success) {
-            let autoDownloaded = false;
-            if (singlePageSettings.autoDownload) {
-              try {
-                await downloadMarkdown(res.markdown, res.title);
-                autoDownloaded = true;
-              } catch (dlErr) {
-                console.warn('[W2M] Single auto-download failed:', dlErr);
-              }
-            }
-            chrome.runtime.sendMessage({
-              type: 'W2M_SINGLE_RESULT',
-              ok: true,
-              markdown: res.markdown,
-              title: res.title,
-              url: url,
-              autoDownloaded: autoDownloaded,
-            }).catch((err) => {
-              if (!err.message?.includes('Receiving end does not exist')) {
-                console.warn('[W2M] sendMessage:', err.message);
-              }
-            });
-          } else {
-            chrome.runtime.sendMessage({
-              type: 'W2M_SINGLE_RESULT',
-              ok: false,
-              error: (res && res.error) || 'Extraction failed',
-              url: url,
-            }).catch((err) => {
-              if (!err.message?.includes('Receiving end does not exist')) {
-                console.warn('[W2M] sendMessage:', err.message);
-              }
-            });
-          }
-        } catch (err) {
-          console.error('[W2M] Single auto-convert error:', err);
-          chrome.runtime.sendMessage({ type: 'W2M_SINGLE_RESULT', ok: false, error: err.message, url: url })
-            .catch(() => {});
-        }
-      }, SINGLE_CONVERT_DEBOUNCE_MS);
-      pendingSingleCaptures.set(details.tabId, singleTimerId);
-    }
+  // ─── Single-page auto-convert (full page load) ──────────────────────────
+  if (!isRestricted && foregroundOk) {
+    await scheduleSinglePageAutoConvert(details.tabId, url);
   }
+});
+
+// SPAs / client-side routing (pushState / replaceState) — no full reload, so onCompleted does not run.
+chrome.webNavigation.onHistoryStateUpdated.addListener(async (details) => {
+  if (details.frameId !== 0) return;
+  const url = details.url;
+  if (navigationUrlIsRestricted(url)) return;
+  if (!(await isForegroundActiveTab(details.tabId))) return;
+  await scheduleSinglePageAutoConvert(details.tabId, url);
+});
+
+// In-page hash navigations (#…) without a document reload.
+chrome.webNavigation.onReferenceFragmentUpdated.addListener(async (details) => {
+  if (details.frameId !== 0) return;
+  const url = details.url;
+  if (navigationUrlIsRestricted(url)) return;
+  if (!(await isForegroundActiveTab(details.tabId))) return;
+  await scheduleSinglePageAutoConvert(details.tabId, url);
 });
 
 chrome.tabs.onRemoved.addListener((tabId) => {
@@ -1312,4 +1394,12 @@ const crawlEngine = new CrawlEngine({
     }
   },
 });
+
+/** Auto-download only when the side panel dashboard is open (crawl port) and Single Page tab is selected. */
+async function shouldAllowSinglePageAutoDownload() {
+  const { dashboardMode } = await chrome.storage.local.get("dashboardMode");
+  if (dashboardMode !== "single") return false;
+  return crawlEngine.ports.size > 0;
+}
+
 crawlEngine.restoreState();

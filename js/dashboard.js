@@ -989,6 +989,12 @@
           self._toggleSettings();
         }
       }
+      if (msg && msg.type === 'W2M_APPLY_DASHBOARD_MODE' && msg.mode) {
+        if (self.settingsVisible) {
+          self._toggleSettings();
+        }
+        self._applyMode(msg.mode);
+      }
       if (msg && msg.type === 'W2M_SINGLE_RESULT') {
         if (!self._singlePanel) {
           self._singlePanel = new SinglePagePanel(self.$singleView, self._showToast.bind(self));

@@ -4,3 +4,9 @@
 .idea/
 .remember/
 node_modules/
+
+# Local/session data (.auto-claude)
+.auto-claude/
+
+# Cursor hook machine-local state
+.cursor/hooks/state/

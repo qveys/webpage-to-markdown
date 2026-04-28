@@ -323,6 +323,11 @@
         var actions = el('div', { className: 'view-home__actions' });
         actions.appendChild(el('button', { className: 'btn btn-primary btn-full', id: 'btn-convert', textContent: t('home.cta'), onClick: function () { app.handleConvert(); } }));
         actions.appendChild(el('button', { className: 'btn btn-secondary btn-full', textContent: t('home.crawl'), onClick: function () { state.navigate(STATES.PRECRAWL, { url: app.currentUrl }); } }));
+        actions.appendChild(el('button', {
+          className: 'btn btn-secondary btn-full mt-2',
+          textContent: t('home.sidePanelSingle'),
+          onClick: function () { app.openDashboardSinglePage(); }
+        }));
         container.appendChild(actions);
         if (data && data.lastConversion) {
           var hist = el('div', { className: 'view-home__history text-muted' }, t('home.history') + ' ' + data.lastConversion.url + ' — ' + formatTimeAgo(data.lastConversion.timestamp));
@@ -1144,6 +1149,25 @@
     chrome.windows.getCurrent(function (win) {
       chrome.sidePanel.open({ windowId: win.id }, function () {
         window.close();
+      });
+    });
+  };
+
+  /** Open side panel focused on Single page tab (persists dashboard mode + notifies dashboard). */
+  App.prototype.openDashboardSinglePage = function () {
+    chrome.storage.local.set({ dashboardMode: 'single' }, function () {
+      chrome.windows.getCurrent(function (win) {
+        chrome.sidePanel.open({ windowId: win.id }, function () {
+          if (chrome.runtime.lastError) {
+            console.warn('[W2M] sidePanel.open:', chrome.runtime.lastError.message);
+          }
+          chrome.runtime.sendMessage({ type: 'W2M_APPLY_DASHBOARD_MODE', mode: 'single' }).catch(function (err) {
+            if (err && err.message && err.message.indexOf('Receiving end does not exist') === -1) {
+              console.warn('[W2M] sendMessage:', err.message);
+            }
+          });
+          window.close();
+        });
       });
     });
   };
