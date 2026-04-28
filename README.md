@@ -38,6 +38,7 @@
 - 📋 **Copy to clipboard** or 💾 **download as `.md`**
 - ⚙️ Configurable heading style (ATX `#` / Setext), bullet style (`-` `*` `+`), code blocks (fenced / indented)
 - 📄 Optional YAML frontmatter with title, URL, and date
+- 📊 **Side-panel mode** — convert directly from the dashboard with auto-convert on tab change and auto-download toggles
 
 ---
 
@@ -155,7 +156,7 @@ graph LR
 ### 🎨 UI
 
 - 🌙 Light / dark theme toggle (shared across popup, dashboard, settings)
-- 📊 Side-panel dashboard for crawl monitoring
+- 📊 Side-panel dashboard for single-page conversion and crawl monitoring
 - ⚙️ Dedicated settings page with markdown, capture, and crawl preferences
 - 🔒 Inputs disabled during active session to prevent misconfiguration
 
@@ -184,7 +185,7 @@ git clone https://github.com/qveys/webpage-to-markdown.git
 |   📥 `downloads`    | Save `.md` files and image assets                        |
 |     🔄 `tabs`       | Track tab navigation for auto-capture                    |
 | 🧭 `webNavigation`  | Detect page loads during sessions                        |
-|   📊 `sidePanel`    | Dashboard side-panel for crawl monitoring                |
+|   📊 `sidePanel`    | Side-panel dashboard for single-page conversion and crawl monitoring |
 |   📄 `offscreen`    | Isolated DOM parsing for link extraction during crawl    |
 |    ⏰ `alarms`      | Keep Service Worker alive during crawl sessions          |
 | 🌐 `<all_urls>`     | Fetch and convert pages from any website during crawl    |
@@ -216,7 +217,7 @@ webpage-to-markdown/
 ├── js/
 │   ├── background.js          # Service Worker (sessions, downloads, crawl)
 │   ├── popup.js               # Popup logic, state views, markdown converter
-│   ├── dashboard.js           # Crawl dashboard UI and port communication
+│   ├── dashboard.js           # Dashboard UI for single-page conversion and crawl monitoring, with port communication
 │   ├── crawl-engine.js        # CrawlEngine class (discovery, workers, anti-bot)
 │   ├── settings.js            # Settings page controller
 │   ├── settings-page.js       # Settings page bootstrap (theme toggle)

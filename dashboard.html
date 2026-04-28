@@ -47,6 +47,12 @@
         </button>
       </div>
     </header>
+    <div class="mode-tabs" id="mode-tabs" role="tablist">
+      <button class="mode-tab" id="tab-single" role="tab" aria-controls="dash-single-view" aria-selected="false"></button>
+      <button class="mode-tab" id="tab-crawl" role="tab" aria-controls="dash-crawl-view" aria-selected="true"></button>
+    </div>
+    <div id="dash-single-view" class="hidden app-body" role="tabpanel" aria-labelledby="tab-single"></div>
+    <div id="dash-crawl-view" role="tabpanel" aria-labelledby="tab-crawl">
     <main class="app-body" id="dash-monitor">
       <div class="progress-bar mb-3">
         <div class="progress-fill" id="dash-progress-fill" style="width:0%"></div>
@@ -95,6 +101,7 @@
         </svg>
       </button>
     </footer>
+    </div><!-- /#dash-crawl-view -->
     <div class="toast-container" id="toast-container"></div>
   </div>
   <script src="js/cleanup-markdown.js"></script>

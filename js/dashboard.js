@@ -55,6 +55,213 @@
   var ICON_PAUSE = [{ tag: 'rect', x: '6', y: '4', width: '4', height: '16', fill: 'currentColor' }, { tag: 'rect', x: '14', y: '4', width: '4', height: '16', fill: 'currentColor' }];
   var ICON_PLAY = [{ tag: 'polygon', points: '5 3 19 12 5 21', fill: 'currentColor' }];
 
+  var MAX_PREVIEW_LENGTH = 2000; // characters shown in the single-page markdown preview
+
+  // =============================================
+  // SINGLE PAGE PANEL
+  // =============================================
+
+  function SinglePagePanel(container, showToast) {
+    this.$container = container;
+    this._showToast = showToast;
+    this._state = 'idle'; // idle | converting | success | error
+    this._result = null;  // { markdown, title, url }
+    this._errorMsg = '';
+    this._settings = { autoConvert: false, autoDownload: false };
+  }
+
+  SinglePagePanel.prototype.init = function () {
+    var self = this;
+    this._readSettings(function (s) {
+      self._settings = s;
+      self._render();
+    });
+  };
+
+  SinglePagePanel.prototype._readSettings = function (callback) {
+    chrome.storage.local.get('singlePageSettings', function (r) {
+      var defaults = { autoConvert: false, autoDownload: false };
+      callback(Object.assign(defaults, r.singlePageSettings || {}));
+    });
+  };
+
+  SinglePagePanel.prototype._saveSettings = function (patch) {
+    this._settings = Object.assign(this._settings, patch);
+    chrome.runtime.sendMessage({ type: 'W2M_SINGLE_SET_SETTINGS', patch: patch }).catch(function (err) {
+      if (err && err.message && err.message.indexOf('Receiving end does not exist') === -1) {
+        console.warn('[W2M] sendMessage:', err.message);
+      }
+    });
+  };
+
+  SinglePagePanel.prototype.setResult = function (result) {
+    this._state = 'success';
+    this._result = result;
+    this._render();
+  };
+
+  SinglePagePanel.prototype.setError = function (msg) {
+    this._state = 'error';
+    this._errorMsg = msg;
+    this._render();
+  };
+
+  SinglePagePanel.prototype._convert = function () {
+    var self = this;
+    this._state = 'converting';
+    this._render();
+    chrome.runtime.sendMessage({ type: 'W2M_SINGLE_CONVERT' }, function (res) {
+      if (chrome.runtime.lastError) {
+        self._state = 'error';
+        self._errorMsg = chrome.runtime.lastError.message || '';
+        self._render();
+        return;
+      }
+      if (res && res.ok) {
+        self._state = 'success';
+        self._result = { markdown: res.markdown, title: res.title, url: res.url };
+      } else {
+        self._state = 'error';
+        self._errorMsg = (res && res.error) || t('single.error');
+      }
+      self._render();
+    });
+  };
+
+  SinglePagePanel.prototype._buildToggles = function () {
+    var self = this;
+
+    function makeToggleRow(labelKey, hintKey, storageKey, currentVal) {
+      var cb = el('input', { type: 'checkbox', className: 'form-checkbox' });
+      cb.checked = !!currentVal;
+      cb.addEventListener('change', function () {
+        var patch = {};
+        patch[storageKey] = cb.checked;
+        self._saveSettings(patch);
+      });
+      var label = el('label', { className: 'form-checkbox-label' });
+      label.appendChild(cb);
+      label.appendChild(document.createTextNode(' ' + t(labelKey)));
+      var hint = el('div', { className: 'single-panel__toggle-hint', textContent: t(hintKey) });
+      var row = el('div', { className: 'single-panel__toggle-row' });
+      row.appendChild(label);
+      row.appendChild(hint);
+      return row;
+    }
+
+    var togglesWrap = el('div', { className: 'single-panel__toggles' });
+    togglesWrap.appendChild(makeToggleRow('single.autoConvert', 'single.autoConvert.hint', 'autoConvert', self._settings.autoConvert));
+    togglesWrap.appendChild(makeToggleRow('single.autoDownload', 'single.autoDownload.hint', 'autoDownload', self._settings.autoDownload));
+    return togglesWrap;
+  };
+
+  SinglePagePanel.prototype._render = function () {
+    var self = this;
+    var c = this.$container;
+    while (c.firstChild) c.removeChild(c.firstChild);
+
+    var panel = el('div', { className: 'single-panel' });
+
+    if (this._state === 'converting') {
+      var spinnerWrap = el('div', { className: 'single-panel__converting' });
+      spinnerWrap.appendChild(el('div', { className: 'spinner' }));
+      spinnerWrap.appendChild(el('p', { className: 'text-muted', textContent: t('single.converting') }));
+      panel.appendChild(spinnerWrap);
+      c.appendChild(panel);
+      return;
+    }
+
+    if (this._state === 'success' && this._result) {
+      var md = this._result.markdown || '';
+      var preview = md.length > MAX_PREVIEW_LENGTH ? md.slice(0, MAX_PREVIEW_LENGTH) + '\n…' : md;
+
+      panel.appendChild(el('div', { className: 'single-panel__status' },
+        el('span', { className: 'text-success', textContent: '\u2713' }),
+        el('span', { textContent: t('single.success') })
+      ));
+
+      if (this._result.url) {
+        panel.appendChild(el('div', { className: 'single-panel__url', textContent: this._result.url }));
+      }
+
+      panel.appendChild(el('pre', { className: 'single-panel__preview text-mono', textContent: preview }));
+
+      var actions = el('div', { className: 'single-panel__actions' });
+      actions.appendChild(el('button', {
+        className: 'btn btn-secondary',
+        textContent: t('single.copy'),
+        onClick: function () {
+          navigator.clipboard.writeText(md).then(function () {
+            self._showToast(t('toast.copied'));
+          }).catch(function (err) {
+            console.warn('[W2M] clipboard write:', err.message);
+            self._showToast(t('toast.error'));
+          });
+        }
+      }));
+      actions.appendChild(el('button', {
+        className: 'btn btn-secondary',
+        textContent: t('single.download'),
+        onClick: function () {
+          chrome.runtime.sendMessage({
+            type: 'W2M_DOWNLOAD_MARKDOWN',
+            markdown: md,
+            title: self._result.title || 'page'
+          }, function (res) {
+            if (chrome.runtime.lastError || !res || !res.ok) {
+              self._showToast(t('toast.error'));
+            } else {
+              self._showToast(t('toast.downloaded'));
+            }
+          });
+        }
+      }));
+      panel.appendChild(actions);
+
+      panel.appendChild(el('button', {
+        className: 'btn btn-secondary btn-full',
+        textContent: t('single.reconvert'),
+        onClick: function () { self._convert(); }
+      }));
+
+      panel.appendChild(this._buildToggles());
+      c.appendChild(panel);
+      return;
+    }
+
+    if (this._state === 'error') {
+      panel.appendChild(el('div', { className: 'single-panel__status' },
+        el('span', { className: 'text-error', textContent: '\u2717' }),
+        el('span', { textContent: t('single.error') })
+      ));
+      if (this._errorMsg) {
+        panel.appendChild(el('p', { className: 'text-muted', textContent: this._errorMsg }));
+      }
+      panel.appendChild(el('button', {
+        className: 'btn btn-primary btn-full',
+        textContent: t('single.idle.cta'),
+        onClick: function () { self._convert(); }
+      }));
+      panel.appendChild(this._buildToggles());
+      c.appendChild(panel);
+      return;
+    }
+
+    // idle state
+    panel.appendChild(el('button', {
+      className: 'btn btn-primary btn-full',
+      textContent: t('single.idle.cta'),
+      onClick: function () { self._convert(); }
+    }));
+
+    panel.appendChild(this._buildToggles());
+    c.appendChild(panel);
+  };
+
+  // =============================================
+  // DASHBOARD CONSTRUCTOR
+  // =============================================
+
   function Dashboard() {
     this.port = null;
     this.status = 'stopped';
@@ -64,6 +271,8 @@
     this.blockedUrls = [];
     this.elapsedTimer = null;
     this.settingsVisible = false;
+    this.currentMode = 'crawl';
+    this._singlePanel = null;
     this.debugCrawlPanel = false;
     this._debugSnapshot = null;
     this._debugTab = 'done';
@@ -114,6 +323,12 @@
     this.$backBtn = document.getElementById('dash-back-btn');
     this.$themeBtn = document.getElementById('dash-theme-btn');
     this.$debug = document.getElementById('dash-debug');
+    // Mode tabs
+    this.$modeTabs = document.getElementById('mode-tabs');
+    this.$tabSingle = document.getElementById('tab-single');
+    this.$tabCrawl = document.getElementById('tab-crawl');
+    this.$singleView = document.getElementById('dash-single-view');
+    this.$crawlView = document.getElementById('dash-crawl-view');
   };
 
   Dashboard.prototype._initLabels = function () {
@@ -127,6 +342,8 @@
     if (lblBlocked) lblBlocked.textContent = t('dashboard.errors');
     if (lblActivity) lblActivity.textContent = t('dashboard.activity');
     if (this.$retryAllBtn) this.$retryAllBtn.textContent = t('dashboard.retryall', { count: 0 });
+    if (this.$tabSingle) this.$tabSingle.textContent = t('dashboard.tab.single');
+    if (this.$tabCrawl) this.$tabCrawl.textContent = t('dashboard.tab.crawl');
   };
 
   // --- Theme ---
@@ -597,6 +814,45 @@
         if (self.settingsVisible) self._toggleSettings();
       });
     }
+
+    // Mode tab click handlers
+    if (this.$tabSingle) {
+      this.$tabSingle.addEventListener('click', function () { self._switchMode('single'); });
+    }
+    if (this.$tabCrawl) {
+      this.$tabCrawl.addEventListener('click', function () { self._switchMode('crawl'); });
+    }
+
+    // Restore persisted mode and initialise the single-page panel
+    chrome.storage.local.get('dashboardMode', function (r) {
+      var mode = r.dashboardMode || 'crawl';
+      self._applyMode(mode);
+    });
+  };
+
+  Dashboard.prototype._switchMode = function (mode) {
+    chrome.storage.local.set({ dashboardMode: mode });
+    this._applyMode(mode);
+  };
+
+  Dashboard.prototype._applyMode = function (mode) {
+    this.currentMode = mode;
+
+    var isSingle = mode === 'single';
+
+    if (this.$tabSingle) this.$tabSingle.classList.toggle('mode-tab--active', isSingle);
+    if (this.$tabCrawl) this.$tabCrawl.classList.toggle('mode-tab--active', !isSingle);
+    if (this.$tabSingle) this.$tabSingle.setAttribute('aria-selected', isSingle ? 'true' : 'false');
+    if (this.$tabCrawl) this.$tabCrawl.setAttribute('aria-selected', isSingle ? 'false' : 'true');
+
+    if (this.$singleView) this.$singleView.classList.toggle('hidden', !isSingle);
+    if (this.$crawlView) this.$crawlView.classList.toggle('hidden', isSingle);
+
+    // Lazy-build the single-page panel the first time the mode is selected
+    if (isSingle && this.$singleView && !this._singlePanel) {
+      this._singlePanel = new SinglePagePanel(this.$singleView, this._showToast.bind(this));
+      this._singlePanel.init();
+    }
   };
 
   Dashboard.prototype._togglePause = function () {
@@ -689,6 +945,9 @@
     if (this.settingsVisible) {
       if (this.$monitor) this.$monitor.classList.add('hidden');
       if (this.$footer) this.$footer.classList.add('hidden');
+      if (this.$modeTabs) this.$modeTabs.classList.add('hidden');
+      if (this.$singleView) this.$singleView.classList.add('hidden');
+      if (this.$crawlView) this.$crawlView.classList.remove('hidden');
       if (this.$settingsView) this.$settingsView.classList.remove('hidden');
       if (this.$site) this.$site.textContent = t('settings.title');
       if (this.$backBtn) this.$backBtn.classList.remove('hidden');
@@ -696,6 +955,9 @@
     } else {
       if (this.$monitor) this.$monitor.classList.remove('hidden');
       if (this.$footer) this.$footer.classList.remove('hidden');
+      if (this.$modeTabs) this.$modeTabs.classList.remove('hidden');
+      // Restore the correct mode panels
+      this._applyMode(this.currentMode);
       if (this.$settingsView) this.$settingsView.classList.add('hidden');
       if (this.$backBtn) this.$backBtn.classList.add('hidden');
       if (this.$settingsBtn) this.$settingsBtn.classList.remove('hidden');
@@ -725,6 +987,17 @@
       if (msg && msg.type === 'W2M_SHOW_SETTINGS') {
         if (!self.settingsVisible) {
           self._toggleSettings();
+        }
+      }
+      if (msg && msg.type === 'W2M_SINGLE_RESULT') {
+        if (!self._singlePanel) {
+          self._singlePanel = new SinglePagePanel(self.$singleView, self._showToast.bind(self));
+          self._singlePanel.init();
+        }
+        if (msg.ok) {
+          self._singlePanel.setResult({ markdown: msg.markdown, title: msg.title, url: msg.url });
+        } else {
+          self._singlePanel.setError(msg.error || '');
         }
       }
     });

@@ -25,7 +25,7 @@ Service Worker changes require extension reload. Popup/dashboard changes take ef
 ### Entry Points & Communication
 - **Service Worker** (`js/background.js`): extraction, Turndown conversion, downloads, crawl orchestration
 - **Popup** (`js/popup.js`): toolbar popup — single capture + crawl trigger
-- **Dashboard** (`js/dashboard.js`): side panel — crawl monitoring, history
+- **Dashboard** (`js/dashboard.js`): side panel — two modes: single-page conversion and crawl monitoring, history
 - **Settings** (`js/settings.js`): options page
 - **Offscreen** (`js/offscreen.js`): isolated DOM parsing (DOMParser for link extraction)
 - **CrawlEngine** (`js/crawl-engine.js`): ES6 class for multi-page crawl with concurrency, queue, block detection
@@ -44,7 +44,7 @@ Communication: `chrome.runtime.sendMessage` for request/response, `chrome.runtim
 ### State Management
 `AppState` (`js/app-state.js`) is a state machine with defined `STATES` and `TRANSITIONS`. Views render based on current state. Both popup and dashboard use it.
 
-Persistent state in `chrome.storage.local`: `markdownSettings`, `captureSettings`, `crawlSettings`, `session`, `theme`.
+Persistent state in `chrome.storage.local`: `markdownSettings`, `captureSettings`, `crawlSettings`, `session`, `theme`, `dashboardMode`, `singlePageSettings`.
 
 ## Permissions
 

@@ -518,11 +518,69 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     })();
     return true;
   }
+  if (message.type === "W2M_SINGLE_CONVERT") {
+    (async () => {
+      try {
+        const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+        if (!tab || !tab.id || !tab.url) throw new Error("No active tab found");
+        const url = tab.url;
+        if (
+          url.startsWith("chrome://") ||
+          url.startsWith("chrome-extension://") ||
+          url.startsWith("edge://") ||
+          url.startsWith("about:") ||
+          url.includes("chrome.google.com/webstore") ||
+          url.includes("chromewebstore.google.com")
+        ) {
+          throw new Error("Cannot convert system pages or Web Store");
+        }
+        await chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          files: ["/js/Readability.js", "/js/turndown.js", "/js/turndown-plugin-gfm.js"],
+        });
+        const results = await chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          func: extractAndConvert,
+        });
+        const res = results?.[0]?.result;
+        if (!res || !res.success) {
+          throw new Error((res && res.error) || "Extraction failed");
+        }
+        const { singlePageSettings } = await chrome.storage.local.get('singlePageSettings');
+        if (singlePageSettings && singlePageSettings.autoDownload) {
+          try {
+            await downloadMarkdown(res.markdown, res.title);
+          } catch (dlErr) {
+            console.warn('[W2M] Single auto-download failed:', dlErr);
+          }
+        }
+        sendResponse({ ok: true, markdown: res.markdown, title: res.title, url });
+      } catch (err) {
+        sendResponse({ ok: false, error: err.message });
+      }
+    })();
+    return true;
+  }
+  if (message.type === "W2M_SINGLE_SET_SETTINGS") {
+    (async () => {
+      try {
+        const { singlePageSettings } = await chrome.storage.local.get('singlePageSettings');
+        const updated = Object.assign({}, singlePageSettings || {}, message.patch || {});
+        await chrome.storage.local.set({ singlePageSettings: updated });
+        sendResponse({ ok: true });
+      } catch (err) {
+        sendResponse({ ok: false, error: err.message });
+      }
+    })();
+    return true;
+  }
 });
 
 // ─── Auto-capture: navigation listener ─────────────────────────────────────
 
 const pendingCaptures = new Map(); // tabId → timeoutId
+const pendingSingleCaptures = new Map(); // tabId → timeoutId for auto single-page convert
+const SINGLE_CONVERT_DEBOUNCE_MS = 1000; // debounce for single-page auto-convert on navigation
 let capturedUrls = new Set(); // URLs already processed in the current session
 
 // Reload captured URLs from storage on SW startup
@@ -541,121 +599,171 @@ async function addCapturedUrl(url) {
 chrome.webNavigation.onCompleted.addListener(async (details) => {
   if (details.frameId !== 0) return;
 
-  const session = await getSession();
-  if (!session.active) return;
+  const url = details.url;
+  const isRestricted = (
+    url.startsWith("chrome://") ||
+    url.startsWith("chrome-extension://") ||
+    url.startsWith("edge://") ||
+    url.startsWith("about:") ||
+    url.includes("chrome.google.com/webstore") ||
+    url.includes("chromewebstore.google.com")
+  );
 
   const [activeTab] = await chrome.tabs.query({
     active: true,
     lastFocusedWindow: true,
   });
-  if (!activeTab || activeTab.id !== details.tabId) return;
 
-  const url = details.url;
-  if (
-    url.startsWith("chrome://") ||
-    url.startsWith("chrome-extension://") ||
-    url.startsWith("edge://") ||
-    url.startsWith("about:") ||
-    url.includes("chrome.google.com/webstore")
-  )
-    return;
-
-  // URL already captured
-  if (capturedUrls.has(url)) {
-    console.log("[W2M] Already captured, skipping:", url);
-    return;
-  }
-
-  if (pendingCaptures.has(details.tabId)) {
-    clearTimeout(pendingCaptures.get(details.tabId));
-  }
-
-  const timerId = setTimeout(async () => {
-    pendingCaptures.delete(details.tabId);
-    try {
-      // Inject Turndown + conversion function into the tab for DOM access
-      await chrome.scripting.executeScript({
-        target: { tabId: details.tabId },
-        files: [
-          "/js/Readability.js",
-          "/js/turndown.js",
-          "/js/turndown-plugin-gfm.js",
-        ],
-      });
-
-      // Attendre que le DOM soit stable (plus de mutations pendant 500ms)
-      try {
-        await chrome.scripting.executeScript({
-          target: { tabId: details.tabId },
-          func: () =>
-            new Promise((resolve) => {
-              if (document.readyState !== "complete") {
-                window.addEventListener("load", () => resolve(), {
-                  once: true,
-                });
-                return;
-              }
-              // Surveiller les mutations pendant 500ms max
-              let timer;
-              const observer = new MutationObserver(() => {
-                clearTimeout(timer);
-                timer = setTimeout(() => {
-                  observer.disconnect();
-                  resolve();
-                }, 300);
-              });
-              observer.observe(document.body, {
-                childList: true,
-                subtree: true,
-              });
-              // Safety timeout: if no mutations for 500ms, proceed
-              timer = setTimeout(() => {
-                observer.disconnect();
-                resolve();
-              }, 500);
-            }),
-        });
-      } catch (stabilityErr) {
-        console.warn(
-          "[W2M] DOM stability wait failed, proceeding anyway:",
-          stabilityErr,
-        );
+  // ─── Session auto-capture (existing behaviour) ──────────────────────────
+  const session = await getSession();
+  if (session.active && !isRestricted && activeTab && activeTab.id === details.tabId) {
+    // URL already captured
+    if (capturedUrls.has(url)) {
+      console.log("[W2M] Already captured, skipping:", url);
+    } else {
+      if (pendingCaptures.has(details.tabId)) {
+        clearTimeout(pendingCaptures.get(details.tabId));
       }
 
-      const results = await chrome.scripting.executeScript({
-        target: { tabId: details.tabId },
-        func: extractAndConvert,
-      });
-      if (!results?.[0]?.result) return;
-      const { success, markdown, title } = results[0].result;
-      if (!success) return;
+      const timerId = setTimeout(async () => {
+        pendingCaptures.delete(details.tabId);
+        try {
+          await chrome.scripting.executeScript({
+            target: { tabId: details.tabId },
+            files: [
+              "/js/Readability.js",
+              "/js/turndown.js",
+              "/js/turndown-plugin-gfm.js",
+            ],
+          });
 
-      await downloadInSession(markdown, title, session.folder, url);
-
-      await addCapturedUrl(url);
-
-      chrome.runtime
-        .sendMessage({
-          type: "W2M_CAPTURE_COUNT",
-          count: capturedUrls.size,
-        })
-        .catch((err) => {
-          if (!err.message?.includes('Receiving end does not exist')) {
-            console.warn('[W2M] sendMessage:', err.message);
+          try {
+            await chrome.scripting.executeScript({
+              target: { tabId: details.tabId },
+              func: () =>
+                new Promise((resolve) => {
+                  if (document.readyState !== "complete") {
+                    window.addEventListener("load", () => resolve(), { once: true });
+                    return;
+                  }
+                  let timer;
+                  const observer = new MutationObserver(() => {
+                    clearTimeout(timer);
+                    timer = setTimeout(() => { observer.disconnect(); resolve(); }, 300);
+                  });
+                  observer.observe(document.body, { childList: true, subtree: true });
+                  timer = setTimeout(() => { observer.disconnect(); resolve(); }, 500);
+                }),
+            });
+          } catch (stabilityErr) {
+            console.warn("[W2M] DOM stability wait failed, proceeding anyway:", stabilityErr);
           }
-        });
 
-      await chrome.storage.local.set({
-        lastConversion: { url, markdown, timestamp: new Date().toISOString() },
-      });
+          const results = await chrome.scripting.executeScript({
+            target: { tabId: details.tabId },
+            func: extractAndConvert,
+          });
+          if (!results?.[0]?.result) return;
+          const { success, markdown, title } = results[0].result;
+          if (!success) return;
 
-    } catch (err) {
-      console.error("[W2M] Auto-capture error:", err);
+          await downloadInSession(markdown, title, session.folder, url);
+          await addCapturedUrl(url);
+
+          chrome.runtime.sendMessage({ type: "W2M_CAPTURE_COUNT", count: capturedUrls.size })
+            .catch((err) => {
+              if (!err.message?.includes('Receiving end does not exist')) {
+                console.warn('[W2M] sendMessage:', err.message);
+              }
+            });
+
+          await chrome.storage.local.set({
+            lastConversion: { url, markdown, timestamp: new Date().toISOString() },
+          });
+        } catch (err) {
+          console.error("[W2M] Auto-capture error:", err);
+        }
+      }, session.delay);
+
+      pendingCaptures.set(details.tabId, timerId);
     }
-  }, session.delay);
+  }
 
-  pendingCaptures.set(details.tabId, timerId);
+  // ─── Single-page auto-convert ────────────────────────────────────────────
+  if (!isRestricted && activeTab && activeTab.id === details.tabId) {
+    const { singlePageSettings } = await chrome.storage.local.get('singlePageSettings');
+    if (singlePageSettings && singlePageSettings.autoConvert) {
+      if (pendingSingleCaptures.has(details.tabId)) {
+        clearTimeout(pendingSingleCaptures.get(details.tabId));
+      }
+      const singleTimerId = setTimeout(async () => {
+        pendingSingleCaptures.delete(details.tabId);
+        try {
+          await chrome.scripting.executeScript({
+            target: { tabId: details.tabId },
+            files: ["/js/Readability.js", "/js/turndown.js", "/js/turndown-plugin-gfm.js"],
+          });
+          const results = await chrome.scripting.executeScript({
+            target: { tabId: details.tabId },
+            func: extractAndConvert,
+          });
+          const res = results?.[0]?.result;
+          if (res && res.success) {
+            let autoDownloaded = false;
+            if (singlePageSettings.autoDownload) {
+              try {
+                await downloadMarkdown(res.markdown, res.title);
+                autoDownloaded = true;
+              } catch (dlErr) {
+                console.warn('[W2M] Single auto-download failed:', dlErr);
+              }
+            }
+            chrome.runtime.sendMessage({
+              type: 'W2M_SINGLE_RESULT',
+              ok: true,
+              markdown: res.markdown,
+              title: res.title,
+              url: url,
+              autoDownloaded: autoDownloaded,
+            }).catch((err) => {
+              if (!err.message?.includes('Receiving end does not exist')) {
+                console.warn('[W2M] sendMessage:', err.message);
+              }
+            });
+          } else {
+            chrome.runtime.sendMessage({
+              type: 'W2M_SINGLE_RESULT',
+              ok: false,
+              error: (res && res.error) || 'Extraction failed',
+              url: url,
+            }).catch((err) => {
+              if (!err.message?.includes('Receiving end does not exist')) {
+                console.warn('[W2M] sendMessage:', err.message);
+              }
+            });
+          }
+        } catch (err) {
+          console.error('[W2M] Single auto-convert error:', err);
+          chrome.runtime.sendMessage({ type: 'W2M_SINGLE_RESULT', ok: false, error: err.message, url: url })
+            .catch(() => {});
+        }
+      }, SINGLE_CONVERT_DEBOUNCE_MS);
+      pendingSingleCaptures.set(details.tabId, singleTimerId);
+    }
+  }
 });
+
+chrome.tabs.onRemoved.addListener((tabId) => {
+  if (pendingCaptures.has(tabId)) {
+    clearTimeout(pendingCaptures.get(tabId));
+    pendingCaptures.delete(tabId);
+  }
+  if (pendingSingleCaptures.has(tabId)) {
+    clearTimeout(pendingSingleCaptures.get(tabId));
+    pendingSingleCaptures.delete(tabId);
+  }
+});
+
 
 // Executed in the tab (has access to DOM and injected TurndownService)
 function extractAndConvert() {
