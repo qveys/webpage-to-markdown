@@ -81,4 +81,51 @@ describe('AppState', () => {
     expect(state.getState()).toBe(STATES.CONVERTING);
     expect(state.getData()).toEqual({ retry: true });
   });
+
+  // Regression coverage for the popup-during-crawl fix: when the popup opens
+  // mid-crawl, AppState starts in IDLE and must be able to jump directly to
+  // any active or terminal crawl state to mirror the SW's authoritative state.
+  test('valid transition IDLE -> RUNNING succeeds (popup opened mid-crawl)', () => {
+    const realConsole = vm.runInThisContext('console');
+    const origWarn = realConsole.warn;
+    const calls = [];
+    realConsole.warn = function () { calls.push(Array.prototype.slice.call(arguments)); };
+    state.navigate(STATES.RUNNING);
+    realConsole.warn = origWarn;
+    expect(state.getState()).toBe(STATES.RUNNING);
+    expect(calls.length).toBe(0);
+  });
+
+  test('valid transition IDLE -> PAUSED succeeds (popup opened mid-crawl)', () => {
+    const realConsole = vm.runInThisContext('console');
+    const origWarn = realConsole.warn;
+    const calls = [];
+    realConsole.warn = function () { calls.push(Array.prototype.slice.call(arguments)); };
+    state.navigate(STATES.PAUSED);
+    realConsole.warn = origWarn;
+    expect(state.getState()).toBe(STATES.PAUSED);
+    expect(calls.length).toBe(0);
+  });
+
+  test('valid transition IDLE -> CRAWL_SUCCESS succeeds (popup opened post-crawl)', () => {
+    const realConsole = vm.runInThisContext('console');
+    const origWarn = realConsole.warn;
+    const calls = [];
+    realConsole.warn = function () { calls.push(Array.prototype.slice.call(arguments)); };
+    state.navigate(STATES.CRAWL_SUCCESS);
+    realConsole.warn = origWarn;
+    expect(state.getState()).toBe(STATES.CRAWL_SUCCESS);
+    expect(calls.length).toBe(0);
+  });
+
+  test('valid transition IDLE -> CRAWL_PARTIAL succeeds (popup opened post-crawl)', () => {
+    const realConsole = vm.runInThisContext('console');
+    const origWarn = realConsole.warn;
+    const calls = [];
+    realConsole.warn = function () { calls.push(Array.prototype.slice.call(arguments)); };
+    state.navigate(STATES.CRAWL_PARTIAL);
+    realConsole.warn = origWarn;
+    expect(state.getState()).toBe(STATES.CRAWL_PARTIAL);
+    expect(calls.length).toBe(0);
+  });
 });
