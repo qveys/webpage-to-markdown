@@ -681,6 +681,20 @@ async function scheduleSinglePageAutoConvert(tabId, url) {
           });
       }
     } catch (err) {
+      // Benign races we should not surface as failures:
+      // - "ExtensionsSettings policy" → admin-locked page we can never script
+      // - "Frame with ID 0 was removed" / "No tab with id" → tab navigated/closed mid-debounce
+      const msg = err?.message || "";
+      const isBenign =
+        msg.includes("ExtensionsSettings policy") ||
+        msg.includes("Frame with ID 0 was removed") ||
+        msg.includes("No frame with id") ||
+        msg.includes("No tab with id") ||
+        msg.includes("The tab was closed");
+      if (isBenign) {
+        console.debug("[W2M] Single auto-convert skipped:", msg);
+        return;
+      }
       console.error("[W2M] Single auto-convert error:", err);
       let failUrl = url;
       try {
