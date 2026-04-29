@@ -2,6 +2,9 @@ name: Release
 
 # On tag v*, create/update GitHub Release with packed extension bundles for
 # Chrome, Firefox, and Edge. Inspired by qveys/tm-exclusions/release.yml.
+#
+# Firefox bundle is produced only when manifest.firefox.json exists in the tree.
+# Cross-browser shims (browser-polyfill, offscreen fallback) land in v2.0.0.
 
 on:
   push:
@@ -64,16 +67,25 @@ jobs:
           cp "$ZIP_CHROME" "$ZIP"
           echo "ZIP_EDGE=$ZIP" >> "$GITHUB_ENV"
 
+      - name: Check for Firefox manifest
+        id: firefox_check
+        run: |
+          if [ -f manifest.firefox.json ]; then
+            echo "build=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "build=false" >> "$GITHUB_OUTPUT"
+            echo "manifest.firefox.json absent — skipping Firefox bundle (v2.0.0 will add it)"
+          fi
+
       - name: Build Firefox bundle
+        if: steps.firefox_check.outputs.build == 'true'
         env:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
           ZIP="webpage-to-markdown-firefox-v${VERSION}.zip"
-          if [ -f manifest.firefox.json ]; then
-            cp manifest.firefox.json manifest.json
-            jq --arg v "$VERSION" '.version = $v' manifest.json > manifest.tmp
-            mv manifest.tmp manifest.json
-          fi
+          cp manifest.firefox.json manifest.json
+          jq --arg v "$VERSION" '.version = $v' manifest.json > manifest.tmp
+          mv manifest.tmp manifest.json
           zip -r "$ZIP" . \
             -x ".git/*" \
                ".github/*" \
@@ -91,7 +103,7 @@ jobs:
 
       - name: Compute SHA256 sums
         run: |
-          for ZIP in "$ZIP_CHROME" "$ZIP_EDGE" "$ZIP_FIREFOX"; do
+          for ZIP in "$ZIP_CHROME" "$ZIP_EDGE" ${ZIP_FIREFOX:+"$ZIP_FIREFOX"}; do
             sha256sum "$ZIP" >> SHA256SUMS.txt
           done
           cat SHA256SUMS.txt
@@ -101,13 +113,16 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ steps.version.outputs.tag }}
         run: |
+          ARTIFACTS=("$ZIP_CHROME" "$ZIP_EDGE")
+          [ -n "${ZIP_FIREFOX:-}" ] && ARTIFACTS+=("$ZIP_FIREFOX")
+          ARTIFACTS+=("SHA256SUMS.txt")
+
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release edit "$TAG" --title "webpage-to-markdown $TAG"
-            gh release upload "$TAG" \
-              "$ZIP_CHROME" "$ZIP_EDGE" "$ZIP_FIREFOX" SHA256SUMS.txt --clobber
+            gh release upload "$TAG" "${ARTIFACTS[@]}" --clobber
           else
             gh release create "$TAG" \
               --title "webpage-to-markdown $TAG" \
               --generate-notes \
-              "$ZIP_CHROME" "$ZIP_EDGE" "$ZIP_FIREFOX" SHA256SUMS.txt
+              "${ARTIFACTS[@]}"
           fi
