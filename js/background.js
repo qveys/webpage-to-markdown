@@ -684,14 +684,15 @@ async function scheduleSinglePageAutoConvert(tabId, url) {
       // Benign races we should not surface as failures:
       // - "ExtensionsSettings policy" → admin-locked page we can never script
       // - "Frame with ID 0 was removed" / "No tab with id" → tab navigated/closed mid-debounce
-      const msg = err?.message || "";
-      const isBenign =
-        msg.includes("ExtensionsSettings policy") ||
-        msg.includes("Frame with ID 0 was removed") ||
-        msg.includes("No frame with id") ||
-        msg.includes("No tab with id") ||
-        msg.includes("The tab was closed");
-      if (isBenign) {
+      const msg = typeof err === "string" ? err : err?.message || "";
+      const benignPatterns = [
+        "ExtensionsSettings policy",
+        "Frame with ID 0 was removed",
+        "No frame with id",
+        "No tab with id",
+        "The tab was closed",
+      ];
+      if (benignPatterns.some((p) => msg.includes(p))) {
         console.debug("[W2M] Single auto-convert skipped:", msg);
         return;
       }
@@ -704,7 +705,7 @@ async function scheduleSinglePageAutoConvert(tabId, url) {
         /* keep navigation url */
       }
       chrome.runtime
-        .sendMessage({ type: "W2M_SINGLE_RESULT", ok: false, error: err.message, url: failUrl })
+        .sendMessage({ type: "W2M_SINGLE_RESULT", ok: false, error: msg, url: failUrl })
         .catch(() => {});
     }
   }, SINGLE_CONVERT_DEBOUNCE_MS);
