@@ -3,6 +3,7 @@
 
 importScripts("/js/turndown.js");
 importScripts("/js/cleanup-markdown.js");
+importScripts("/js/markdown-output.js");
 
 // Reset session on every SW startup (including extension reload)
 // New timestamped folder on each startup, delay preserved
@@ -317,21 +318,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             if (capturedUrls.has(tab.url)) {
               return;
             } else {
-              await chrome.scripting.executeScript({
-                target: { tabId: tab.id },
-                files: [
-                  "/js/Readability.js",
-                  "/js/turndown.js",
-                  "/js/turndown-plugin-gfm.js",
-                  "/js/cleanup-markdown.js",
-                ],
-              });
-              const results = await chrome.scripting.executeScript({
-                target: { tabId: tab.id },
-                func: extractAndConvert,
-              });
-              if (results?.[0]?.result?.success) {
-                const { markdown, title } = results[0].result;
+              const extracted = await extractMarkdownFromTab(tab.id, tab.url);
+              if (extracted?.success) {
+                const { markdown, title } = extracted;
                 await downloadInSession(markdown, title, folder, tab.url);
                 await addCapturedUrl(tab.url);
                 chrome.runtime
@@ -548,15 +537,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         ) {
           throw new Error("Cannot convert system pages or Web Store");
         }
-        await chrome.scripting.executeScript({
-          target: { tabId: tab.id },
-          files: ["/js/Readability.js", "/js/turndown.js", "/js/turndown-plugin-gfm.js", "/js/cleanup-markdown.js"],
-        });
-        const results = await chrome.scripting.executeScript({
-          target: { tabId: tab.id },
-          func: extractAndConvert,
-        });
-        const res = results?.[0]?.result;
+        const res = await extractMarkdownFromTab(tab.id, url);
         if (!res || !res.success) {
           throw new Error((res && res.error) || "Extraction failed");
         }
@@ -660,20 +641,7 @@ async function scheduleSinglePageAutoConvert(tabId, url) {
       if (!(await isForegroundActiveTab(tabId))) return;
       const currentUrl = tab.url;
 
-      await chrome.scripting.executeScript({
-        target: { tabId },
-        files: [
-          "/js/Readability.js",
-          "/js/turndown.js",
-          "/js/turndown-plugin-gfm.js",
-          "/js/cleanup-markdown.js",
-        ],
-      });
-      const results = await chrome.scripting.executeScript({
-        target: { tabId },
-        func: extractAndConvert,
-      });
-      const res = results?.[0]?.result;
+      const res = await extractMarkdownFromTab(tabId, currentUrl);
       if (res && res.success) {
         let autoDownloaded = false;
         if (sp.autoDownload && (await shouldAllowSinglePageAutoDownload())) {
@@ -751,16 +719,6 @@ chrome.webNavigation.onCompleted.addListener(async (details) => {
       const timerId = setTimeout(async () => {
         pendingCaptures.delete(details.tabId);
         try {
-          await chrome.scripting.executeScript({
-            target: { tabId: details.tabId },
-            files: [
-              "/js/Readability.js",
-              "/js/turndown.js",
-              "/js/turndown-plugin-gfm.js",
-              "/js/cleanup-markdown.js",
-            ],
-          });
-
           try {
             await chrome.scripting.executeScript({
               target: { tabId: details.tabId },
@@ -783,13 +741,9 @@ chrome.webNavigation.onCompleted.addListener(async (details) => {
             console.warn("[W2M] DOM stability wait failed, proceeding anyway:", stabilityErr);
           }
 
-          const results = await chrome.scripting.executeScript({
-            target: { tabId: details.tabId },
-            func: extractAndConvert,
-          });
-          if (!results?.[0]?.result) return;
-          const { success, markdown, title } = results[0].result;
-          if (!success) return;
+          const extracted = await extractMarkdownFromTab(details.tabId, url);
+          if (!extracted?.success) return;
+          const { markdown, title } = extracted;
 
           await downloadInSession(markdown, title, session.folder, url);
           await addCapturedUrl(url);
@@ -848,9 +802,51 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   }
 });
 
+async function injectConversionLibraries(tabId) {
+  await chrome.scripting.executeScript({
+    target: { tabId },
+    files: [
+      "/js/Readability.js",
+      "/js/turndown.js",
+      "/js/turndown-plugin-gfm.js",
+      "/js/cleanup-markdown.js",
+    ],
+  });
+}
+
+/**
+ * Same Markdown pipeline as the toolbar popup: markdownSettings (Turndown options, YAML frontmatter).
+ */
+async function extractMarkdownFromTab(tabId, pageUrl) {
+  const { markdownSettings } = await chrome.storage.local.get("markdownSettings");
+  const m = self.W2M.markdownOutput.mergeSettings(markdownSettings);
+  await injectConversionLibraries(tabId);
+  const injectOpts = {
+    headingStyle: m.headingStyle,
+    bulletListMarker: m.bulletListMarker,
+    codeBlockStyle: m.codeBlockStyle,
+  };
+  const results = await chrome.scripting.executeScript({
+    target: { tabId },
+    func: extractAndConvert,
+    args: [injectOpts],
+  });
+  const res = results?.[0]?.result;
+  if (!res?.success) return res;
+  let markdown = res.markdown;
+  if (m.frontmatter) {
+    markdown = self.W2M.markdownOutput.prependYamlFrontmatter(
+      markdown,
+      res.title,
+      pageUrl,
+    );
+  }
+  return { success: true, markdown, title: res.title };
+}
+
 
 // Executed in the tab (has access to DOM and injected TurndownService)
-function extractAndConvert() {
+function extractAndConvert(options) {
   try {
     if (!document || !document.body) throw new Error("Document body not found");
 
@@ -1040,11 +1036,25 @@ function extractAndConvert() {
     // ─── End HTML cleanup ─────────────────────────────────────────────
 
     const title = document.title || "Untitled Page";
+    const opts = options || {};
+    const headingStyle = opts.headingStyle === "setext" ? "setext" : "atx";
+    let bullet = opts.bulletListMarker;
+    if (bullet !== "-" && bullet !== "*" && bullet !== "+") bullet = "-";
+    const codeBlockStyle = opts.codeBlockStyle === "indented" ? "indented" : "fenced";
+
+    function escapeHtml(s) {
+      return String(s)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
     const service = new TurndownService({
-      headingStyle: "atx",
+      headingStyle,
       hr: "---",
-      bulletListMarker: "-",
-      codeBlockStyle: "fenced",
+      bulletListMarker: bullet,
+      codeBlockStyle,
       emDelimiter: "_",
     });
     if (typeof turndownPluginGfm !== "undefined") {
@@ -1125,7 +1135,8 @@ function extractAndConvert() {
       },
     });
 
-    let markdown = service.turndown(`<div><h1>${title}</h1>${html}</div>`);
+    const wrapHtml = `<div><h1>${escapeHtml(title)}</h1>${html}</div>`;
+    let markdown = service.turndown(wrapHtml);
     markdown = cleanupMarkdown(markdown);
 
     return { success: true, markdown, title };

@@ -7,6 +7,9 @@
   var SVG_NS = 'http://www.w3.org/2000/svg';
   var MAX_DISPLAY_ITEMS = 50;
   var MAX_STORED_ITEMS = 200;
+  var DEFAULT_CAPTURE_SETTINGS = W2M.DEFAULT_CAPTURE_SETTINGS;
+  var DEFAULT_CRAWL_SETTINGS = W2M.DEFAULT_CRAWL_SETTINGS;
+  var defaultSessionFolder = W2M.defaultSettings.defaultSessionFolder;
 
   function createSvgIcon(paths, width, height, fill, stroke) {
     var svg = document.createElementNS(SVG_NS, 'svg');
@@ -54,8 +57,6 @@
   ];
   var ICON_PAUSE = [{ tag: 'rect', x: '6', y: '4', width: '4', height: '16', fill: 'currentColor' }, { tag: 'rect', x: '14', y: '4', width: '4', height: '16', fill: 'currentColor' }];
   var ICON_PLAY = [{ tag: 'polygon', points: '5 3 19 12 5 21', fill: 'currentColor' }];
-
-  var MAX_PREVIEW_LENGTH = 2000; // characters shown in the single-page markdown preview
 
   // =============================================
   // SINGLE PAGE PANEL
@@ -173,12 +174,14 @@
 
     if (this._state === 'success' && this._result) {
       var md = this._result.markdown || '';
-
+      var preview = (W2M.markdownOutput && W2M.markdownOutput.stripPreviewLeadingHeading)
+        ? W2M.markdownOutput.stripPreviewLeadingHeading(md)
+        : md;
       W2M.appendSingleConversionSuccess(panel, {
         bemPrefix: 'single-panel',
         markdown: md,
+        previewMarkdown: preview,
         url: this._result.url || '',
-        maxPreviewChars: MAX_PREVIEW_LENGTH,
         showMeta: true,
         onCopy: function () {
           navigator.clipboard.writeText(md).then(function () {
@@ -372,9 +375,15 @@
 
   Dashboard.prototype._loadSession = function () {
     var self = this;
+    if (!this.$site) return;
     chrome.storage.local.get('session', function (r) {
-      if (self.$site && r.session && r.session.folder) {
-        self.$site.textContent = r.session.folder;
+      var folder = r && r.session && r.session.folder ? r.session.folder : '';
+      if (self.settingsVisible) {
+        self.$site.textContent = t('settings.title');
+      } else if (self.currentMode === 'crawl' && folder) {
+        self.$site.textContent = folder;
+      } else {
+        self.$site.textContent = t('app.title');
       }
     });
   };
@@ -520,7 +529,7 @@
 
     // Enable/disable footer buttons
     var isStopped = newStatus === 'stopped';
-    if (this.$pauseBtn) this.$pauseBtn.disabled = isStopped;
+    if (this.$pauseBtn) this.$pauseBtn.disabled = false; // allow "play" from initial stopped state
     if (this.$stopBtn) this.$stopBtn.disabled = isStopped;
     if (this.$resetBtn) this.$resetBtn.disabled = !isStopped;
   };
@@ -828,6 +837,7 @@
 
     if (this.$singleView) this.$singleView.classList.toggle('hidden', !isSingle);
     if (this.$crawlView) this.$crawlView.classList.toggle('hidden', isSingle);
+    this._loadSession();
 
     // Lazy-build the single-page panel the first time the mode is selected
     if (isSingle && this.$singleView && !this._singlePanel) {
@@ -837,12 +847,55 @@
   };
 
   Dashboard.prototype._togglePause = function () {
+    if (this.status === 'stopped') {
+      this._startCrawlFromActiveTab();
+      return;
+    }
     if (!this.port) return;
     if (this.status === 'paused') {
       this.port.postMessage({ type: 'crawl:resume' });
     } else {
       this.port.postMessage({ type: 'crawl:pause' });
     }
+  };
+
+  Dashboard.prototype._startCrawlFromActiveTab = function () {
+    var self = this;
+    chrome.tabs.query({ active: true, lastFocusedWindow: true }, function (tabs) {
+      var tab = tabs && tabs[0];
+      var url = tab && tab.url ? tab.url : '';
+      if (!url || !/^https?:\/\//.test(url)) {
+        self._showToast(t('error.unavailable.message'));
+        return;
+      }
+
+      var folder = defaultSessionFolder(url);
+
+      chrome.storage.local.get(['captureSettings', 'crawlSettings'], function (data) {
+        var cap = Object.assign({}, DEFAULT_CAPTURE_SETTINGS, data.captureSettings || {});
+        var cr = Object.assign({}, DEFAULT_CRAWL_SETTINGS, data.crawlSettings || {});
+
+        chrome.runtime.sendMessage({
+          type: 'W2M_CRAWL_START',
+          startUrl: url,
+          folder: folder,
+          delay: cap.delay,
+          urlTree: !!cap.urlTree,
+          saveAssets: !!cap.saveAssets,
+          concurrency: Number(cr.concurrency) || DEFAULT_CRAWL_SETTINGS.concurrency,
+          maxBlocks: Number.isFinite(Number(cr.maxBlocks)) ? Number(cr.maxBlocks) : DEFAULT_CRAWL_SETTINGS.maxBlocks,
+          depth: Number.isFinite(Number(cr.depth)) ? Number(cr.depth) : DEFAULT_CRAWL_SETTINGS.depth
+        }, function (res) {
+          if (chrome.runtime.lastError || !res || !res.ok) {
+            self._showToast(t('toast.error'));
+            return;
+          }
+          self._setStatus('running');
+          self._applyMode('crawl');
+          if (self.port) self.port.postMessage({ type: 'crawl:get-status' });
+        });
+      });
+    });
   };
 
   Dashboard.prototype._stopCrawl = function () {
@@ -862,10 +915,12 @@
       while (this.$activity.firstChild) this.$activity.removeChild(this.$activity.firstChild);
     }
 
-    // Clear debug
-    if (this.$debug) {
-      this._debugBuilt = false;
-      while (this.$debug.firstChild) this.$debug.removeChild(this.$debug.firstChild);
+    // Clear debug snapshot and refresh panel content in place.
+    this._debugSnapshot = null;
+    if (this.debugCrawlPanel) {
+      this._ensureDebugShell();
+      this._updateDebugMeta();
+      this._renderDebugTabContent();
     }
 
     // Reset progress
@@ -876,6 +931,9 @@
     // Tell background to clear crawl state
     if (this.port) {
       this.port.postMessage({ type: 'crawl:reset' });
+      if (this.debugCrawlPanel) {
+        this.port.postMessage({ type: 'crawl:get-debug-snapshot' });
+      }
     }
 
     this._loadSession();
@@ -1116,7 +1174,12 @@
 
   Dashboard.prototype._updateDebugMeta = function () {
     var self = this;
-    if (!this._debugEls || !this._debugSnapshot) return;
+    if (!this._debugEls) return;
+    if (!this._debugSnapshot) {
+      this._debugEls.meta.textContent = '';
+      this._debugEls.syncBadge.classList.add('hidden');
+      return;
+    }
     var snap = this._debugSnapshot;
 
     chrome.storage.local.getBytesInUse(null, function (bytes) {
