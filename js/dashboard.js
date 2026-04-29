@@ -174,9 +174,13 @@
 
     if (this._state === 'success' && this._result) {
       var md = this._result.markdown || '';
+      var preview = (W2M.markdownOutput && W2M.markdownOutput.stripPreviewLeadingHeading)
+        ? W2M.markdownOutput.stripPreviewLeadingHeading(md)
+        : md;
       W2M.appendSingleConversionSuccess(panel, {
         bemPrefix: 'single-panel',
         markdown: md,
+        previewMarkdown: preview,
         url: this._result.url || '',
         showMeta: true,
         onCopy: function () {
