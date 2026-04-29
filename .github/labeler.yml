@@ -1,0 +1,62 @@
+"🧩 Area: Auto-Capture":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "js/popup.js"
+          - "popup.html"
+
+"🧩 Area: Conversion":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "js/cleanup-markdown.js"
+          - "js/turndown.js"
+          - "js/turndown-plugin-gfm.js"
+          - "js/Readability.js"
+
+"🧩 Area: Crawl":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "js/crawl-engine.js"
+          - "js/offscreen.js"
+          - "offscreen.html"
+
+"🧩 Area: Platform":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "manifest.json"
+          - "manifest.firefox.json"
+          - "js/background.js"
+
+"🧩 Area: UI":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "js/dashboard.js"
+          - "js/settings.js"
+          - "js/settings-page.js"
+          - "js/single-conversion-result.js"
+          - "js/theme-init.js"
+          - "js/theme-icon.js"
+          - "js/i18n.js"
+          - "js/app-state.js"
+          - "dashboard.html"
+          - "settings.html"
+          - "styles.css"
+
+"🧩 Area: CI":
+  - changed-files:
+      - any-glob-to-any-file:
+          - ".github/**/*"
+
+"🧩 Area: Tests":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "tests/**/*"
+          - "package.json"
+          - "package-lock.json"
+
+"🧩 Area: Docs":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "README.md"
+          - "CLAUDE.md"
+          - "AGENTS.md"
+          - "docs/**/*"
