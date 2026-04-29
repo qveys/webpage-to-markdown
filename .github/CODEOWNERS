@@ -1,0 +1,3 @@
+# Default ownership: Quentin handles every change.
+# Required for branch protection rulesets to enforce code owner review later.
+* @qveys
