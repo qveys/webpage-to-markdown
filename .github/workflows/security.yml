@@ -1,9 +1,11 @@
 name: Security
 
-# PR-only dependency review. Production scanning relies on Code Scanning default setup
-# (CodeQL is configured separately in codeql.yml).
+# Run npm audit against PRs and pushes to main. Works on private repos without
+# GitHub Advanced Security (dependency-review-action requires GHAS).
 
 on:
+  push:
+    branches: [main]
   pull_request:
     branches: [main]
 
@@ -11,16 +13,15 @@ permissions:
   contents: read
 
 jobs:
-  dependency-review:
-    name: Dependency review
+  audit:
+    name: npm audit
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pull-requests: write
     steps:
       - uses: actions/checkout@v6
-
-      - name: Dependency review
-        uses: actions/dependency-review-action@v4
+      - uses: actions/setup-node@v4
         with:
-          comment-summary-in-pr: always
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Audit (high+ severity blocks)
+        run: npm audit --audit-level=high
