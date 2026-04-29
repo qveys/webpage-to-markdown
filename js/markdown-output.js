@@ -37,15 +37,20 @@
   }
 
   /**
-   * Side panel single-page preview: skip YAML block then first ATX H1 (duplicate tab title).
+   * Side panel single-page preview: skip YAML block then a leading ATX H1 (duplicate tab title).
+   * Only strips when the H1 is at the very start of the document (after optional BOM and
+   * whitespace). An H1 appearing later in the body is preserved.
    */
   function stripPreviewLeadingHeading(markdown) {
     var s = markdown || '';
+    // Drop optional BOM so anchoring to start-of-string still matches.
+    if (s.charCodeAt(0) === 0xFEFF) s = s.slice(1);
     if (/^---\s*\r?\n/.test(s)) {
       var fm = s.match(/^---\s*\r?\n[\s\S]*?\r?\n---\s*\r?\n?/);
       if (fm) s = s.slice(fm[0].length);
     }
-    s = s.replace(/^#\s[^\n\r]*(\r?\n|$)/m, '');
+    s = s.replace(/^\s+/, '');
+    s = s.replace(/^#\s[^\n\r]*(\r?\n|$)/, '');
     s = s.replace(/^\s+/, '');
     return s;
   }
