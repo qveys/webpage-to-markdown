@@ -1,0 +1,26 @@
+name: Security
+
+# PR-only dependency review. Production scanning relies on Code Scanning default setup
+# (CodeQL is configured separately in codeql.yml).
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  dependency-review:
+    name: Dependency review
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Dependency review
+        uses: actions/dependency-review-action@v4
+        with:
+          comment-summary-in-pr: always
