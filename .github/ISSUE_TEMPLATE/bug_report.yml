@@ -1,0 +1,58 @@
+name: 🐞 Bug report
+description: Report something that does not behave as expected.
+labels:
+  - "🐞 Type: Bug"
+body:
+  - type: dropdown
+    id: browser
+    attributes:
+      label: Browser
+      options:
+        - Chrome
+        - Edge
+        - Firefox
+        - Other (please specify in description)
+    validations:
+      required: true
+  - type: input
+    id: browser-version
+    attributes:
+      label: Browser version
+      placeholder: "e.g. Chrome 132.0.6834.111"
+    validations:
+      required: true
+  - type: input
+    id: extension-version
+    attributes:
+      label: Extension version
+      placeholder: "e.g. v1.8.0 (visible in chrome://extensions)"
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open page X
+        2. Click the toolbar icon
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: console
+    attributes:
+      label: Service worker / console errors
+      description: Paste relevant lines from chrome://extensions DevTools or the page console.
+      render: shell

@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Chrome Web Store listing
+    url: https://chrome.google.com/webstore/category/extensions
+    about: Reviews and questions about the published extension belong on the store listing.
