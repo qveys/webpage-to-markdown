@@ -1,0 +1,20 @@
+webpage-to-markdown
+Copyright (c) 2026 Quentin Veys <contact@quentinveys.be>
+
+This product bundles vendored third-party libraries that retain their
+original licenses:
+
+- js/Readability.js
+  Apache License 2.0
+  Copyright (c) 2010 Mozilla / Arc90 Inc.
+  Source: https://github.com/mozilla/readability
+
+- js/turndown.js
+  MIT License
+  Copyright (c) Dom Christie
+  Source: https://github.com/mixmark-io/turndown
+
+- js/turndown-plugin-gfm.js
+  MIT License
+  Copyright (c) Dom Christie
+  Source: https://github.com/mixmark-io/turndown-plugin-gfm

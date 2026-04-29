@@ -19,16 +19,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
----
-
-Vendored third-party libraries retain their original licenses:
-
-- js/Readability.js — Apache License 2.0 (Mozilla / Arc90 Inc., 2010)
-  https://github.com/mozilla/readability
-
-- js/turndown.js — MIT License (Dom Christie)
-  https://github.com/mixmark-io/turndown
-
-- js/turndown-plugin-gfm.js — MIT License (Dom Christie)
-  https://github.com/mixmark-io/turndown-plugin-gfm
