@@ -17,8 +17,11 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/qveys/webpage-to-markdown/actions/workflows/test.yml"><img src="https://img.shields.io/github/actions/workflow/status/qveys/webpage-to-markdown/test.yml?branch=main&style=flat-square&label=tests&logo=jest" alt="Tests" /></a>
+  <a href="https://github.com/qveys/webpage-to-markdown/security/code-scanning"><img src="https://img.shields.io/github/actions/workflow/status/qveys/webpage-to-markdown/codeql.yml?branch=main&style=flat-square&label=CodeQL&logo=github" alt="CodeQL" /></a>
+  <a href="https://github.com/qveys/webpage-to-markdown/releases/latest"><img src="https://img.shields.io/github/v/release/qveys/webpage-to-markdown?style=flat-square&logo=github" alt="Latest release" /></a>
   <img src="https://img.shields.io/badge/Manifest-V3-blue?style=flat-square&logo=googlechrome" alt="Manifest V3" />
-  <img src="https://img.shields.io/badge/License-MIT-green?style=flat-square" alt="MIT License" />
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/qveys/webpage-to-markdown?style=flat-square" alt="MIT License" /></a>
   <img src="https://img.shields.io/badge/JS-Vanilla-yellow?style=flat-square&logo=javascript" alt="Vanilla JS" />
 </p>
 
@@ -225,6 +228,8 @@ webpage-to-markdown/
 │   ├── i18n.js                # Internationalization (FR/EN)
 │   ├── offscreen.js           # Offscreen DOM parser (link extraction)
 │   ├── cleanup-markdown.js    # Shared markdown post-processing
+│   ├── markdown-output.js     # Shared markdown rendering helpers (preview heading strip)
+│   ├── default-settings.js    # Shared DEFAULT_*_SETTINGS + defaultSessionFolder()
 │   ├── single-conversion-result.js # Shared module for building the single-page conversion result UI (used by both popup and side panel)
 │   ├── theme-icon.js          # Shared sun/moon theme icon builder
 │   ├── theme-init.js          # Early theme detection (prevent flash)
@@ -241,13 +246,15 @@ webpage-to-markdown/
 
 ## 🤝 Contributing
 
-Contributions welcome! Feel free to open an issue or submit a PR.
+Contributions welcome! Open an issue or submit a PR. By participating you agree to the [PR template](.github/PULL_REQUEST_TEMPLATE.md) and one of the [issue forms](.github/ISSUE_TEMPLATE/).
+
+Commit messages follow `<emoji> <type>(<scope>): <description>` (Conventional Commits + emoji). PRs auto-label by area and titles are auto-normalized via the `Triage` workflow.
 
 ---
 
 ## 📄 License
 
-MIT — free to use, modify, and distribute.
+[MIT](LICENSE) — free to use, modify, and distribute. Vendored third-party libraries retain their original licenses; see [`NOTICE`](NOTICE) for attribution.
 
 ---
 
