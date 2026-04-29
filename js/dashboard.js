@@ -7,8 +7,9 @@
   var SVG_NS = 'http://www.w3.org/2000/svg';
   var MAX_DISPLAY_ITEMS = 50;
   var MAX_STORED_ITEMS = 200;
-  var DEFAULT_CAPTURE_SETTINGS = { delay: 2000, urlTree: true, saveAssets: true };
-  var DEFAULT_CRAWL_SETTINGS = { concurrency: 3, maxBlocks: 5, depth: 0 };
+  var DEFAULT_CAPTURE_SETTINGS = W2M.DEFAULT_CAPTURE_SETTINGS;
+  var DEFAULT_CRAWL_SETTINGS = W2M.DEFAULT_CRAWL_SETTINGS;
+  var defaultSessionFolder = W2M.defaultSettings.defaultSessionFolder;
 
   function createSvgIcon(paths, width, height, fill, stroke) {
     var svg = document.createElementNS(SVG_NS, 'svg');
@@ -864,9 +865,7 @@
         return;
       }
 
-      var host = '';
-      try { host = new URL(url).hostname.replace(/[^a-z0-9]/gi, '-'); } catch (_e) { /* ignore */ }
-      var folder = 'w2m-' + host.substring(0, 20) + '-' + new Date().toISOString().slice(0, 10);
+      var folder = defaultSessionFolder(url);
 
       chrome.storage.local.get(['captureSettings', 'crawlSettings'], function (data) {
         var cap = Object.assign({}, DEFAULT_CAPTURE_SETTINGS, data.captureSettings || {});

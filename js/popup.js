@@ -8,8 +8,9 @@
   var AppState = W2M.AppState;
   var el = W2M.el;
 
-  var DEFAULT_CAPTURE_SETTINGS = { delay: 2000, urlTree: true, saveAssets: true };
-  var DEFAULT_CRAWL_SETTINGS = { concurrency: 3, maxBlocks: 5, depth: 0 };
+  var DEFAULT_CAPTURE_SETTINGS = W2M.DEFAULT_CAPTURE_SETTINGS;
+  var DEFAULT_CRAWL_SETTINGS = W2M.DEFAULT_CRAWL_SETTINGS;
+  var defaultSessionFolder = W2M.defaultSettings.defaultSessionFolder;
 
   function precrawlDelayLabel(ms) {
     if (ms <= 500) return t('precrawl.delay.fast');
@@ -457,9 +458,7 @@
           el('div', { className: 'heading-sm', textContent: data.url || '' })
         ));
         // Folder
-        var host = '';
-        try { host = new URL(data.url || '').hostname.replace(/[^a-z0-9]/gi, '-'); } catch (e) { /* ignore */ }
-        var defaultFolder = 'w2m-' + host.substring(0, 20) + '-' + new Date().toISOString().slice(0, 10);
+        var defaultFolder = defaultSessionFolder(data.url || '');
         folderInput = el('input', { className: 'form-input', type: 'text', value: defaultFolder });
         container.appendChild(el('div', { className: 'form-group' },
           el('label', { className: 'form-label', textContent: t('precrawl.folder') }),
