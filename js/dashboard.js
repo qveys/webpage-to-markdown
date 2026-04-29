@@ -892,7 +892,6 @@
           }
           self._setStatus('running');
           self._applyMode('crawl');
-          self._loadSession();
           if (self.port) self.port.postMessage({ type: 'crawl:get-status' });
         });
       });
