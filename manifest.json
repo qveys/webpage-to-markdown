@@ -1,0 +1,24 @@
+{
+   "action": {
+      "default_icon": {
+         "16": "img/icon.png",
+         "48": "img/icon.png"
+      },
+      "default_popup": "popup.html"
+   },
+   "content_security_policy": {
+      "extension_pages": "script-src 'self'; object-src 'self'"
+   },
+   "description": "Convert any webpage to Markdown format with a single click",
+   "icons": {
+      "128": "img/icon.png",
+      "16": "img/icon.png",
+      "48": "img/icon.png"
+   },
+   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAvB/0i3nrajV8Md1HVITuC3EfqVbRBetbCToTPapaVe1w7OI8M/XFpoleQiNYCEKOX4Jrsku9X60115WYestAyUojEtzVFWF1Majq43PIwdBDvUEMg8LdWN7fKBZyzAGydL+NZqFdpPQ+3OCBCT8HVsGY11ptzN1DanwRBNnEOxe3nwB4jqRyrD/+fJOdnZa9ziSKPcg3GBKRIndoDgSljhIRM/rVnbvQLJNnkRv+DMERcsiHOwThC03RIQMpUW0ky+TB+sjDriTIuOeeT2dbpQlayAVMl9cFTDh5xF17W8QP1/Jge7teEq0wj9D0898Ckx4ufT7Yj1HG8NOElGAHUQIDAQAB",
+   "manifest_version": 3,
+   "name": "Webpage to Markdown",
+   "permissions": [ "activeTab", "scripting", "storage" ],
+   "update_url": "https://clients2.google.com/service/update2/crx",
+   "version": "1.0.1"
+}
