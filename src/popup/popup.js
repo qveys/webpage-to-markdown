@@ -6,13 +6,13 @@ class MarkdownConverter {
             bulletListMarker: '-',
             codeBlockStyle: 'fenced'
         };
-        
+
         this.settings = { ...this.defaultSettings };
-        
+
         this.initializeTheme();
         this.loadSettings();
         this.initializeEventListeners();
-        
+
         // Restore last conversion if available
         this.restoreLastState();
     }
@@ -27,7 +27,7 @@ class MarkdownConverter {
         });
 
         service.keep(['iframe', 'script', 'style']);
-        
+
         service.addRule('figures', {
             filter: 'figure',
             replacement: (content, node) => {
@@ -53,13 +53,13 @@ ${captionText}
 
     initializeTheme() {
         const toggleBtn = document.getElementById('theme-toggle');
-        const sunIcon = toggleBtn.querySelector('.sun-icon');
-        const moonIcon = toggleBtn.querySelector('.moon-icon');
+        const _sunIcon = toggleBtn.querySelector('.sun-icon');
+        const _moonIcon = toggleBtn.querySelector('.moon-icon');
 
         // Check saved theme or system preference
         const savedTheme = localStorage.getItem('theme');
         const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-        
+
         const isDark = savedTheme === 'dark' || (!savedTheme && systemDark);
         this.setTheme(isDark);
 
@@ -72,17 +72,17 @@ ${captionText}
     setTheme(isDark) {
         const sunIcon = document.querySelector('.sun-icon');
         const moonIcon = document.querySelector('.moon-icon');
-        
+
         if (isDark) {
             document.documentElement.setAttribute('data-theme', 'dark');
             localStorage.setItem('theme', 'dark');
-            sunIcon.style.display = 'block'; 
+            sunIcon.style.display = 'block';
             moonIcon.style.display = 'none';
         } else {
             document.documentElement.removeAttribute('data-theme');
             localStorage.setItem('theme', 'light');
             sunIcon.style.display = 'none';
-            moonIcon.style.display = 'block'; 
+            moonIcon.style.display = 'block';
         }
     }
 
@@ -93,10 +93,18 @@ ${captionText}
         document.getElementById('settings-toggle').addEventListener('click', () => this.toggleSettingsPanel());
 
         // Settings change listeners
-        document.getElementById('setting-frontmatter').addEventListener('change', (e) => this.saveSetting('frontmatter', e.target.checked));
-        document.getElementById('setting-heading').addEventListener('change', (e) => this.saveSetting('headingStyle', e.target.value));
-        document.getElementById('setting-bullet').addEventListener('change', (e) => this.saveSetting('bulletListMarker', e.target.value));
-        document.getElementById('setting-code').addEventListener('change', (e) => this.saveSetting('codeBlockStyle', e.target.value));
+        document
+            .getElementById('setting-frontmatter')
+            .addEventListener('change', (e) => this.saveSetting('frontmatter', e.target.checked));
+        document
+            .getElementById('setting-heading')
+            .addEventListener('change', (e) => this.saveSetting('headingStyle', e.target.value));
+        document
+            .getElementById('setting-bullet')
+            .addEventListener('change', (e) => this.saveSetting('bulletListMarker', e.target.value));
+        document
+            .getElementById('setting-code')
+            .addEventListener('change', (e) => this.saveSetting('codeBlockStyle', e.target.value));
     }
 
     loadSettings() {
@@ -121,7 +129,7 @@ ${captionText}
         const panel = document.getElementById('settings-panel');
         const btn = document.getElementById('settings-toggle');
         const isHidden = panel.style.display === 'none';
-        
+
         panel.style.display = isHidden ? 'flex' : 'none';
         if (isHidden) {
             btn.classList.add('active');
@@ -132,7 +140,7 @@ ${captionText}
 
     async restoreLastState() {
         try {
-            const data = await chrome.storage.local.get('lastConversion');
+            const _data = await chrome.storage.local.get('lastConversion');
             // Logic to restore state if desired
         } catch (e) {
             console.log('Error reading storage', e);
@@ -142,19 +150,21 @@ ${captionText}
     async convertPage() {
         try {
             this.setLoading(true);
-            
+
             const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
             if (!tab || !tab.id) throw new Error('No active tab found');
-    
+
             // Prevent scripting on restricted pages
-            if (tab.url.startsWith('chrome://') || 
-                tab.url.startsWith('chrome-extension://') || 
-                tab.url.startsWith('edge://') || 
+            if (
+                tab.url.startsWith('chrome://') ||
+                tab.url.startsWith('chrome-extension://') ||
+                tab.url.startsWith('edge://') ||
                 tab.url.startsWith('about:') ||
-                tab.url.includes('chrome.google.com/webstore')) {
+                tab.url.includes('chrome.google.com/webstore')
+            ) {
                 throw new Error('Cannot convert system pages or Web Store');
             }
-    
+
             const results = await chrome.scripting.executeScript({
                 target: { tabId: tab.id },
                 func: () => {
@@ -168,7 +178,9 @@ ${captionText}
                                 const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
                                 if (!iframeDoc || !iframeDoc.body) return '';
                                 const iframeClone = iframeDoc.body.cloneNode(true);
-                                iframeClone.querySelectorAll('script, style, nav, footer, aside, .ads, .comments').forEach(el => el.remove());
+                                iframeClone
+                                    .querySelectorAll('script, style, nav, footer, aside, .ads, .comments')
+                                    .forEach((el) => el.remove());
                                 return `<div class="iframe-content">${iframeClone.innerHTML}</div>`;
                             } catch (e) {
                                 return '';
@@ -176,22 +188,31 @@ ${captionText}
                         };
 
                         const bodyClone = document.body.cloneNode(true);
-                        
+
                         const iframes = document.querySelectorAll('iframe');
                         let iframeContents = [];
                         iframes.forEach((iframe) => {
                             const content = getIframeContent(iframe);
                             if (content) iframeContents.push(content);
                         });
-                        
+
                         const unwanted = bodyClone.querySelectorAll(
                             'script, style, nav, footer, aside, .ads, .comments, [role="complementary"], .cookie-banner, .popup, .overlay, .modal'
                         );
-                        unwanted.forEach(el => el.remove());
+                        unwanted.forEach((el) => el.remove());
 
-                        const mainSelectors = ['main', 'article', '.content', '.post', '.entry', '[role="main"]', '#content', '.main'];
+                        const mainSelectors = [
+                            'main',
+                            'article',
+                            '.content',
+                            '.post',
+                            '.entry',
+                            '[role="main"]',
+                            '#content',
+                            '.main'
+                        ];
                         let mainContent = null;
-                        
+
                         for (const selector of mainSelectors) {
                             const found = bodyClone.querySelector(selector);
                             if (found && found.innerHTML.trim().length > 100) {
@@ -217,26 +238,26 @@ ${captionText}
                     }
                 }
             });
-    
+
             if (!results || !results[0] || !results[0].result) {
                 throw new Error('Failed to get page content');
             }
-    
+
             const { success, content, title, url, error } = results[0].result;
-    
+
             if (!success) throw new Error(error || 'Failed to extract content');
-    
+
             const wrappedContent = `
                 <div class="markdown-content">
                     <h1>${title}</h1>
                     ${content}
                 </div>
             `;
-    
+
             // Initialize Turndown with current settings
             const turndownService = this.createTurndownService();
             let markdown = turndownService.turndown(wrappedContent);
-            
+
             // Post-processing: Collapse multiple newlines (3+) into max 2
             markdown = markdown.replace(/\n{3,}/g, '\n\n').trim();
 
@@ -255,10 +276,10 @@ date: ${date}
 
             const output = document.getElementById('output');
             output.value = markdown;
-    
+
             this.enableActions(true);
             this.showToast('Conversion successful!', 'success');
-            
+
             await chrome.storage.local.set({
                 lastConversion: {
                     url: tab.url,
@@ -266,7 +287,6 @@ date: ${date}
                     timestamp: new Date().toISOString()
                 }
             });
-
         } catch (error) {
             console.error('Conversion error:', error);
             this.showToast(error.message, 'error');
@@ -280,7 +300,7 @@ date: ${date}
     async copyToClipboard() {
         const output = document.getElementById('output');
         if (!output.value) return;
-        
+
         try {
             await navigator.clipboard.writeText(output.value);
             this.showToast('Copied to clipboard!', 'success');
@@ -297,12 +317,12 @@ date: ${date}
             const blob = new Blob([output.value], { type: 'text/markdown' });
             const url = URL.createObjectURL(blob);
             const timestamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
-            
+
             const a = document.createElement('a');
             a.href = url;
             a.download = `page-${timestamp}.md`;
             a.click();
-            
+
             URL.revokeObjectURL(url);
             this.showToast('Download started', 'success');
         } catch (error) {
@@ -330,9 +350,9 @@ date: ${date}
         const toast = document.getElementById('toast');
         toast.textContent = message;
         toast.className = `toast show ${type}`;
-        
+
         if (this.toastTimeout) clearTimeout(this.toastTimeout);
-        
+
         this.toastTimeout = setTimeout(() => {
             toast.className = 'toast hidden';
         }, 1500);

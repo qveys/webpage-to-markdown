@@ -1,0 +1,19 @@
+{
+  "name": "webpage-to-markdown",
+  "version": "1.0.1",
+  "description": "A Chrome extension that converts any webpage to Markdown format with a single click.",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "lint": "eslint src/",
+    "lint:fix": "eslint src/ --fix",
+    "format": "prettier --write 'src/**/*.{js,html,css,json}'",
+    "format:check": "prettier --check 'src/**/*.{js,html,css,json}'"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.4",
+    "eslint": "^9.39.4",
+    "globals": "^15.15.0",
+    "prettier": "^3.8.4"
+  }
+}
