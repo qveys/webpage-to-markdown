@@ -1,4 +1,7 @@
 {
+   "background": {
+      "service_worker": "src/background.js"
+   },
    "action": {
       "default_icon": {
          "16": "src/assets/icon.png",
@@ -18,7 +21,10 @@
    "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAvB/0i3nrajV8Md1HVITuC3EfqVbRBetbCToTPapaVe1w7OI8M/XFpoleQiNYCEKOX4Jrsku9X60115WYestAyUojEtzVFWF1Majq43PIwdBDvUEMg8LdWN7fKBZyzAGydL+NZqFdpPQ+3OCBCT8HVsGY11ptzN1DanwRBNnEOxe3nwB4jqRyrD/+fJOdnZa9ziSKPcg3GBKRIndoDgSljhIRM/rVnbvQLJNnkRv+DMERcsiHOwThC03RIQMpUW0ky+TB+sjDriTIuOeeT2dbpQlayAVMl9cFTDh5xF17W8QP1/Jge7teEq0wj9D0898Ckx4ufT7Yj1HG8NOElGAHUQIDAQAB",
    "manifest_version": 3,
    "name": "Webpage to Markdown",
-   "permissions": [ "activeTab", "scripting", "storage" ],
+   "permissions": [ "activeTab", "scripting", "storage", "sidePanel", "downloads" ],
+   "side_panel": {
+      "default_path": "src/sidepanel/sidepanel.html"
+   },
    "update_url": "https://clients2.google.com/service/update2/crx",
    "version": "1.0.1"
 }
