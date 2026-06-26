@@ -11,7 +11,7 @@
 
 Le repository `_previous_webpage-to-markdown` est une **extension Chrome (Manifest V3)** écrite en **Vanilla JavaScript** (sans framework ni bundler). Elle convertit des pages web en Markdown via Turndown.js + Readability.js, avec trois modes : conversion unique, auto-capture par session de navigation et crawl multi-pages concurrent.
 
-Le projet représente un ordre de grandeur d'environ **10 kLoC JavaScript** et **7 fichiers de tests**. Le chiffrage a été relevé le 2026-06-16 sur `/tmp/previous-repo` via `find /tmp/previous-repo/js -name '*.js' | xargs wc -l` et `find /tmp/previous-repo/tests -name '*.test.js'`, en incluant les bibliothèques embarquées `Readability.js`, `turndown.js` et `turndown-plugin-gfm.js`.
+Le projet représente un ordre de grandeur d'environ **10 kLoC JavaScript** et **7 fichiers de tests**. Le chiffrage a été relevé le 2026-06-16 sur une copie locale du repo source, en séparant volontairement deux mesures distinctes: le volume de code JavaScript via `find js -name '*.js' | xargs wc -l` et le nombre de fichiers de tests via `find tests -name '*.test.js' | wc -l`, en incluant les bibliothèques embarquées `Readability.js`, `turndown.js` et `turndown-plugin-gfm.js`.
 
 ---
 
@@ -71,7 +71,7 @@ Le projet représente un ordre de grandeur d'environ **10 kLoC JavaScript** et *
 - **Persistence** — `saveState()` / `restoreState()` via `chrome.storage.local` (état) + `chrome.storage.session` (queue volatile). Le crawl survit aux redémarrages du Service Worker.
 - **Communication temps réel** — Ports persistants pour streamer le statut vers le dashboard. Broadcast coalescé (200ms debounce) pour éviter le spam de messages.
 
-**Interprétation** : L'architecture CrawlEngine est un excellent modèle pour tout système de traitement concurrent avec queue. Les patterns de lifecycle (pause/resume), persistence d'état, et communication temps réel sont réutilisables tels quels.
+**Interprétation** : L'architecture CrawlEngine est un excellent modèle pour tout système de traitement concurrent avec queue. Les patterns de lifecycle (pause/resume), persistance d'état, et communication temps réel sont réutilisables tels quels.
 
 **Recommandation** : Modéliser en TypeScript avec la même architecture (queue, workers, scope, lifecycle) mais en ajoutant le typage et en séparant les responsabilités (storage adapter, message adapter).
 
