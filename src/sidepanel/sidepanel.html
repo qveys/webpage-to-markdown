@@ -12,19 +12,13 @@
         <!-- Zone 1: Header -->
         <header class="panel-header">
             <div class="header-left">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                    <polyline points="14 2 14 8 20 8"></polyline>
-                    <line x1="16" y1="13" x2="8" y2="13"></line>
-                    <line x1="16" y1="17" x2="8" y2="17"></line>
-                    <polyline points="10 9 9 9 8 9"></polyline>
-                </svg>
+                <svg width="20" height="20"><use href="../assets/icons.svg#icon-file-text"/></svg>
                 <h1>Dashboard</h1>
             </div>
             <div class="header-controls">
                 <button id="theme-toggle" class="icon-btn" aria-label="Toggle Theme" title="Toggle Theme">
-                    <svg class="sun-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
-                    <svg class="moon-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+                    <svg class="sun-icon" width="18" height="18"><use href="../assets/icons.svg#icon-sun"/></svg>
+                    <svg class="moon-icon" width="18" height="18" style="display:none;"><use href="../assets/icons.svg#icon-moon"/></svg>
                 </button>
             </div>
         </header>
@@ -43,10 +37,7 @@
             <!-- History list view -->
             <div id="history-view">
                 <div id="empty-state" class="empty-state">
-                    <svg class="empty-icon" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                        <polyline points="22 12 16 12 14 15 10 15 8 12 2 12"></polyline>
-                        <path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"></path>
-                    </svg>
+                    <svg class="empty-icon" width="48" height="48"><use href="../assets/icons.svg#icon-inbox"/></svg>
                     <h3>No conversions yet</h3>
                     <p>Convert a page to get started</p>
                 </div>
@@ -57,13 +48,13 @@
             <div id="detail-view" style="display:none;">
                 <div class="detail-header">
                     <button id="back-btn" class="icon-btn back-btn" aria-label="Back to history" title="Back to history">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+                        <svg class="icon" width="18" height="18"><use href="../assets/icons.svg#icon-arrow-left"/></svg>
                         <span>Back</span>
                     </button>
                     <span id="detail-title" class="detail-title"></span>
                 </div>
                 <div class="detail-meta">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+                    <svg class="icon-sm" width="14" height="14"><use href="../assets/icons.svg#icon-link"/></svg>
                     <a id="detail-url" class="detail-url" target="_blank" rel="noopener"></a>
                 </div>
                 <div class="detail-meta">
@@ -79,17 +70,18 @@
         <footer class="panel-footer">
             <div id="footer-history" class="footer-actions">
                 <button id="convert-btn" class="btn btn-primary">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline></svg>
+                    <svg class="icon" width="18" height="18"><use href="../assets/icons.svg#icon-file"/></svg>
                     Convert Active Tab
+                    <kbd class="kbd-hint" id="kbd-hint"></kbd>
                 </button>
             </div>
             <div id="footer-detail" class="footer-actions footer-detail-actions" style="display:none;">
                 <button id="copy-btn" class="btn btn-secondary">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                    <svg class="icon" width="18" height="18"><use href="../assets/icons.svg#icon-copy"/></svg>
                     <span>Copy</span>
                 </button>
                 <button id="download-btn" class="btn btn-secondary">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                    <svg class="icon" width="18" height="18"><use href="../assets/icons.svg#icon-download"/></svg>
                     <span>Download</span>
                 </button>
             </div>

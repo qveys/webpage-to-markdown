@@ -35,8 +35,8 @@ body {
 }
 
 .header-left h1 {
-    font-size: 1rem;
-    font-weight: 600;
+    font-size: var(--fs-lg);
+    font-weight: var(--fw-semibold);
     margin: 0;
     color: var(--text-color);
 }
@@ -52,7 +52,7 @@ body {
 }
 
 .auto-download-label {
-    font-size: 0.85rem;
+    font-size: var(--fs-sm);
     color: var(--text-color);
     user-select: none;
 }
@@ -128,14 +128,14 @@ body {
 
 .empty-state h3 {
     margin: 0 0 4px 0;
-    font-size: 1rem;
-    font-weight: 600;
+    font-size: var(--fs-lg);
+    font-weight: var(--fw-semibold);
     color: var(--text-color);
 }
 
 .empty-state p {
     margin: 0;
-    font-size: 0.85rem;
+    font-size: var(--fs-sm);
     color: var(--text-muted);
 }
 
@@ -177,7 +177,7 @@ body {
 
 .history-item-indicator {
     flex-shrink: 0;
-    font-size: 0.7rem;
+    font-size: var(--fs-xs);
     line-height: 1.4;
     color: var(--primary-color);
     width: 12px;
@@ -190,8 +190,8 @@ body {
 }
 
 .history-item-title {
-    font-size: 0.9rem;
-    font-weight: 500;
+    font-size: var(--fs-md);
+    font-weight: var(--fw-medium);
     color: var(--text-color);
     overflow: hidden;
     text-overflow: ellipsis;
@@ -199,7 +199,7 @@ body {
 }
 
 .history-item-url {
-    font-size: 0.75rem;
+    font-size: var(--fs-xs);
     color: var(--text-muted);
     overflow: hidden;
     text-overflow: ellipsis;
@@ -208,7 +208,7 @@ body {
 }
 
 .history-item-meta {
-    font-size: 0.7rem;
+    font-size: var(--fs-xs);
     color: var(--text-muted);
     margin-top: 4px;
 }
@@ -281,14 +281,14 @@ body {
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    font-size: 0.85rem;
+    font-size: var(--fs-sm);
     color: var(--primary-color);
     white-space: nowrap;
 }
 
 .detail-title {
-    font-size: 0.9rem;
-    font-weight: 600;
+    font-size: var(--fs-md);
+    font-weight: var(--fw-semibold);
     color: var(--text-color);
     overflow: hidden;
     text-overflow: ellipsis;
@@ -302,7 +302,7 @@ body {
     align-items: center;
     gap: 6px;
     padding: 6px 16px;
-    font-size: 0.75rem;
+    font-size: var(--fs-xs);
     color: var(--text-muted);
 }
 
@@ -351,8 +351,8 @@ body {
     background-color: var(--secondary-bg);
     color: var(--text-color);
     font-family: var(--font-mono);
-    font-size: 0.8rem;
-    line-height: 1.5;
+    font-size: var(--fs-sm);
+    line-height: var(--lh-base);
     resize: none;
     outline: none;
 }

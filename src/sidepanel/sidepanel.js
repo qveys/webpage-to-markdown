@@ -18,6 +18,7 @@ class SidePanelController {
         await this.loadHistory();
         this.initializeEventListeners();
         this.initializeStorageListener();
+        this.initializeKeyboardShortcut();
         this.render();
     }
 
@@ -101,6 +102,25 @@ class SidePanelController {
 
         document.getElementById('download-btn').addEventListener('click', function () {
             self.downloadCurrent();
+        });
+    }
+
+    initializeKeyboardShortcut() {
+        this.isMac = /Mac/.test(navigator.platform);
+        this.kbdLabel = this.isMac ? '⌘↩' : 'Ctrl↩';
+        var badge = document.getElementById('kbd-hint');
+        if (badge) {
+            badge.textContent = this.kbdLabel;
+        }
+
+        var self = this;
+        document.addEventListener('keydown', function (e) {
+            var tag = e.target.tagName;
+            if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+            if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+                e.preventDefault();
+                self.convertActiveTab();
+            }
         });
     }
 
@@ -313,18 +333,19 @@ class SidePanelController {
 
     setConvertLoading(isLoading) {
         var btn = document.getElementById('convert-btn');
+        var kbd = this.kbdLabel ? ' <kbd class="kbd-hint">' + this.kbdLabel + '</kbd>' : '';
         if (isLoading) {
             btn.disabled = true;
             if (this.reducedMotion) {
                 btn.innerHTML = 'Converting…';
             } else {
                 btn.innerHTML =
-                    '<svg class="animate-spin" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg> Converting…';
+                    '<svg class="icon animate-spin" width="18" height="18"><use href="../assets/icons.svg#icon-loader"/></svg> Converting…';
             }
         } else {
             btn.disabled = false;
             btn.innerHTML =
-                '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline></svg> Convert Active Tab';
+                '<svg class="icon" width="18" height="18"><use href="../assets/icons.svg#icon-file"/></svg> Convert Active Tab' + kbd;
         }
     }
 
@@ -334,7 +355,7 @@ class SidePanelController {
 
         try {
             await navigator.clipboard.writeText(output.value);
-            this.showToast('Copied to clipboard!', 'success', 1500);
+            this.showButtonSuccess(document.getElementById('copy-btn'), 'Copied!');
         } catch (e) {
             this.showToast('Failed to copy', 'error', 1500);
         }
@@ -354,15 +375,32 @@ class SidePanelController {
             var url = URL.createObjectURL(blob);
             chrome.downloads.download({ url: url, filename: filename, saveAs: false });
             URL.revokeObjectURL(url);
-            this.showToast('Download started', 'success', 1500);
+            this.showButtonSuccess(document.getElementById('download-btn'), 'Downloaded!');
         } catch (e) {
             var a = document.createElement('a');
             a.href = URL.createObjectURL(new Blob([output.value], { type: 'text/markdown' }));
             a.download = filename;
             a.click();
             URL.revokeObjectURL(a.href);
-            this.showToast('Download started', 'success', 1500);
+            this.showButtonSuccess(document.getElementById('download-btn'), 'Downloaded!');
         }
+    }
+
+    showButtonSuccess(btn, label) {
+        if (btn._successTimeout) {
+            clearTimeout(btn._successTimeout);
+        } else {
+            btn._originalHTML = btn.innerHTML;
+        }
+        btn.classList.add('btn-success-feedback');
+        btn.innerHTML = '<svg class="icon" width="18" height="18"><use href="../assets/icons.svg#icon-check"/></svg> <span>' + label + '</span>';
+
+        btn._successTimeout = setTimeout(function () {
+            btn.classList.remove('btn-success-feedback');
+            btn.innerHTML = btn._originalHTML;
+            delete btn._originalHTML;
+            delete btn._successTimeout;
+        }, 1500);
     }
 
     showToast(message, type, duration) {
