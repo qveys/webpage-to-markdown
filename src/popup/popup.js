@@ -7,17 +7,18 @@ class MarkdownConverter {
             codeBlockStyle: 'fenced'
         };
 
-        this.settings = Object.assign({}, this.defaultSettings);
+        this.settings = { ...this.defaultSettings };
 
         this.initializeTheme();
         this.loadSettings();
         this.initializeEventListeners();
-        this.initializeKeyboardShortcut();
+
+        // Restore last conversion if available
         this.restoreLastState();
     }
 
     createTurndownService() {
-        var service = new TurndownService({
+        const service = new TurndownService({
             headingStyle: this.settings.headingStyle,
             hr: '---',
             bulletListMarker: this.settings.bulletListMarker,
@@ -29,14 +30,19 @@ class MarkdownConverter {
 
         service.addRule('figures', {
             filter: 'figure',
-            replacement: function (content, node) {
-                var img = node.querySelector('img');
-                var caption = node.querySelector('figcaption');
+            replacement: (content, node) => {
+                const img = node.querySelector('img');
+                const caption = node.querySelector('figcaption');
                 if (img) {
-                    var alt = img.getAttribute('alt') || '';
-                    var src = img.getAttribute('src') || '';
-                    var captionText = caption ? caption.textContent : '';
-                    return '\n\n![' + alt + '](' + src + ')\n' + captionText + '\n\n';
+                    const alt = img.getAttribute('alt') || '';
+                    const src = img.getAttribute('src') || '';
+                    const captionText = caption ? caption.textContent : '';
+                    return `
+
+![${alt}](${src})
+${captionText}
+
+`;
                 }
                 return content;
             }
@@ -45,79 +51,74 @@ class MarkdownConverter {
         return service;
     }
 
-    async initializeTheme() {
-        var toggleBtn = document.getElementById('theme-toggle');
+    initializeTheme() {
+        const toggleBtn = document.getElementById('theme-toggle');
+        const _sunIcon = toggleBtn.querySelector('.sun-icon');
+        const _moonIcon = toggleBtn.querySelector('.moon-icon');
 
-        var data = await chrome.storage.local.get(STORAGE_KEYS.THEME);
-        var savedTheme = data[STORAGE_KEYS.THEME];
+        // Check saved theme or system preference
+        const savedTheme = localStorage.getItem('theme');
+        const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
 
-        if (!savedTheme) {
-            var legacyTheme = localStorage.getItem('theme');
-            if (legacyTheme) {
-                savedTheme = legacyTheme;
-                await chrome.storage.local.set({ theme: legacyTheme });
-                localStorage.removeItem('theme');
-            }
-        }
+        const isDark = savedTheme === 'dark' || (!savedTheme && systemDark);
+        this.setTheme(isDark);
 
-        var systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-        var isDark = savedTheme === 'dark' || (!savedTheme && systemDark);
-        this.applyTheme(isDark);
-
-        var self = this;
-        toggleBtn.addEventListener('click', function () {
-            var isCurrentDark = document.documentElement.getAttribute('data-theme') === 'dark';
-            self.setTheme(!isCurrentDark);
-        });
-
-        chrome.storage.onChanged.addListener(function (changes, areaName) {
-            if (areaName === 'local' && changes.theme) {
-                var isDark = changes.theme.newValue === 'dark';
-                self.applyTheme(isDark);
-            }
+        toggleBtn.addEventListener('click', () => {
+            const isCurrentDark = document.documentElement.getAttribute('data-theme') === 'dark';
+            this.setTheme(!isCurrentDark);
         });
     }
 
     setTheme(isDark) {
-        this.applyTheme(isDark);
-        chrome.storage.local.set({ theme: isDark ? 'dark' : 'light' });
-    }
-
-    applyTheme(isDark) {
-        var sunIcon = document.querySelector('.sun-icon');
-        var moonIcon = document.querySelector('.moon-icon');
+        const sunIcon = document.querySelector('.sun-icon');
+        const moonIcon = document.querySelector('.moon-icon');
 
         if (isDark) {
             document.documentElement.setAttribute('data-theme', 'dark');
+            localStorage.setItem('theme', 'dark');
             sunIcon.style.display = 'block';
             moonIcon.style.display = 'none';
         } else {
             document.documentElement.removeAttribute('data-theme');
+            localStorage.setItem('theme', 'light');
             sunIcon.style.display = 'none';
             moonIcon.style.display = 'block';
         }
     }
 
     initializeEventListeners() {
-        var self = this;
-        document.getElementById('panel-open').addEventListener('click', function () { self.openSidePanel(); });
-        document.getElementById('convert').addEventListener('click', function () { self.convertPage(); });
-        document.getElementById('copy').addEventListener('click', function () { self.copyToClipboard(); });
-        document.getElementById('download').addEventListener('click', function () { self.downloadMarkdown(); });
-        document.getElementById('settings-toggle').addEventListener('click', function () { self.toggleSettingsPanel(); });
+        document.getElementById('convert').addEventListener('click', () => this.convertPage());
+        document.getElementById('copy').addEventListener('click', () => this.copyToClipboard());
+        document.getElementById('download').addEventListener('click', () => this.downloadMarkdown());
+        document.getElementById('settings-toggle').addEventListener('click', () => this.toggleSettingsPanel());
 
-        document.getElementById('setting-frontmatter').addEventListener('change', function (e) { self.saveSetting('frontmatter', e.target.checked); });
-        document.getElementById('setting-heading').addEventListener('change', function (e) { self.saveSetting('headingStyle', e.target.value); });
-        document.getElementById('setting-bullet').addEventListener('change', function (e) { self.saveSetting('bulletListMarker', e.target.value); });
-        document.getElementById('setting-code').addEventListener('change', function (e) { self.saveSetting('codeBlockStyle', e.target.value); });
+        // Settings change listeners
+        document
+            .getElementById('setting-frontmatter')
+            .addEventListener('change', (e) => this.saveSetting('frontmatter', e.target.checked));
+        document
+            .getElementById('setting-heading')
+            .addEventListener('change', (e) => this.saveSetting('headingStyle', e.target.value));
+        document
+            .getElementById('setting-bullet')
+            .addEventListener('change', (e) => this.saveSetting('bulletListMarker', e.target.value));
+        document
+            .getElementById('setting-code')
+            .addEventListener('change', (e) => this.saveSetting('codeBlockStyle', e.target.value));
     }
 
     loadSettings() {
-        var stored = localStorage.getItem('markdownSettings');
+        const stored = localStorage.getItem('markdownSettings');
         if (stored) {
-            this.settings = Object.assign({}, this.defaultSettings, JSON.parse(stored));
+            try {
+                this.settings = { ...this.defaultSettings, ...JSON.parse(stored) };
+            } catch {
+                localStorage.removeItem('markdownSettings');
+                this.settings = { ...this.defaultSettings };
+            }
         }
 
+        // Update UI
         document.getElementById('setting-frontmatter').checked = this.settings.frontmatter;
         document.getElementById('setting-heading').value = this.settings.headingStyle;
         document.getElementById('setting-bullet').value = this.settings.bulletListMarker;
@@ -129,86 +130,26 @@ class MarkdownConverter {
         localStorage.setItem('markdownSettings', JSON.stringify(this.settings));
     }
 
-    async openSidePanel() {
-        try {
-            var win = await chrome.windows.getCurrent();
-            await chrome.sidePanel.open({ windowId: win.id });
-        } catch (e) {
-            // sidePanel API unavailable or error — ignore silently
-        }
-    }
-
-    initializeKeyboardShortcut() {
-        this.isMac = /Mac/.test(navigator.platform);
-        this.kbdLabel = this.isMac ? '⌘↩' : 'Ctrl↩';
-        var badge = document.getElementById('kbd-hint');
-        if (badge) {
-            badge.textContent = this.kbdLabel;
-        }
-
-        var self = this;
-        document.addEventListener('keydown', function (e) {
-            var tag = e.target.tagName;
-            if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
-            if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-                e.preventDefault();
-                self.convertPage();
-            }
-        });
-    }
-
     toggleSettingsPanel() {
-        var panel = document.getElementById('settings-panel');
-        var btn = document.getElementById('settings-toggle');
-        var isOpen = panel.classList.contains('open');
+        const panel = document.getElementById('settings-panel');
+        const btn = document.getElementById('settings-toggle');
+        const isOpen = panel.classList.contains('open');
 
         if (isOpen) {
             panel.classList.remove('open');
             btn.classList.remove('active');
-            btn.setAttribute('aria-expanded', 'false');
         } else {
             panel.classList.add('open');
             btn.classList.add('active');
-            btn.setAttribute('aria-expanded', 'true');
         }
-    }
-
-    showConversionMeta(url, timestamp) {
-        var metaEl = document.getElementById('conversion-meta');
-        var urlEl = document.getElementById('meta-url');
-        var tsEl = document.getElementById('meta-timestamp');
-
-        if (url) {
-            urlEl.textContent = url;
-            urlEl.title = url;
-        }
-
-        if (timestamp) {
-            try {
-                var date = new Date(timestamp);
-                tsEl.textContent = date.toLocaleString();
-            } catch (e) {
-                tsEl.textContent = timestamp;
-            }
-        }
-
-        metaEl.style.display = 'flex';
-    }
-
-    hideConversionMeta() {
-        document.getElementById('conversion-meta').style.display = 'none';
     }
 
     async restoreLastState() {
         try {
-            var response = await sendMessage(MESSAGE_TYPES.GET_LAST_CONVERSION);
-            if (response && response.ok && response.data && response.data.markdown) {
-                document.getElementById('output').value = response.data.markdown;
-                this.enableActions(true);
-                this.showConversionMeta(response.data.url, response.data.timestamp);
-            }
+            const _data = await chrome.storage.local.get('lastConversion');
+            // Logic to restore state if desired
         } catch (e) {
-            // Corrupted or absent storage — empty state, no error
+            console.log('Error reading storage', e);
         }
     }
 
@@ -216,99 +157,202 @@ class MarkdownConverter {
         try {
             this.setLoading(true);
 
-            var response = await sendMessage(MESSAGE_TYPES.CONVERT_ACTIVE_TAB, {
-                settings: this.settings
-            });
+            const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+            if (!tab || !tab.id || !tab.url) throw new Error('No active tab found');
 
-            if (!response || !response.ok) {
-                var classified = classifyError(response && response.error);
-                this.showToast(classified.message, 'error', { duration: 4000, retry: true });
-                this.enableActions(false);
-                document.getElementById('output').value = '';
-                this.hideConversionMeta();
-                return;
+            // Prevent scripting on restricted pages
+            if (
+                tab.url.startsWith('chrome://') ||
+                tab.url.startsWith('chrome-extension://') ||
+                tab.url.startsWith('edge://') ||
+                tab.url.startsWith('about:') ||
+                tab.url.includes('chromewebstore.google.com') ||
+                tab.url.includes('chrome.google.com/webstore')
+            ) {
+                throw new Error('Cannot convert system pages or Web Store');
             }
 
-            document.getElementById('output').value = response.data.markdown;
+            const results = await chrome.scripting.executeScript({
+                target: { tabId: tab.id },
+                func: () => {
+                    try {
+                        if (!document || !document.body) {
+                            throw new Error('Document body not found');
+                        }
+
+                        const getIframeContent = (iframe) => {
+                            try {
+                                const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+                                if (!iframeDoc || !iframeDoc.body) return '';
+                                const iframeClone = iframeDoc.body.cloneNode(true);
+                                iframeClone
+                                    .querySelectorAll('script, style, nav, footer, aside, .ads, .comments')
+                                    .forEach((el) => el.remove());
+                                return `<div class="iframe-content">${iframeClone.innerHTML}</div>`;
+                            } catch (e) {
+                                return '';
+                            }
+                        };
+
+                        const bodyClone = document.body.cloneNode(true);
+
+                        const iframes = document.querySelectorAll('iframe');
+                        let iframeContents = [];
+                        iframes.forEach((iframe) => {
+                            const content = getIframeContent(iframe);
+                            if (content) iframeContents.push(content);
+                        });
+
+                        const unwanted = bodyClone.querySelectorAll(
+                            'script, style, nav, footer, aside, .ads, .comments, [role="complementary"], .cookie-banner, .popup, .overlay, .modal'
+                        );
+                        unwanted.forEach((el) => el.remove());
+
+                        const mainSelectors = [
+                            'main',
+                            'article',
+                            '.content',
+                            '.post',
+                            '.entry',
+                            '[role="main"]',
+                            '#content',
+                            '.main'
+                        ];
+                        let mainContent = null;
+
+                        for (const selector of mainSelectors) {
+                            const found = bodyClone.querySelector(selector);
+                            if (found && found.innerHTML.trim().length > 100) {
+                                mainContent = found;
+                                break;
+                            }
+                        }
+
+                        let finalContent = mainContent ? mainContent.innerHTML : bodyClone.innerHTML;
+
+                        if (iframeContents.length > 0) {
+                            finalContent += '<h2>Embedded Content</h2>' + iframeContents.join('<hr>');
+                        }
+
+                        return {
+                            title: document.title || 'Untitled Page',
+                            url: document.location.href, // Added URL capture
+                            content: finalContent,
+                            success: true
+                        };
+                    } catch (error) {
+                        return { success: false, error: error.message };
+                    }
+                }
+            });
+
+            if (!results || !results[0] || !results[0].result) {
+                throw new Error('Failed to get page content');
+            }
+
+            const { success, content, title, url, error } = results[0].result;
+
+            if (!success) throw new Error(error || 'Failed to extract content');
+
+            const escapeHtml = (value) => String(value)
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+
+            const wrappedContent = `
+                <div class="markdown-content">
+                    <h1>${escapeHtml(title)}</h1>
+                    ${content}
+                </div>
+            `;
+
+            // Initialize Turndown with current settings
+            const turndownService = this.createTurndownService();
+            let markdown = turndownService.turndown(wrappedContent);
+
+            // Post-processing: Collapse multiple newlines (3+) into max 2
+            markdown = markdown.replace(/\n{3,}/g, '\n\n').trim();
+
+            // Add Frontmatter if enabled
+            if (this.settings.frontmatter) {
+                const date = new Date().toISOString().split('T')[0];
+                const yamlString = (v) => JSON.stringify(String(v));
+                const frontmatter = `---
+title: ${yamlString(title)}
+url: ${yamlString(url)}
+date: ${date}
+---
+
+`;
+                markdown = frontmatter + markdown;
+            }
+
+            const output = document.getElementById('output');
+            output.value = markdown;
+
+            document.getElementById('conversion-meta').classList.remove('hidden');
+            document.getElementById('meta-url').textContent = tab.url;
+
             this.enableActions(true);
             this.showToast('Conversion successful!', 'success');
-            this.showConversionMeta(response.data.url, response.data.timestamp);
+
+            await chrome.storage.local.set({
+                lastConversion: {
+                    url: tab.url,
+                    timestamp: new Date().toISOString()
+                }
+            });
         } catch (error) {
             console.error('Conversion error:', error);
-            var classified = classifyError({ message: error.message });
-            this.showToast(classified.message, 'error', { duration: 4000, retry: true });
+            this.showToast(error.message, 'error');
             this.enableActions(false);
+            document.getElementById('conversion-meta').classList.add('hidden');
             document.getElementById('output').value = '';
-            this.hideConversionMeta();
         } finally {
             this.setLoading(false);
         }
     }
 
     async copyToClipboard() {
-        var output = document.getElementById('output');
+        const output = document.getElementById('output');
         if (!output.value) return;
 
         try {
             await navigator.clipboard.writeText(output.value);
-            this.showButtonSuccess(document.getElementById('copy'), 'Copied!');
+            this.showToast('Copied to clipboard!', 'success');
         } catch (error) {
             this.showToast('Failed to copy', 'error');
         }
     }
 
     downloadMarkdown() {
-        var output = document.getElementById('output');
+        const output = document.getElementById('output');
         if (!output.value) return;
 
         try {
-            var blob = new Blob([output.value], { type: 'text/markdown' });
-            var url = URL.createObjectURL(blob);
-            var timestamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+            const blob = new Blob([output.value], { type: 'text/markdown' });
+            const url = URL.createObjectURL(blob);
+            const timestamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
 
-            var a = document.createElement('a');
+            const a = document.createElement('a');
             a.href = url;
-            a.download = 'page-' + timestamp + '.md';
+            a.download = `page-${timestamp}.md`;
             a.click();
 
             URL.revokeObjectURL(url);
-            this.showButtonSuccess(document.getElementById('download'), 'Downloaded!');
+            this.showToast('Download started', 'success');
         } catch (error) {
             this.showToast('Download failed', 'error');
         }
     }
 
-    showButtonSuccess(btn, label) {
-        if (btn._successTimeout) {
-            clearTimeout(btn._successTimeout);
-        } else {
-            btn._originalHTML = btn.innerHTML;
-        }
-        btn.classList.add('btn-success-feedback');
-        btn.innerHTML = '<svg class="icon" width="18" height="18"><use href="../assets/icons.svg#icon-check"/></svg> <span>' + label + '</span>';
-
-        btn._successTimeout = setTimeout(function () {
-            btn.classList.remove('btn-success-feedback');
-            btn.innerHTML = btn._originalHTML;
-            delete btn._originalHTML;
-            delete btn._successTimeout;
-        }, 1500);
-    }
-
     setLoading(isLoading) {
-        var btn = document.getElementById('convert');
-        var kbd = this.kbdLabel ? ' <kbd class="kbd-hint">' + this.kbdLabel + '</kbd>' : '';
+        const btn = document.getElementById('convert');
         if (isLoading) {
             btn.disabled = true;
-            var prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-            if (prefersReducedMotion) {
-                btn.textContent = 'Converting…';
-            } else {
-                btn.innerHTML = '<svg class="icon animate-spin" width="18" height="18"><use href="../assets/icons.svg#icon-loader"/></svg> Converting…';
-            }
+            btn.innerHTML = `<svg class="animate-spin" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg> Converting...`;
         } else {
             btn.disabled = false;
-            btn.innerHTML = '<svg class="icon" width="18" height="18"><use href="../assets/icons.svg#icon-file"/></svg> Convert Page to Markdown' + kbd;
+            btn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline></svg> Convert Page to Markdown`;
         }
     }
 
@@ -317,39 +361,19 @@ class MarkdownConverter {
         document.getElementById('download').disabled = !enabled;
     }
 
-    showToast(message, type, options) {
-        var toast = document.getElementById('toast');
-        var duration = (options && options.duration) || 1500;
-
-        if (options && options.retry) {
-            toast.innerHTML = '';
-            var span = document.createElement('span');
-            span.textContent = message;
-            toast.appendChild(span);
-
-            var retryBtn = document.createElement('button');
-            retryBtn.className = 'toast-retry';
-            retryBtn.textContent = 'Retry';
-            var self = this;
-            retryBtn.addEventListener('click', function () {
-                toast.className = 'toast hidden';
-                self.convertPage();
-            });
-            toast.appendChild(retryBtn);
-        } else {
-            toast.textContent = message;
-        }
-
-        toast.className = 'toast show ' + (type || 'info');
+    showToast(message, type = 'info') {
+        const toast = document.getElementById('toast');
+        toast.textContent = message;
+        toast.className = `toast show ${type}`;
 
         if (this.toastTimeout) clearTimeout(this.toastTimeout);
 
-        this.toastTimeout = setTimeout(function () {
+        this.toastTimeout = setTimeout(() => {
             toast.className = 'toast hidden';
-        }, duration);
+        }, 1500);
     }
 }
 
-document.addEventListener('DOMContentLoaded', function () {
+document.addEventListener('DOMContentLoaded', () => {
     new MarkdownConverter();
 });
