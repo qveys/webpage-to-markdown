@@ -82,17 +82,19 @@ _**Objectif** : Décomposer la vision en blocs de travail réalisables et les pr
 _**Objectif** : Lister les incertitudes et poser des questions claires pour obtenir les arbitrages nécessaires._
 
 ### Questions de priorisation
-1.  **Question 1 ?**
-    -   Scénario A : ...
-    -   Scénario B : ...
-    -   **Question** : Faut-il choisir A ou B ? Pourquoi ?
 
-2.  **Question 2 ?**
-    -   ...
+1. **Question 1 ?**
+    - Scénario A : ...
+    - Scénario B : ...
+    - **Question** : Faut-il choisir A ou B ? Pourquoi ?
+
+2. **Question 2 ?**
+    - ...
 
 ### Hypothèses marquées
-- **[H1]** _Ex: Le public cible est technique._ | *Confiance : élevée/moyenne/faible.*
-- **[H2]** _Ex: Le volume de données restera faible._ | *Confiance : faible — à confirmer.*
+
+- **[H1]** _Ex: Le public cible est technique._ | _Confiance : élevée/moyenne/faible._
+- **[H2]** _Ex: Le volume de données restera faible._ | _Confiance : faible — à confirmer._
 - **[H3]** _..._
 
 ---
@@ -116,7 +118,7 @@ flowchart LR
 
 _**Objectif** : Proposer un plan de déploiement par phases._
 
-```
+```text
 Phase 0 (Quick wins) :
   └─ ...
 
@@ -133,8 +135,8 @@ Phase 2 (Valeur métier) :
 
 _**Objectif** : Lister toutes les autres questions qui nécessitent une réponse pour avancer._
 
-1.  ...
-2.  ...
+1. ...
+2. ...
 
 ---
 
@@ -143,6 +145,7 @@ _**Objectif** : Lister toutes les autres questions qui nécessitent une réponse
 _**Objectif** : Clarifier qui doit faire quoi après la lecture de ce document._
 
 **Actions requises :**
-1.  Le mainteneur/décideur répond aux questions.
-2.  Les réponses alimenteront le [PRD](/PREFIX/issues/ISSUE-ID#document-key).
-3.  ...
+
+1. Le mainteneur/décideur répond aux questions.
+2. Les réponses alimenteront le [PRD](/PREFIX/issues/ISSUE-ID#document-key).
+3. ...

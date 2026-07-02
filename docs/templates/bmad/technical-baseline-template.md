@@ -18,6 +18,7 @@ _**Objectif** : Fournir les informations d'identification de base du projet._
 | **URL de déploiement** | _..._ |
 
 ### Git
+
 - **Commits** : _Nombre de commits_
 - **Remote** : _URL du remote ou "non configurée"_
 
@@ -82,9 +83,10 @@ graph TD
 ```
 
 _Ou décrivez le flux en étapes :_
-1.  **Étape 1** : ...
-2.  **Étape 2** : ...
-3.  ...
+
+1. **Étape 1** : ...
+2. **Étape 2** : ...
+3. ...
 
 ---
 
@@ -115,16 +117,19 @@ _**Objectif** : Lister toutes les dépendances de production._
 _**Objectif** : Partager une analyse critique de l'architecture actuelle._
 
 ### Forces
+
 - _Ex: Conforme aux standards X_
 - _Ex: Code propre et bien structuré_
 - _..._
 
 ### Faiblesses / Risques
+
 - _Ex: Pas de service worker, logique couplée à l'UI_
 - _Ex: Pas de tests automatisés_
 - _..._
 
 ### Pistes de dette technique
+
 - _Ex: La dépendance X devrait être mise à jour_
 - _Ex: Le module Y devrait être refactorisé_
 - _..._

@@ -12,6 +12,7 @@
 Le projet a suivi 6 phases distinctes, confirmées par les tags de release et les dates de commit :
 
 ### Phase 1 — Fork initial + Service Worker + Capture sessions (13 mars, ~4h)
+
 **Commits** : `41d3e7d` → `84238a1` (27 commits)
 **Tags** : v1.0.1 → v1.1.0
 
@@ -21,6 +22,7 @@ Le projet a suivi 6 phases distinctes, confirmées par les tags de release et le
 | Recommandation | L'ordre fork → service worker → capture → markdown polish est bon. Commencer par la base fonctionnelle avant d'enrichir. |
 
 **Commits clés** :
+
 - `41d3e7d` — Fork initial (1806 lignes : popup.js, turndown.js, manifest, styles)
 - `b20d2e7` — Service Worker + API message externe
 - `439f33d` — Mode auto-capture session (+932 lignes popup)
@@ -28,6 +30,7 @@ Le projet a suivi 6 phases distinctes, confirmées par les tags de release et le
 - `981bf03` — Premier redesign popup CSS
 
 ### Phase 2 — Redesign complet : état centralisé, crawl engine, dashboard (24 mars)
+
 **Tag** : v1.2.0
 **Commits** : `d3febb6` → `a3f0b13` (13 commits)
 
@@ -37,6 +40,7 @@ Le projet a suivi 6 phases distinctes, confirmées par les tags de release et le
 | Recommandation | L'ordre de cette phase (i18n → state → styles → engine → UI) est un bon pattern bottom-up pour les fondations. |
 
 **Commits clés** :
+
 - `d3febb6` — Module i18n (+352 lignes, traductions FR/EN)
 - `b75c69b` — AppState avec machine d'état (+138 lignes)
 - `0bd5ec4` — CrawlEngine + offscreen (+1485 lignes) — commit critique
@@ -44,6 +48,7 @@ Le projet a suivi 6 phases distinctes, confirmées par les tags de release et le
 - `dbcdeb7` — Dashboard crawl et vues session (+1042)
 
 ### Phase 3 — Polissage UX, perf, tests, refactoring (27 mars)
+
 **Tags** : v1.3.0 → v1.4.0 → v1.5.0
 **Commits** : `92cc4dc` → `42afc5d` (36 commits en une journée)
 
@@ -53,16 +58,19 @@ Le projet a suivi 6 phases distinctes, confirmées par les tags de release et le
 | Recommandation | Anticiper les extractions (theme-icon, cleanup-markdown) dès la phase 2 pour éviter la duplication. |
 
 **Refactorings notables** :
+
 - `1f42b78` — Extraction theme-icon.js (+51 lignes, -185 réparties) — déduplication du builder d'icônes
 - `e340f96` — Extraction cleanup-markdown.js (+127 centralisées, -321 réparties) — logique markdown partagée
 - `c39842c` — Remplacement catch silencieux par logging filtré (5 fichiers)
 
 **Tests ajoutés** :
+
 - `af3c890` — Infrastructure Jest + Chrome mock
 - 5 suites de tests : crawl-engine, app-state, cleanup-markdown, i18n, url-path
 - `b00a1e4` — CI GitHub Actions
 
 ### Phase 4 — Single-page conversion (28 avril)
+
 **Tags** : v1.6.0 → v1.6.1 → v1.7.0 → v1.8.0
 **Commits** : `04efdf0` → `339a3a2` (4 commits)
 
@@ -71,6 +79,7 @@ Le projet a suivi 6 phases distinctes, confirmées par les tags de release et le
 | Interprétation | Feature autonome construite sur les fondations existantes. Le pattern est bon : feature → hotfix → polish → shared UI. |
 
 ### Phase 5 — CI/CD et gouvernance repo (29 avril)
+
 **Commits** : `e172878` → `5252204` (12 commits)
 
 | Observation | Mise en place industrielle : release workflow (Chrome/Firefox/Edge), CODEOWNERS, auto-labeler, Dependabot, PR templates, CodeQL, stale bot. Corrections itératives CI immédiates (CodeQL perms, npm audit). |
@@ -79,6 +88,7 @@ Le projet a suivi 6 phases distinctes, confirmées par les tags de release et le
 | Recommandation | Mettre en place CI/CD plus tôt, après la phase 2, pour capturer les régressions du crawl-engine. |
 
 ### Phase 6 — Bugfixes via PR et maintenance (29 avril → 4 mai)
+
 **Commits** : `72b68da` → `711508c` (7 commits via PRs #4-#10)
 
 | Observation | Passage à workflow PR. Corrections : state mirroring pendant crawl actif, races bénignes single-page, split LICENSE/NOTICE, CI badges. Dependabot bumps. |
@@ -172,22 +182,26 @@ Semaine 4-5 — Governance complète + release
 ## 4. Refactorings et leur motivation
 
 ### 1. Extraction `cleanup-markdown.js` (`e340f96`)
+
 - **Problème** : Code dupliqué dans background.js, offscreen.js, popup.js (~100 lignes chacun)
 - **Solution** : Module +127 lignes, inclusion via `<script>` dans tous les HTML
 - **Impact** : -321 lignes réparties, +144 centralisées. Net : -177
 - **Motivation** : Éviter la divergence. Chaque correction devait être faite 3 fois.
 
 ### 2. Extraction `theme-icon.js` (`1f42b78`)
+
 - **Problème** : Builder d'icône SVG copié dans popup.js, dashboard.js, settings-page.js
 - **Solution** : Module partagé +51 lignes, suppression des copies -185
 - **Impact** : Déduplication d'une UI mécanique
 
 ### 3. Popup view-based (`bd14716`)
+
 - **Problème** : popup.js était un monolithe procédural (+743 lignes dans `439f33d`)
 - **Solution** : Réécriture complète en architecture view-based (+1153/-727)
 - **Motivation** : L'ajout du crawl rendait le monolithe ingérable. Les vues deviennent des fonctions indépendantes.
 
 ### 4. Error logging (`c39842c`)
+
 - **Problème** : `catch {}` silencieux partout (5 fichiers)
 - **Solution** : Logging filtré qui exclut les erreurs bénignes mais log les vraies
 - **Motivation** : Debugging en production.
@@ -197,15 +211,19 @@ Semaine 4-5 — Governance complète + release
 ## 5. Patterns de construction observés
 
 ### Pattern 1 : Batch et rebase
+
 Les commits de la phase 2 ont tous le même timestamp (`01:06:19`), suggérant un rebase/squash. Le travail a été préparé hors-branche pendant 11 jours, puis fusionné en bloc. Bon pour la clarté, mais masque les itérations intermédiaires.
 
 ### Pattern 2 : Bugfixing immédiat
+
 Les corrections de path (2 commits en 6 min), les fixes CodeQL (3 commits en qq min) montrent un workflow itératif build-test-fix très serré.
 
 ### Pattern 3 : Extraction post-hoc
+
 Les refactorings (cleanup-markdown, theme-icon) arrivent en phase 3 après avoir observé la duplication. Idéalement, les anticiper en phase 2.
 
 ### Pattern 4 : Tests après stabilisation
+
 Les tests arrivent en semaine 4 quand le code est stable. Pragmatique pour un prototype, mais rend la refactoring plus risquée.
 
 ---
@@ -224,6 +242,7 @@ Les tests arrivent en semaine 4 quand le code est stable. Pragmatique pour un pr
 | **Total** | 7 semaines | **107** | **~17 900 lignes** |
 
 ### Tags de versioning
+
 - `v1.0.1` — Initial fork
 - `v1.1.0` — Markdown improvements (Readability, GFM, tables)
 - `v1.2.0` — Major redesign (crawl engine, state machine, dashboard)
@@ -239,8 +258,8 @@ Les tests arrivent en semaine 4 quand le code est stable. Pragmatique pour un pr
 
 ## Conclusion
 
-La construction du projet suit un pattern pragmatique : **fork → service worker → capture → markdown → state machine → crawl engine → tests → CI/CD → PR workflow**. 
+La construction du projet suit un pattern pragmatique : **fork → service worker → capture → markdown → state machine → crawl engine → tests → CI/CD → PR workflow**.
 
-Les décisions architecturales (Readability vendorisé, pas de bundler, offscreen parser, ES5) sont des contraintes d'extension Chrome bien compris et respectés. Les refactorings arrivent tardivement mais efficacement. 
+Les décisions architecturales (Readability vendorisé, pas de bundler, offscreen parser, ES5) sont des contraintes d'extension Chrome bien compris et respectés. Les refactorings arrivent tardivement mais efficacement.
 
 **Pour la reconstruction actuelle : anticiper les modules partagés (cleanup-markdown) dès la phase 2, mettre en place CI après la phase 2 plutôt que la phase 5, et privilégier les commits atomiques pour faciliter le debugging.**

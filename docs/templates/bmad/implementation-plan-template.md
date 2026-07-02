@@ -56,6 +56,7 @@ gantt
 ```
 
 ### Jalons clés
+
 - **Jalon 1 (AAAA-MM-JJ)** : _Ex: Socle technique terminé et déployé en staging._
 - **Jalon 2 (AAAA-MM-JJ)** : _Ex: Feature X entièrement fonctionnelle pour une démo interne._
 - **Jalon 3 (AAAA-MM-JJ)** : _Ex: Déploiement en production._

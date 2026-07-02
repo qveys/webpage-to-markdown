@@ -30,6 +30,7 @@ A simple Chrome extension that converts any webpage to Markdown format with a si
 ## How It Works
 
 The extension uses:
+
 - **Chrome Scripting API** to extract content from the active webpage
 - **Turndown.js** library to convert HTML to Markdown
 - **Smart content detection** to find main article/content areas
@@ -56,6 +57,7 @@ The extension uses:
 ## Permissions
 
 The extension requires these permissions:
+
 - `activeTab`: To access the current webpage content
 - `scripting`: To inject content extraction scripts
 - `storage`: To save conversion history

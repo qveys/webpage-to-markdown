@@ -1,0 +1,32 @@
+{
+  "config": {
+    // MD013: Existing docs use natural prose wrapping without hard line breaks.
+    // Enforcing 80-char lines would require mass-reformatting contrary to project style.
+    "MD013": false,
+
+    // MD029: Analysis docs use continuation numbering across section breaks (5, 6, 7…).
+    // This is intentional and renders correctly on GitHub.
+    "MD029": false,
+
+    // MD033: One analysis doc uses inline HTML in table cells — standard GFM pattern.
+    "MD033": false,
+
+    // MD036: Analysis docs use bold text (**Description**, **Preuve**) as structured
+    // sub-headings within sections. Intentional documentation pattern.
+    "MD036": false,
+
+    // MD041: Template files start with blockquotes by design, not headings.
+    "MD041": false,
+
+    // MD060: Existing tables use compact/mixed pipe styles across analysis docs.
+    // 276 violations — all rendering correctly. Too strict for current content.
+    "MD060": false
+  },
+  "globs": [
+    "**/*.md"
+  ],
+  "ignores": [
+    "node_modules",
+    ".paperclip"
+  ]
+}

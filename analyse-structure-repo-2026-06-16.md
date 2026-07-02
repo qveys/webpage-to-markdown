@@ -80,6 +80,7 @@ Extension Chrome Manifest V3 — **"Webpage to Markdown"** — publiée sur le C
 Le dépôt contient le **nécessaire** pour charger et tester l'extension en mode "Load unpacked", ainsi que des **artefacts de processus** :
 
 **Requis au chargement et aux tests :**
+
 1. **Code source** (`src/`) — Extension, icône, librairie
 2. **Configuration** (`manifest.json`, `package.json`, `.prettierrc`, `eslint.config.js`)
 
@@ -95,6 +96,7 @@ Le dépôt contient le **nécessaire** pour charger et tester l'extension en mod
 ### 3.1 `manifest.json` (24 lignes)
 
 Fichier de configuration MV3 standard. Points clés :
+
 - **`action.default_popup`** : `src/popup/popup.html` — l'UI est une popup uniquement
 - **Permissions** : `activeTab`, `scripting`, `storage` — strict minimum
 - **`content_security_policy`** : restrictif (`script-src 'self'`)
@@ -128,6 +130,7 @@ Fichier de configuration MV3 standard. Points clés :
 ### 3.3 `src/popup/popup.html` (190 lignes)
 
 Structure UI :
+
 - **Header** : logo SVG + titre + boutons (settings, thème)
 - **Settings panel** : frontmatter toggle, heading style, bullet style, code style
 - **Main** : bouton "Convert", textarea de sortie, boutons Copy/Download
@@ -146,7 +149,7 @@ Structure UI :
 - **Turndown.js v5.x** — vendored (copié-collé, pas via npm)
 - IIFE vanilla (ni module ES, ni UMD)
 - Aucune modification locale détectée
-- Source upstream : https://github.com/mixmark-io/turndown
+- Source upstream : <https://github.com/mixmark-io/turndown>
 
 ### 3.6 `src/assets/icon.png` (946 octets)
 
@@ -202,15 +205,18 @@ Le projet suit une approche **BMAD pragmatique** documentée dans `CONTRIBUTING.
 ## 6. Dépendances (externes et internes)
 
 ### Externes
+
 - **Turndown.js** (v5.x) — seule dépendance fonctionnelle, vendored
 - **Aucune dépendance réseau ou CDN**
 
 ### Dev
+
 - `eslint` 9.x + `globals`
 - `prettier` 3.x
 - `@eslint/js` 9.x
 
 ### Natives (Chrome APIs)
+
 - `chrome.tabs.query()`
 - `chrome.scripting.executeScript()`
 - `chrome.storage.local.get()` / `.set()`
@@ -281,6 +287,7 @@ e273bc8 ✨ add: Create .gitignore
 ### 11.1 Worktrees Paperclip
 
 Deux worktrees existent :
+
 - **QUE-128** : Développement V2 (fondations F1-F4) — copie complète du code source
 - **QUE-138** : Analyse d'un précédent essai — contient une copie du repo source
 
@@ -300,18 +307,21 @@ La config ESLint reconnaît `TurndownService` comme variable globale — correct
 ## 12. Recommandations pour le repo
 
 ### Court terme (quick wins)
+
 1. ~~**Configurer un remote Git**~~ ✅ Déjà fait (GitHub + CI/CD via QUE-126)
 2. **Ignorer `node_modules/`** dans `.gitignore` (déjà fait — à vérifier)
 3. **Ajouter un badge Chrome Web Store** dans le README
 4. **Documenter la procédure de build/publication** dans le README
 
 ### Moyen terme (pour la V2)
+
 5. **Restructurer le code en modules ES6** : séparer extraction, conversion, UI
 6. **Ajouter un service worker** pour orchestrer les opérations de longue durée
 7. **Mettre en place des tests** (au moins unitaires pour la conversion)
 8. **Versionner Turndown.js via npm** avec un build step
 
 ### Long terme
+
 9. **Automatiser le build + publication** Chrome Web Store via CI/CD
 10. **Internationaliser** l'UI et la documentation
 
@@ -322,6 +332,7 @@ La config ESLint reconnaît `TurndownService` comme variable globale — correct
 Le dépôt source de **Webpage to Markdown v1.0.1** est un repo minimaliste, propre et bien organisé pour un projet solo. Il suit les conventions Manifest V3 et contient tout le nécessaire pour développer, tester et packager l'extension.
 
 **Points d'attention pour la V2 :**
+
 - Le monolithisme de `popup.js` (364 lignes, classe unique) sera le premier frein à l'évolutivité
 - L'absence de service worker bloque les features de longue durée (auto-capture, dashboard, crawl)
 - L'absence de tests est le risque principal pour les refactors

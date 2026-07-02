@@ -22,6 +22,7 @@ Extension Chrome (Manifest V3) convertissant des pages web en Markdown. Supporte
 **Observation :** 7 suites de test, 66 tests, 100% passing.
 
 Modules couverts :
+
 - `app-state.js` : 131 lignes de tests — transitions d'état, listeners, erreurs d'input
 - `crawl-engine.js` : 154 lignes — scope, filtrage d'URLs, queue, blocages
 - `cleanup-markdown.js` : 59 lignes — liens multilignes, headings cassés, nettoyage Twitter/X
@@ -32,6 +33,7 @@ Modules couverts :
 
 **Problème critique — Coverage trompeuse :**  
 Jest ne charge que les fichiers explicitement importés. Le rapport de couverture ne couvre PAS :
+
 - `background.js` (1 431 lignes, toute la logique SW + message handlers)
 - `popup.js` (1 217 lignes, UI complète du popup)
 - `dashboard.js` (1 354 lignes, side panel entier)
@@ -51,6 +53,7 @@ Jest ne charge que les fichiers explicitement importés. Le rapport de couvertur
 ### 2.2 Documentation — ⭐⭐⭐⭐ (4/5)
 
 **Observation :**
+
 - **README.md** (12 708 octets) : Excellente documentation utilisateur. Features détaillées, diagrammes ASCII, tableau technique, badges CI/CodeQL/version.
 - **CLAUDE.md** : Guide clair pour Claude Code — architecture, conventions de code, permissions, git conventions, hooks. À jour.
 - **AGENTS.md** : Équivalent pour Codex — plus complet que CLAUDE.md (inclut les lessons learned). Légèrement en avance sur CLAUDE.md.
@@ -67,6 +70,7 @@ Jest ne charge que les fichiers explicitement importés. Le rapport de couvertur
 ### 2.3 Robustesse du code — ⭐⭐⭐½ (3.5/5)
 
 **Points positifs :**
+
 - `AppState` est une vraie machine à états avec `STATES` + `TRANSITIONS` frozen — transitions invalides bloquées silencieusement (warn console).
 - `CrawlEngine` : auto-pause sur N blocages consécutifs, AbortController pour annuler les fetches en vol, gestion des erreurs 403/429.
 - `background.js` : ~124 occurrences de `try/catch` — gestion d'erreurs intensive.
@@ -74,13 +78,16 @@ Jest ne charge que les fichiers explicitement importés. Le rapport de couvertur
 
 **Code dupliqué — Risque majeur :**  
 La logique d'extraction de contenu existe en **deux versions** dans `background.js` :
+
 - **Version 1** (ligne 27) : `extractPageContent()` — injectée dans les pages via `scripting.executeScript`
 - **Version 2** (ligne 940) : logique inline dans `extractMarkdownFromTab()` — utilise Readability + fallback heuristique
 
 Les deux versions partagent le même tableau de sélecteurs CSS :  
+
 ```js
 ["main", "article", ".content", ".post", ".entry", "[role='main']", "#content", ".main"]
 ```
+
 Toute modification dans l'une risque d'être oubliée dans l'autre.
 
 **Edge case non testé :** Le Service Worker se réinitialise à chaque redémarrage de l'extension et réinitialise la session (`capturedUrls: []`). Si une session de capture était active, les URLs déjà capturées sont perdues. Le comportement est documenté dans CLAUDE.md mais non testé.
@@ -90,6 +97,7 @@ Toute modification dans l'une risque d'être oubliée dans l'autre.
 ### 2.4 Sécurité — ⭐⭐⭐½ (3.5/5)
 
 **Points positifs :**
+
 - **CSP stricte :** `"script-src 'self'; object-src 'self'"` — aucun `unsafe-inline`, aucun CDN externe.
 - **MV3 :** Le Service Worker remplace le background persistant — surface d'attaque réduite.
 - **Dépendances :** `npm audit` → 0 vulnérabilités. `brace-expansion` correctement patchée via `overrides`.
@@ -100,10 +108,12 @@ Toute modification dans l'une risque d'être oubliée dans l'autre.
 1. **`host_permissions: ["<all_urls>"]`** — Nécessaire pour le crawl, mais octroie à l'extension la permission de fetch toute URL et d'exécuter des scripts sur toute page. La permission est documentée comme contrainte de design dans README et CLAUDE.md.
 
 2. **`chrome.runtime.onMessage` sans validation du sender** (ligne 268) :
+
    ```js
    chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
      // sender.id non vérifié
    ```
+
    En MV3, d'autres extensions ou des pages web (si `externally_connectable` était défini) pourraient envoyer des messages. Actuellement, `externally_connectable` est absent du manifest → risque limité mais validité non vérifiée explicitement.
 
 3. **`innerHTML` sans sanitization explicite** (background.js lignes 982, 1018; popup.js ligne 194) :
@@ -122,6 +132,7 @@ Toute modification dans l'une risque d'être oubliée dans l'autre.
 Aucun `TODO`, `FIXME`, ou `HACK` trouvé dans le code source principal (hors vendored libs). Positif.
 
 **Complexité :**
+
 - `background.js` : 1 431 lignes, 27 fonctions, 118 conditions. Fichier god-object combinant SW lifecycle, extraction, conversion, sessions, crawl orchestration, et download management.
 - `popup.js` : 1 217 lignes, IIFE masquant toute la complexité UI.
 - `dashboard.js` : 1 354 lignes, idem.
@@ -139,6 +150,7 @@ CLAUDE.md stipule : *"ES5-compatible in IIFEs: `var`, `function` — no arrow fu
 ### 2.6 Dépendances — ⭐⭐⭐⭐ (4/5)
 
 **Observation :**
+
 - **1 seule dépendance de dev :** `jest@^29.0.0` — minimaliste, excellent.
 - **Dependabot configuré :** Mises à jour hebdomadaires pour npm et GitHub Actions, groupées.
 - **0 dépendance de runtime via npm** — les libs sont vendorisées → pas de compromission via supply chain npm.
@@ -150,6 +162,7 @@ CLAUDE.md stipule : *"ES5-compatible in IIFEs: `var`, `function` — no arrow fu
 ### 2.7 CI/CD — ⭐⭐⭐⭐ (4/5)
 
 **Workflows présents :**
+
 | Workflow | Trigger | Rôle |
 |---|---|---|
 | `test.yml` | PR → main | `npm ci && npm test` |
@@ -160,6 +173,7 @@ CLAUDE.md stipule : *"ES5-compatible in IIFEs: `var`, `function` — no arrow fu
 | `stale.yml` | Quotidien | Marque les issues/PRs inactifs après 60j |
 
 **Absent :**
+
 - Pas de **linting** (ESLint) dans CI — les erreurs de style ne sont pas bloquantes.
 - Pas de **formatage** (Prettier) — cohérence stylistique non enforced.
 - **CodeQL supprimé** (commit `5252204` : *"remove workflow — requires GitHub Advanced Security on private repo"*) → Analyse statique de sécurité absente. `npm audit` est insuffisant pour détecter les XSS, message handler abuses, etc.

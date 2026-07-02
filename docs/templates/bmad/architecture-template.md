@@ -11,11 +11,13 @@
 _**Objectif** : Décrire les buts de ce document d'architecture. Quels problèmes techniques résolvons-nous ? Quelles sont les contraintes (budget, temps, technologie existante) ?_
 
 **Objectifs de l'architecture** :
+
 - _Ex: Concevoir un système capable de supporter 10 000 utilisateurs concurrents._
 - _Ex: Mettre en place une architecture modulaire pour faciliter les évolutions futures._
 - _..._
 
 **Contraintes** :
+
 - _Ex: Doit être déployé sur AWS._
 - _Ex: Doit réutiliser le système d'authentification existant._
 - _..._
@@ -101,15 +103,19 @@ erDiagram
 _**Objectif** : Définir les contrats d'interface entre les services._
 
 **Endpoint** : `POST /users`
+
 - **Description** : _Crée un nouvel utilisateur._
 - **Request Body** :
+
   ```json
   {
     "name": "string",
     "email": "string"
   }
   ```
+
 - **Response (201 Created)** :
+
   ```json
   {
     "id": "string",

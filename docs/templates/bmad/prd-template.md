@@ -17,16 +17,19 @@ _**Objectif** : Résumer le produit ou la feature à construire. Quel problème 
 _**Objectif** : Définir clairement ce que nous cherchons à accomplir et comment nous mesurerons le succès._
 
 ### Objectifs
+
 - **Objectif 1** : _Ex: Augmenter le taux de conversion de 10%._
 - **Objectif 2** : _Ex: Réduire le temps de support client de 20%._
 - **Objectif 3** : _..._
 
 ### Métriques de succès
+
 - **Métrique 1** : _Ex: Taux de clics sur le bouton "Exporter"._
 - **Métrique 2** : _Ex: Nombre de téléchargements par utilisateur._
 - **Métrique 3** : _..._
 
 ### Non-Objectifs
+
 - _Ex: Nous ne traiterons pas le support pour Firefox dans cette version._
 - _Ex: L'authentification par des services tiers est hors périmètre._
 
@@ -52,6 +55,7 @@ _**Objectif** : C'est le cœur du PRD. Lister toutes les exigences fonctionnelle
 ### Épopée 1 : Titre de l'épopée
 
 #### User Story 1.1
+
 **En tant que** [Persona], **je veux** [action] **afin de** [bénéfice].
 
 - **Critères d'acceptation** :
@@ -60,9 +64,11 @@ _**Objectif** : C'est le cœur du PRD. Lister toutes les exigences fonctionnelle
   - [ ] _Le message d'erreur Z s'affiche si..._
 
 #### User Story 1.2
+
 ...
 
 ### Épopée 2 : Titre de l'épopée
+
 ...
 
 ---

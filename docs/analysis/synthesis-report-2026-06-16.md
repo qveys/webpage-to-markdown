@@ -63,7 +63,7 @@ Les deux repos convertissent des pages web en Markdown. Le fork a élargi vers c
 
 ### Architecture fonctionnelle cible
 
-```
+```text
 [UI] → [Orchestrateur SW] → [Injection DOM tab] → [Extraction + nettoyage]
   → [Readability / heuristiques] → [Turndown custom] → [cleanupMarkdown] → [Export]
 ```
@@ -161,22 +161,26 @@ Les deux repos convertissent des pages web en Markdown. Le fork a élargi vers c
 ## 8. Recommandations BMAD
 
 ### Business / Besoin
+
 - **Must** : flux MVP 1 clic → Markdown propre comme north star
 - **Should** : frontmatter YAML, GFM, code blocks comme différenciateurs
 - **Could** : crawl comme phase ultérieure
 - Valider product brief [QUE-122](https://paperclip.qveys.cloud/QUE/issues/QUE-122) avant PRD
 
 ### Model / Produit
+
 - MVP V2 : conversion single-page side panel
 - V2.1 : auto-capture session ; V2.2+ : crawl si validé
 - AppState pour transitions UI ; i18n FR/EN
 
 ### Architecture (Winston)
+
 - Modules : page-extractor | markdown-converter | export-store | ui-controller | sw-orchestrator
 - Stockage normalisé chrome.storage.local
 - Bundler Vite recommandé
 
 ### Delivery (Amelia / CTO)
+
 - Fixtures HTML + tests non-régression
 - CI semaine 1 : lint + test + audit
 - Max 400 lignes par fichier source
@@ -186,6 +190,7 @@ Les deux repos convertissent des pages web en Markdown. Le fork a élargi vers c
 ## 9. Backlog proposé
 
 ### F1 — Fondations (Must)
+
 - [ ] F1.1 Valider Turndown et flux end-to-end
 - [ ] F1.2 Structure modulaire
 - [ ] F1.3 page-extractor (Readability + heuristiques)
@@ -196,6 +201,7 @@ Les deux repos convertissent des pages web en Markdown. Le fork a élargi vers c
 - [ ] F1.8 CI GitHub Actions
 
 ### F2 — UX & qualité (Should)
+
 - [ ] F2.1 Side panel single-page
 - [ ] F2.2 AppState FSM
 - [ ] F2.3 YAML frontmatter
@@ -204,6 +210,7 @@ Les deux repos convertissent des pages web en Markdown. Le fork a élargi vers c
 - [ ] F2.6 Stockage normalisé
 
 ### F3 — Capture & crawl (Could)
+
 - [ ] F3.1 Auto-capture session
 - [ ] F3.2 CrawlEngine
 - [ ] F3.3 Offscreen + dashboard
@@ -211,6 +218,7 @@ Les deux repos convertissent des pages web en Markdown. Le fork a élargi vers c
 - [ ] F3.5 Download assets
 
 ### F4 — Industrialisation (Should)
+
 - [ ] F4.1 Release multi-browser
 - [ ] F4.2 Dependabot + branch protection
 - [ ] F4.3 Script MAJ libs vendorisées vers les dernieres versions stables validees
@@ -224,6 +232,7 @@ Les deux repos convertissent des pages web en Markdown. Le fork a élargi vers c
 ## 10. Synthèse finale
 
 ### Top 5 idées
+
 1. Pipeline Readability → Turndown → cleanup
 2. AppState FSM pour UI multi-étapes
 3. Modules partagés dès le jour 1
@@ -231,6 +240,7 @@ Les deux repos convertissent des pages web en Markdown. Le fork a élargi vers c
 5. Repo actuel = UX ; fork = architecture
 
 ### Top 5 actions
+
 1. **Winston** : architecture modulaire V2
 2. **Amelia** : pipeline conversion testé F1.1–F1.5
 3. **John** : PRD epic F1/F2 depuis ce rapport
@@ -248,6 +258,7 @@ Les deux repos convertissent des pages web en Markdown. Le fork a élargi vers c
 | i18n | FR/EN dès F2 | John |
 
 ### Zones à investiguer
+
 1. Écart Turndown — état réel worktree release
 2. Scope crawl — justifie-t-il host_permissions all_urls ?
 3. Continuité ID Chrome Web Store

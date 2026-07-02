@@ -32,6 +32,7 @@ Point critique: l'extension référence `src/lib/turndown.js` depuis `src/popup/
 **Description**
 
 Une classe `MarkdownConverter` orchestre tout:
+
 - boot UI
 - préférences
 - injection script dans la page
