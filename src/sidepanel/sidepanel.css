@@ -106,8 +106,7 @@ body {
 /* Zone 2 — Content (scroll) */
 .content-zone {
     flex: 1;
-    overflow-y: auto;
-    overflow-x: hidden;
+    overflow: hidden auto;
 }
 
 /* Empty state (R4) */
@@ -127,7 +126,7 @@ body {
 }
 
 .empty-state h3 {
-    margin: 0 0 4px 0;
+    margin: 0 0 4px;
     font-size: var(--fs-lg);
     font-weight: var(--fw-semibold);
     color: var(--text-color);
@@ -359,7 +358,7 @@ body {
 
 #detail-output:focus {
     border-color: var(--primary-color);
-    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+    box-shadow: 0 0 0 2px rgb(59 130 246 / 20%);
 }
 
 /* Zone 3 — Footer */

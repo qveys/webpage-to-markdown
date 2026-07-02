@@ -1,5 +1,5 @@
 :root {
-    --bg-color: #ffffff;
+    --bg-color: #fff;
     --text-color: #1f2937;
     --text-muted: #4b5563;
     --border-color: #e5e7eb;
@@ -9,11 +9,11 @@
     --secondary-hover: #e5e7eb;
     --success-color: #10b981;
     --error-color: #ef4444;
-    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 5%);
+    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 10%), 0 2px 4px -1px rgb(0 0 0 / 6%);
     --radius: 8px;
-    --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-    --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    --font-sans: -apple-system, "BlinkMacSystemFont", "Segoe UI", "Roboto", "Helvetica Neue", "Arial", sans-serif;
+    --font-mono: ui-monospace, "SFMono-Regular", "Menlo", "Monaco", "Consolas", "Liberation Mono", "Courier New", monospace;
 
     /* Type scale — base 16px */
     --fs-xs:  0.6875rem; /* 11px */
@@ -51,7 +51,7 @@
     --primary-hover: #3b82f6; /* Blue 500 */
     --secondary-bg: #1f2937; /* Gray 800 */
     --secondary-hover: #374151; /* Gray 700 */
-    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 30%);
 }
 
 * {
@@ -332,7 +332,7 @@ textarea {
 
 textarea:focus {
     border-color: var(--primary-color);
-    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+    box-shadow: 0 0 0 2px rgb(59 130 246 / 20%);
 }
 
 .secondary-actions {
@@ -356,8 +356,8 @@ textarea:focus {
     pointer-events: none;
     transition: all 0.2s cubic-bezier(0.18, 0.89, 0.32, 1.28);
     box-shadow:
-        0 10px 15px -3px rgba(0, 0, 0, 0.1),
-        0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        0 10px 15px -3px rgb(0 0 0 / 10%),
+        0 4px 6px -2px rgb(0 0 0 / 5%);
     z-index: 100;
     white-space: nowrap;
 }
@@ -386,7 +386,7 @@ textarea:focus {
     align-items: center;
     padding: 1px 5px;
     border-radius: 4px;
-    background: rgba(255, 255, 255, 0.18);
+    background: rgb(255 255 255 / 18%);
     font-family: var(--font-mono);
     font-size: var(--fs-xs);
     font-weight: var(--fw-regular);
@@ -396,13 +396,24 @@ textarea:focus {
 }
 
 [data-theme="dark"] .kbd-hint {
-    background: rgba(0, 0, 0, 0.25);
+    background: rgb(0 0 0 / 25%);
 }
 
 /* Icon sizing via sprite */
-.icon    { width: 18px; height: 18px; }
-.icon-sm { width: 14px; height: 14px; }
-.icon-lg { width: 24px; height: 24px; }
+.icon {
+    width: 18px;
+    height: 18px;
+}
+
+.icon-sm {
+    width: 14px;
+    height: 14px;
+}
+
+.icon-lg {
+    width: 24px;
+    height: 24px;
+}
 
 /* Button success feedback state — scoped to secondary to guarantee contrast */
 .btn-secondary.btn-success-feedback {
@@ -418,6 +429,7 @@ textarea:focus {
     from {
         transform: rotate(0deg);
     }
+
     to {
         transform: rotate(360deg);
     }
@@ -429,6 +441,7 @@ textarea:focus {
         animation-duration: 0.01ms !important;
         transition-duration: 0.01ms !important;
     }
+
     .animate-spin {
         animation: none !important;
     }
@@ -445,8 +458,8 @@ input:focus-visible {
 
 /* R2 — toast retry button */
 .toast-retry {
-    background: rgba(0, 0, 0, 0.18);
-    border: 1px solid rgba(255, 255, 255, 0.9);
+    background: rgb(0 0 0 / 18%);
+    border: 1px solid rgb(255 255 255 / 90%);
     color: #fff;
     padding: 2px 8px;
     border-radius: 12px;
@@ -456,7 +469,7 @@ input:focus-visible {
 }
 
 .toast-retry:hover {
-    background: rgba(0, 0, 0, 0.3);
+    background: rgb(0 0 0 / 30%);
 }
 
 /* Focus-ring sandwich for CTA on colored background */
