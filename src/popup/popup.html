@@ -1,102 +1,112 @@
 <!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Webpage to Markdown</title>
-    <link rel="stylesheet" href="styles.css">
-</head>
-<body>
-    <div class="app-container">
-        <header>
-            <div class="logo-area">
-                <svg class="icon-lg" width="24" height="24"><use href="../assets/icons.svg#icon-file-text"/></svg>
-                <h1>Webpage to Markdown</h1>
-            </div>
-            <div class="header-controls">
-                <button id="panel-open" class="icon-btn" aria-label="Open dashboard panel" title="Open dashboard">
-                    <svg width="20" height="20"><use href="../assets/icons.svg#icon-panel-left"/></svg>
-                </button>
-                <button id="settings-toggle" class="icon-btn" aria-label="Settings" title="Settings" aria-expanded="false">
-                    <svg width="20" height="20"><use href="../assets/icons.svg#icon-settings"/></svg>
-                </button>
-                <button id="theme-toggle" class="icon-btn" aria-label="Toggle Theme" title="Toggle Theme">
-                    <svg class="sun-icon" width="20" height="20"><use href="../assets/icons.svg#icon-sun"/></svg>
-                    <svg class="moon-icon" width="20" height="20" style="display:none;"><use href="../assets/icons.svg#icon-moon"/></svg>
-                </button>
-            </div>
-        </header>
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Webpage to Markdown</title>
+        <link rel="stylesheet" href="styles.css" />
+    </head>
+    <body>
+        <div class="app-container">
+            <header>
+                <div class="logo-area">
+                    <svg class="icon-lg" width="24" height="24"><use href="../assets/icons.svg#icon-file-text" /></svg>
+                    <h1>Webpage to Markdown</h1>
+                </div>
+                <div class="header-controls">
+                    <button id="panel-open" class="icon-btn" aria-label="Open dashboard panel" title="Open dashboard">
+                        <svg width="20" height="20"><use href="../assets/icons.svg#icon-panel-left" /></svg>
+                    </button>
+                    <button
+                        id="settings-toggle"
+                        class="icon-btn"
+                        aria-label="Settings"
+                        title="Settings"
+                        aria-expanded="false"
+                    >
+                        <svg width="20" height="20"><use href="../assets/icons.svg#icon-settings" /></svg>
+                    </button>
+                    <button id="theme-toggle" class="icon-btn" aria-label="Toggle Theme" title="Toggle Theme">
+                        <svg class="sun-icon" width="20" height="20"><use href="../assets/icons.svg#icon-sun" /></svg>
+                        <svg class="moon-icon" width="20" height="20" style="display: none">
+                            <use href="../assets/icons.svg#icon-moon" />
+                        </svg>
+                    </button>
+                </div>
+            </header>
 
-        <div id="settings-panel" class="settings-panel">
-            <div class="setting-group">
-                <label class="setting-item">
-                    <input type="checkbox" id="setting-frontmatter">
-                    <span>Include Frontmatter</span>
-                </label>
-            </div>
-            <div class="setting-group two-col">
-                <div class="setting-field">
-                    <label for="setting-heading">Heading Style</label>
-                    <select id="setting-heading">
-                        <option value="atx">ATX (#)</option>
-                        <option value="setext">Setext (Underline)</option>
-                    </select>
+            <div id="settings-panel" class="settings-panel">
+                <div class="setting-group">
+                    <label class="setting-item">
+                        <input type="checkbox" id="setting-frontmatter" />
+                        <span>Include Frontmatter</span>
+                    </label>
                 </div>
-                <div class="setting-field">
-                    <label for="setting-bullet">Bullet Style</label>
-                    <select id="setting-bullet">
-                        <option value="-">-</option>
-                        <option value="*">*</option>
-                        <option value="+">+</option>
-                    </select>
+                <div class="setting-group two-col">
+                    <div class="setting-field">
+                        <label for="setting-heading">Heading Style</label>
+                        <select id="setting-heading">
+                            <option value="atx">ATX (#)</option>
+                            <option value="setext">Setext (Underline)</option>
+                        </select>
+                    </div>
+                    <div class="setting-field">
+                        <label for="setting-bullet">Bullet Style</label>
+                        <select id="setting-bullet">
+                            <option value="-">-</option>
+                            <option value="*">*</option>
+                            <option value="+">+</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="setting-group">
+                    <div class="setting-field">
+                        <label for="setting-code">Code Block Style</label>
+                        <select id="setting-code">
+                            <option value="fenced">Fenced (```)</option>
+                            <option value="indented">Indented</option>
+                        </select>
+                    </div>
                 </div>
             </div>
-            <div class="setting-group">
-                <div class="setting-field">
-                    <label for="setting-code">Code Block Style</label>
-                    <select id="setting-code">
-                        <option value="fenced">Fenced (```)</option>
-                        <option value="indented">Indented</option>
-                    </select>
+
+            <main>
+                <div class="primary-action">
+                    <button id="convert" class="btn btn-primary">
+                        <svg class="icon" width="18" height="18"><use href="../assets/icons.svg#icon-file" /></svg>
+                        Convert Page to Markdown
+                        <kbd class="kbd-hint" id="kbd-hint"></kbd>
+                    </button>
                 </div>
-            </div>
+
+                <div id="conversion-meta" class="conversion-meta hidden">
+                    <div class="meta-source">
+                        <svg class="icon-sm" width="14" height="14"><use href="../assets/icons.svg#icon-link" /></svg>
+                        <span id="meta-url" class="meta-url"></span>
+                    </div>
+
+                    <div class="editor-container">
+                        <textarea id="output" placeholder="# Markdown content will appear here..." readonly></textarea>
+                    </div>
+
+                    <div class="secondary-actions">
+                        <button id="copy" class="btn btn-secondary" disabled>
+                            <svg class="icon" width="18" height="18"><use href="../assets/icons.svg#icon-copy" /></svg>
+                            <span>Copy</span>
+                        </button>
+                        <button id="download" class="btn btn-secondary" disabled>
+                            <svg class="icon" width="18" height="18">
+                                <use href="../assets/icons.svg#icon-download" />
+                            </svg>
+                            <span>Download</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div id="toast" class="toast hidden"></div>
+            </main>
         </div>
-
-        <main>
-            <div class="primary-action">
-                <button id="convert" class="btn btn-primary">
-                    <svg class="icon" width="18" height="18"><use href="../assets/icons.svg#icon-file"/></svg>
-                    Convert Page to Markdown
-                    <kbd class="kbd-hint" id="kbd-hint"></kbd>
-                </button>
-            </div>
-
-            <div id="conversion-meta" class="conversion-meta hidden">
-                <div class="meta-source">
-                    <svg class="icon-sm" width="14" height="14"><use href="../assets/icons.svg#icon-link"/></svg>
-                    <span id="meta-url" class="meta-url"></span>
-                </div>
-
-                <div class="editor-container">
-                    <textarea id="output" placeholder="# Markdown content will appear here..." readonly></textarea>
-                </div>
-
-                <div class="secondary-actions">
-                    <button id="copy" class="btn btn-secondary" disabled>
-                        <svg class="icon" width="18" height="18"><use href="../assets/icons.svg#icon-copy"/></svg>
-                        <span>Copy</span>
-                    </button>
-                    <button id="download" class="btn btn-secondary" disabled>
-                        <svg class="icon" width="18" height="18"><use href="../assets/icons.svg#icon-download"/></svg>
-                        <span>Download</span>
-                    </button>
-                </div>
-            </div>
-
-            <div id="toast" class="toast hidden"></div>
-        </main>
-    </div>
-    <script src="../lib/turndown.js"></script>
-    <script src="popup.js"></script>
-</body>
+        <script src="../lib/turndown.js"></script>
+        <script src="popup.js"></script>
+    </body>
 </html>

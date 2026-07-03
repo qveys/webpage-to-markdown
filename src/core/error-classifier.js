@@ -5,12 +5,10 @@ var ERROR_CATEGORIES = {
 };
 
 var ERROR_MESSAGES = {};
-ERROR_MESSAGES[ERROR_CATEGORIES.NOT_EXTRACTABLE] =
-    'This page cannot be converted (system page or unsupported format).';
+ERROR_MESSAGES[ERROR_CATEGORIES.NOT_EXTRACTABLE] = 'This page cannot be converted (system page or unsupported format).';
 ERROR_MESSAGES[ERROR_CATEGORIES.PERMISSION_REQUIRED] =
     'Permission required for this page. Click the extension icon in the address bar to grant access.';
-ERROR_MESSAGES[ERROR_CATEGORIES.CONVERSION_FAILED] =
-    'Conversion failed. Try again in a moment.';
+ERROR_MESSAGES[ERROR_CATEGORIES.CONVERSION_FAILED] = 'Conversion failed. Try again in a moment.';
 
 function classifyError(error) {
     if (!error) {
@@ -28,14 +26,14 @@ function classifyError(error) {
         category = ERROR_CATEGORIES.NOT_EXTRACTABLE;
     } else if (code === ERROR_CATEGORIES.PERMISSION_REQUIRED) {
         category = ERROR_CATEGORIES.PERMISSION_REQUIRED;
-    } else if (msg.includes('cannot access') ||
-               msg.includes('permission') ||
-               msg.includes('host permission')) {
+    } else if (msg.includes('cannot access') || msg.includes('permission') || msg.includes('host permission')) {
         category = ERROR_CATEGORIES.PERMISSION_REQUIRED;
-    } else if (msg.includes('chrome://') ||
-               msg.includes('system page') ||
-               msg.includes('web store') ||
-               msg.includes('chrome-extension://')) {
+    } else if (
+        msg.includes('chrome://') ||
+        msg.includes('system page') ||
+        msg.includes('web store') ||
+        msg.includes('chrome-extension://')
+    ) {
         category = ERROR_CATEGORIES.NOT_EXTRACTABLE;
     } else {
         category = ERROR_CATEGORIES.CONVERSION_FAILED;

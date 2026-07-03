@@ -7,7 +7,10 @@ async function convertActiveTab(settings, source) {
     }
 
     if (isRestrictedUrl(tab.url)) {
-        return { ok: false, error: createError(ERROR_CODES.NOT_EXTRACTABLE, 'Cannot convert system pages or Web Store') };
+        return {
+            ok: false,
+            error: createError(ERROR_CODES.NOT_EXTRACTABLE, 'Cannot convert system pages or Web Store')
+        };
     }
 
     var results;
@@ -17,7 +20,10 @@ async function convertActiveTab(settings, source) {
             func: extractPageContent
         });
     } catch (e) {
-        return { ok: false, error: createError(ERROR_CODES.PERMISSION_REQUIRED, 'Permission needed to access this page') };
+        return {
+            ok: false,
+            error: createError(ERROR_CODES.PERMISSION_REQUIRED, 'Permission needed to access this page')
+        };
     }
 
     if (!results || !results[0] || !results[0].result) {
@@ -27,10 +33,14 @@ async function convertActiveTab(settings, source) {
     var extraction = results[0].result;
 
     if (!extraction.success) {
-        return { ok: false, error: createError(ERROR_CODES.CONVERSION_FAILED, extraction.error || 'Failed to extract content') };
+        return {
+            ok: false,
+            error: createError(ERROR_CODES.CONVERSION_FAILED, extraction.error || 'Failed to extract content')
+        };
     }
 
-    var wrappedContent = '<div class="markdown-content"><h1>' + extraction.title + '</h1>' + extraction.content + '</div>';
+    var wrappedContent =
+        '<div class="markdown-content"><h1>' + extraction.title + '</h1>' + extraction.content + '</div>';
 
     var turndownService = createTurndownService(settings);
     var markdown = turndownService.turndown(wrappedContent);
@@ -38,7 +48,14 @@ async function convertActiveTab(settings, source) {
 
     if (settings.frontmatter) {
         var date = new Date().toISOString().split('T')[0];
-        var frontmatter = '---\ntitle: "' + extraction.title.replace(/"/g, '\\"') + '"\nurl: "' + extraction.url + '"\ndate: ' + date + '\n---\n\n';
+        var frontmatter =
+            '---\ntitle: "' +
+            extraction.title.replace(/"/g, '\\"') +
+            '"\nurl: "' +
+            extraction.url +
+            '"\ndate: ' +
+            date +
+            '\n---\n\n';
         markdown = frontmatter + markdown;
     }
 

@@ -12,34 +12,35 @@
     --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 5%);
     --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 10%), 0 2px 4px -1px rgb(0 0 0 / 6%);
     --radius: 8px;
-    --font-sans: -apple-system, "BlinkMacSystemFont", "Segoe UI", "Roboto", "Helvetica Neue", "Arial", sans-serif;
-    --font-mono: ui-monospace, "SFMono-Regular", "Menlo", "Monaco", "Consolas", "Liberation Mono", "Courier New", monospace;
+    --font-sans: -apple-system, 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial', sans-serif;
+    --font-mono:
+        ui-monospace, 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'Liberation Mono', 'Courier New', monospace;
 
     /* Type scale — base 16px */
-    --fs-xs:  0.6875rem; /* 11px */
-    --fs-sm:  0.8125rem; /* 13px */
-    --fs-md:  0.875rem;  /* 14px */
-    --fs-lg:  1rem;      /* 16px */
-    --fs-xl:  1.125rem;  /* 18px */
+    --fs-xs: 0.6875rem; /* 11px */
+    --fs-sm: 0.8125rem; /* 13px */
+    --fs-md: 0.875rem; /* 14px */
+    --fs-lg: 1rem; /* 16px */
+    --fs-xl: 1.125rem; /* 18px */
 
-    --fw-regular:  400;
-    --fw-medium:   500;
+    --fw-regular: 400;
+    --fw-medium: 500;
     --fw-semibold: 600;
 
     --lh-tight: 1.25;
-    --lh-base:  1.5;
+    --lh-base: 1.5;
 
     --tracking-caps: 0.04em;
 
     /* Motion tokens */
     --duration-instant: 100ms;
-    --duration-fast:    180ms;
-    --duration-base:    240ms;
-    --duration-toast:   300ms;
+    --duration-fast: 180ms;
+    --duration-base: 240ms;
+    --duration-toast: 300ms;
 
     --ease-standard: cubic-bezier(0.2, 0, 0, 1);
-    --ease-emphasis:  cubic-bezier(0.18, 0.89, 0.32, 1.28);
-    --ease-out:       cubic-bezier(0.4, 0, 1, 1);
+    --ease-emphasis: cubic-bezier(0.18, 0.89, 0.32, 1.28);
+    --ease-out: cubic-bezier(0.4, 0, 1, 1);
 }
 
 [data-theme='dark'] {
@@ -112,8 +113,9 @@ header {
     padding: 6px;
     border-radius: var(--radius);
     color: var(--text-muted);
-    transition: background-color var(--duration-instant) var(--ease-standard),
-                color var(--duration-instant) var(--ease-standard);
+    transition:
+        background-color var(--duration-instant) var(--ease-standard),
+        color var(--duration-instant) var(--ease-standard);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -139,11 +141,12 @@ header {
     padding: 0 12px;
     border: 1px solid transparent;
     visibility: hidden;
-    transition: max-height var(--duration-base) var(--ease-standard),
-                opacity var(--duration-base) var(--ease-standard),
-                padding var(--duration-base) var(--ease-standard),
-                border-color var(--duration-base) var(--ease-standard),
-                visibility var(--duration-base);
+    transition:
+        max-height var(--duration-base) var(--ease-standard),
+        opacity var(--duration-base) var(--ease-standard),
+        padding var(--duration-base) var(--ease-standard),
+        border-color var(--duration-base) var(--ease-standard),
+        visibility var(--duration-base);
 }
 
 .settings-panel.open {
@@ -229,12 +232,13 @@ main {
     font-weight: var(--fw-medium);
     font-size: var(--fs-md);
     cursor: pointer;
-    transition: background-color var(--duration-fast) var(--ease-standard),
-                color var(--duration-fast) var(--ease-standard),
-                border-color var(--duration-fast) var(--ease-standard),
-                box-shadow var(--duration-fast) var(--ease-standard),
-                opacity var(--duration-fast) var(--ease-standard),
-                transform var(--duration-instant) var(--ease-standard);
+    transition:
+        background-color var(--duration-fast) var(--ease-standard),
+        color var(--duration-fast) var(--ease-standard),
+        border-color var(--duration-fast) var(--ease-standard),
+        box-shadow var(--duration-fast) var(--ease-standard),
+        opacity var(--duration-fast) var(--ease-standard),
+        transform var(--duration-instant) var(--ease-standard);
 }
 
 .btn:active {
@@ -395,7 +399,7 @@ textarea:focus {
     pointer-events: none;
 }
 
-[data-theme="dark"] .kbd-hint {
+[data-theme='dark'] .kbd-hint {
     background: rgb(0 0 0 / 25%);
 }
 
@@ -437,7 +441,9 @@ textarea:focus {
 
 /* R5 — prefers-reduced-motion */
 @media (prefers-reduced-motion: reduce) {
-    *, *::before, *::after {
+    *,
+    *::before,
+    *::after {
         animation-duration: 0.01ms !important;
         transition-duration: 0.01ms !important;
     }
@@ -475,7 +481,9 @@ input:focus-visible {
 /* Focus-ring sandwich for CTA on colored background */
 .btn-primary:focus-visible {
     outline: none;
-    box-shadow: 0 0 0 2px var(--bg-color), 0 0 0 4px var(--primary-color);
+    box-shadow:
+        0 0 0 2px var(--bg-color),
+        0 0 0 4px var(--primary-color);
 }
 
 #conversion-meta.hidden {

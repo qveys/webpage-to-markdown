@@ -5,7 +5,9 @@ body {
     font-family: var(--font-sans);
     background-color: var(--bg-color);
     color: var(--text-color);
-    transition: background-color 0.2s, color 0.2s;
+    transition:
+        background-color 0.2s,
+        color 0.2s;
     overflow: hidden;
 }
 
@@ -170,7 +172,7 @@ body {
     outline-offset: -2px;
 }
 
-.history-item[data-selected="true"] {
+.history-item[data-selected='true'] {
     border-left: 3px solid var(--primary-color);
 }
 
@@ -242,8 +244,13 @@ body {
 }
 
 @keyframes skeleton-pulse {
-    0%, 100% { opacity: 0.4; }
-    50% { opacity: 1; }
+    0%,
+    100% {
+        opacity: 0.4;
+    }
+    50% {
+        opacity: 1;
+    }
 }
 
 /* R5 — prefers-reduced-motion */

@@ -1,100 +1,111 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard</title>
-    <link rel="stylesheet" href="../popup/styles.css">
-    <link rel="stylesheet" href="sidepanel.css">
-</head>
-<body>
-    <div class="panel-container">
-        <!-- Zone 1: Header -->
-        <header class="panel-header">
-            <div class="header-left">
-                <svg width="20" height="20"><use href="../assets/icons.svg#icon-file-text"/></svg>
-                <h1>Dashboard</h1>
-            </div>
-            <div class="header-controls">
-                <button id="theme-toggle" class="icon-btn" aria-label="Toggle Theme" title="Toggle Theme">
-                    <svg class="sun-icon" width="18" height="18"><use href="../assets/icons.svg#icon-sun"/></svg>
-                    <svg class="moon-icon" width="18" height="18" style="display:none;"><use href="../assets/icons.svg#icon-moon"/></svg>
-                </button>
-            </div>
-        </header>
-
-        <!-- Auto-download toggle (always visible, above content) -->
-        <div class="auto-download-row">
-            <span class="auto-download-label">Auto-save .md files</span>
-            <label class="toggle-switch" for="auto-download">
-                <input type="checkbox" id="auto-download" aria-label="Auto-save .md files">
-                <span class="toggle-slider"></span>
-            </label>
-        </div>
-
-        <!-- Zone 2: Content (scrollable) -->
-        <div class="content-zone">
-            <!-- History list view -->
-            <div id="history-view">
-                <div id="empty-state" class="empty-state">
-                    <svg class="empty-icon" width="48" height="48"><use href="../assets/icons.svg#icon-inbox"/></svg>
-                    <h3>No conversions yet</h3>
-                    <p>Convert a page to get started</p>
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Dashboard</title>
+        <link rel="stylesheet" href="../popup/styles.css" />
+        <link rel="stylesheet" href="sidepanel.css" />
+    </head>
+    <body>
+        <div class="panel-container">
+            <!-- Zone 1: Header -->
+            <header class="panel-header">
+                <div class="header-left">
+                    <svg width="20" height="20"><use href="../assets/icons.svg#icon-file-text" /></svg>
+                    <h1>Dashboard</h1>
                 </div>
-                <div id="history-list" class="history-list" style="display:none;"></div>
-            </div>
-
-            <!-- Detail view -->
-            <div id="detail-view" style="display:none;">
-                <div class="detail-header">
-                    <button id="back-btn" class="icon-btn back-btn" aria-label="Back to history" title="Back to history">
-                        <svg class="icon" width="18" height="18"><use href="../assets/icons.svg#icon-arrow-left"/></svg>
-                        <span>Back</span>
+                <div class="header-controls">
+                    <button id="theme-toggle" class="icon-btn" aria-label="Toggle Theme" title="Toggle Theme">
+                        <svg class="sun-icon" width="18" height="18"><use href="../assets/icons.svg#icon-sun" /></svg>
+                        <svg class="moon-icon" width="18" height="18" style="display: none">
+                            <use href="../assets/icons.svg#icon-moon" />
+                        </svg>
                     </button>
-                    <span id="detail-title" class="detail-title"></span>
                 </div>
-                <div class="detail-meta">
-                    <svg class="icon-sm" width="14" height="14"><use href="../assets/icons.svg#icon-link"/></svg>
-                    <a id="detail-url" class="detail-url" target="_blank" rel="noopener"></a>
+            </header>
+
+            <!-- Auto-download toggle (always visible, above content) -->
+            <div class="auto-download-row">
+                <span class="auto-download-label">Auto-save .md files</span>
+                <label class="toggle-switch" for="auto-download">
+                    <input type="checkbox" id="auto-download" aria-label="Auto-save .md files" />
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+
+            <!-- Zone 2: Content (scrollable) -->
+            <div class="content-zone">
+                <!-- History list view -->
+                <div id="history-view">
+                    <div id="empty-state" class="empty-state">
+                        <svg class="empty-icon" width="48" height="48">
+                            <use href="../assets/icons.svg#icon-inbox" />
+                        </svg>
+                        <h3>No conversions yet</h3>
+                        <p>Convert a page to get started</p>
+                    </div>
+                    <div id="history-list" class="history-list" style="display: none"></div>
                 </div>
-                <div class="detail-meta">
-                    <span id="detail-timestamp" class="detail-timestamp"></span>
-                </div>
-                <div class="detail-output-container">
-                    <textarea id="detail-output" readonly></textarea>
+
+                <!-- Detail view -->
+                <div id="detail-view" style="display: none">
+                    <div class="detail-header">
+                        <button
+                            id="back-btn"
+                            class="icon-btn back-btn"
+                            aria-label="Back to history"
+                            title="Back to history"
+                        >
+                            <svg class="icon" width="18" height="18">
+                                <use href="../assets/icons.svg#icon-arrow-left" />
+                            </svg>
+                            <span>Back</span>
+                        </button>
+                        <span id="detail-title" class="detail-title"></span>
+                    </div>
+                    <div class="detail-meta">
+                        <svg class="icon-sm" width="14" height="14"><use href="../assets/icons.svg#icon-link" /></svg>
+                        <a id="detail-url" class="detail-url" target="_blank" rel="noopener"></a>
+                    </div>
+                    <div class="detail-meta">
+                        <span id="detail-timestamp" class="detail-timestamp"></span>
+                    </div>
+                    <div class="detail-output-container">
+                        <textarea id="detail-output" readonly></textarea>
+                    </div>
                 </div>
             </div>
+
+            <!-- Zone 3: Footer -->
+            <footer class="panel-footer">
+                <div id="footer-history" class="footer-actions">
+                    <button id="convert-btn" class="btn btn-primary">
+                        <svg class="icon" width="18" height="18"><use href="../assets/icons.svg#icon-file" /></svg>
+                        Convert Active Tab
+                        <kbd class="kbd-hint" id="kbd-hint"></kbd>
+                    </button>
+                </div>
+                <div id="footer-detail" class="footer-actions footer-detail-actions" style="display: none">
+                    <button id="copy-btn" class="btn btn-secondary">
+                        <svg class="icon" width="18" height="18"><use href="../assets/icons.svg#icon-copy" /></svg>
+                        <span>Copy</span>
+                    </button>
+                    <button id="download-btn" class="btn btn-secondary">
+                        <svg class="icon" width="18" height="18"><use href="../assets/icons.svg#icon-download" /></svg>
+                        <span>Download</span>
+                    </button>
+                </div>
+            </footer>
+
+            <div id="toast" class="toast hidden"></div>
         </div>
 
-        <!-- Zone 3: Footer -->
-        <footer class="panel-footer">
-            <div id="footer-history" class="footer-actions">
-                <button id="convert-btn" class="btn btn-primary">
-                    <svg class="icon" width="18" height="18"><use href="../assets/icons.svg#icon-file"/></svg>
-                    Convert Active Tab
-                    <kbd class="kbd-hint" id="kbd-hint"></kbd>
-                </button>
-            </div>
-            <div id="footer-detail" class="footer-actions footer-detail-actions" style="display:none;">
-                <button id="copy-btn" class="btn btn-secondary">
-                    <svg class="icon" width="18" height="18"><use href="../assets/icons.svg#icon-copy"/></svg>
-                    <span>Copy</span>
-                </button>
-                <button id="download-btn" class="btn btn-secondary">
-                    <svg class="icon" width="18" height="18"><use href="../assets/icons.svg#icon-download"/></svg>
-                    <span>Download</span>
-                </button>
-            </div>
-        </footer>
-
-        <div id="toast" class="toast hidden"></div>
-    </div>
-
-    <script src="../messaging/message-types.js"></script>
-    <script src="../messaging/request.js"></script>
-    <script src="../core/errors.js"></script>
-    <script src="../core/error-classifier.js"></script>
-    <script src="../core/download.js"></script>
-    <script src="sidepanel.js"></script>
-</body>
+        <script src="../messaging/message-types.js"></script>
+        <script src="../messaging/request.js"></script>
+        <script src="../core/errors.js"></script>
+        <script src="../core/error-classifier.js"></script>
+        <script src="../core/download.js"></script>
+        <script src="sidepanel.js"></script>
+    </body>
 </html>

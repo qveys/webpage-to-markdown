@@ -3,12 +3,14 @@ function createError(code, message) {
 }
 
 function isRestrictedUrl(url) {
-    return !url ||
+    return (
+        !url ||
         url.startsWith('chrome://') ||
         url.startsWith('chrome-extension://') ||
         url.startsWith('edge://') ||
         url.startsWith('about:') ||
-        url.includes('chrome.google.com/webstore');
+        url.includes('chrome.google.com/webstore')
+    );
 }
 
 var ERROR_DISPLAY = {

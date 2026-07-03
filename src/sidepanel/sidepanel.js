@@ -145,7 +145,11 @@ class SidePanelController {
 
     render() {
         if (this.selectedHistoryId && this.currentView === 'history') {
-            var item = this.historyItems.find(function (h) { return h.id === this.selectedHistoryId; }.bind(this));
+            var item = this.historyItems.find(
+                function (h) {
+                    return h.id === this.selectedHistoryId;
+                }.bind(this)
+            );
             if (!item) {
                 this.selectedHistoryId = null;
                 this.savePreferences();
@@ -185,9 +189,9 @@ class SidePanelController {
         el.innerHTML =
             '<div class="history-item-indicator"></div>' +
             '<div class="history-item-content">' +
-                '<div class="skeleton-line skeleton-title"></div>' +
-                '<div class="skeleton-line skeleton-url"></div>' +
-                '<div class="skeleton-line skeleton-meta"></div>' +
+            '<div class="skeleton-line skeleton-title"></div>' +
+            '<div class="skeleton-line skeleton-url"></div>' +
+            '<div class="skeleton-line skeleton-meta"></div>' +
             '</div>';
         return el;
     }
@@ -212,11 +216,21 @@ class SidePanelController {
         var sizeKB = (item.markdown.length / 1024).toFixed(1);
 
         el.innerHTML =
-            '<div class="history-item-indicator">' + indicator + '</div>' +
+            '<div class="history-item-indicator">' +
+            indicator +
+            '</div>' +
             '<div class="history-item-content">' +
-                '<div class="history-item-title">' + this.escapeHtml(item.title || 'Untitled') + '</div>' +
-                '<div class="history-item-url">' + this.escapeHtml(hostname) + '</div>' +
-                '<div class="history-item-meta">' + dateStr + ' · ' + sizeKB + ' KB</div>' +
+            '<div class="history-item-title">' +
+            this.escapeHtml(item.title || 'Untitled') +
+            '</div>' +
+            '<div class="history-item-url">' +
+            this.escapeHtml(hostname) +
+            '</div>' +
+            '<div class="history-item-meta">' +
+            dateStr +
+            ' · ' +
+            sizeKB +
+            ' KB</div>' +
             '</div>';
 
         var self = this;
@@ -279,7 +293,11 @@ class SidePanelController {
                 this.isConverting = false;
                 this.setConvertLoading(false);
                 this.renderHistoryList();
-                this.showToast(classified.message, 'error', classified.category === ERROR_CATEGORIES.CONVERSION_FAILED ? 4000 : 1500);
+                this.showToast(
+                    classified.message,
+                    'error',
+                    classified.category === ERROR_CATEGORIES.CONVERSION_FAILED ? 4000 : 1500
+                );
                 return;
             }
 
@@ -345,7 +363,8 @@ class SidePanelController {
         } else {
             btn.disabled = false;
             btn.innerHTML =
-                '<svg class="icon" width="18" height="18"><use href="../assets/icons.svg#icon-file"/></svg> Convert Active Tab' + kbd;
+                '<svg class="icon" width="18" height="18"><use href="../assets/icons.svg#icon-file"/></svg> Convert Active Tab' +
+                kbd;
         }
     }
 
@@ -365,7 +384,11 @@ class SidePanelController {
         var output = document.getElementById('detail-output');
         if (!output.value) return;
 
-        var item = this.historyItems.find(function (h) { return h.id === this.selectedHistoryId; }.bind(this));
+        var item = this.historyItems.find(
+            function (h) {
+                return h.id === this.selectedHistoryId;
+            }.bind(this)
+        );
         var title = item ? item.title : 'page';
         var timestamp = item ? item.timestamp : new Date().toISOString();
         var filename = generateFilename(title, timestamp);
@@ -393,7 +416,10 @@ class SidePanelController {
             btn._originalHTML = btn.innerHTML;
         }
         btn.classList.add('btn-success-feedback');
-        btn.innerHTML = '<svg class="icon" width="18" height="18"><use href="../assets/icons.svg#icon-check"/></svg> <span>' + label + '</span>';
+        btn.innerHTML =
+            '<svg class="icon" width="18" height="18"><use href="../assets/icons.svg#icon-check"/></svg> <span>' +
+            label +
+            '</span>';
 
         btn._successTimeout = setTimeout(function () {
             btn.classList.remove('btn-success-feedback');
@@ -417,8 +443,7 @@ class SidePanelController {
 
     formatDate(timestamp) {
         var date = new Date(timestamp);
-        var months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-                      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        var months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
         var day = date.getDate();
         var month = months[date.getMonth()];
         var hours = String(date.getHours()).padStart(2, '0');
@@ -428,8 +453,7 @@ class SidePanelController {
 
     formatDateFull(timestamp) {
         var date = new Date(timestamp);
-        var months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-                      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        var months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
         var day = date.getDate();
         var month = months[date.getMonth()];
         var year = date.getFullYear();

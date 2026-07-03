@@ -254,9 +254,13 @@ ${captionText}
 
             if (!success) throw new Error(error || 'Failed to extract content');
 
-            const escapeHtml = (value) => String(value)
-                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-                .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+            const escapeHtml = (value) =>
+                String(value)
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#39;');
 
             const wrappedContent = `
                 <div class="markdown-content">

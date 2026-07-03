@@ -9,7 +9,11 @@ function extractPageContent() {
                 var iframeDoc = iframe.contentDocument || (iframe.contentWindow && iframe.contentWindow.document);
                 if (!iframeDoc || !iframeDoc.body) return '';
                 var iframeClone = iframeDoc.body.cloneNode(true);
-                iframeClone.querySelectorAll('script, style, nav, footer, aside, .ads, .comments').forEach(function (el) { el.remove(); });
+                iframeClone
+                    .querySelectorAll('script, style, nav, footer, aside, .ads, .comments')
+                    .forEach(function (el) {
+                        el.remove();
+                    });
                 return '<div class="iframe-content">' + iframeClone.innerHTML + '</div>';
             } catch (e) {
                 return '';
@@ -25,12 +29,16 @@ function extractPageContent() {
             if (content) iframeContents.push(content);
         });
 
-        bodyClone.querySelectorAll(
-            'script, style, nav, footer, aside, .ads, .comments, [role="complementary"], ' +
-            '.cookie-banner, .cookie-notice, .cookie-consent, #cookie-consent, ' +
-            '.popup, .overlay, .modal, [aria-modal="true"], ' +
-            '.gdpr, .consent-banner, .newsletter-popup'
-        ).forEach(function (el) { el.remove(); });
+        bodyClone
+            .querySelectorAll(
+                'script, style, nav, footer, aside, .ads, .comments, [role="complementary"], ' +
+                    '.cookie-banner, .cookie-notice, .cookie-consent, #cookie-consent, ' +
+                    '.popup, .overlay, .modal, [aria-modal="true"], ' +
+                    '.gdpr, .consent-banner, .newsletter-popup'
+            )
+            .forEach(function (el) {
+                el.remove();
+            });
 
         var mainSelectors = ['main', 'article', '#content', '.content', '.post', '.entry', '[role="main"]', '.main'];
         var mainContent = null;
