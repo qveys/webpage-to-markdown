@@ -46,11 +46,11 @@ _Justification :_ Centraliser et standardiser les choix de style (quotes, indent
     }
     ```
 
-  * `singleQuote: true` : Utilise des guillemets simples.
-  * `trailingComma: "none"` : Pas de virgule traînante en fin d'objet/tableau.
-  * `tabWidth: 4` : Indentation de 4 espaces.
-  * `semi: true` : Ajoute des points-virgules en fin d'instructions.
-  * `printWidth: 120` : Limite la longueur des lignes à 120 caractères.
+* `singleQuote: true` : Utilise des guillemets simples.
+* `trailingComma: "none"` : Pas de virgule traînante en fin d'objet/tableau.
+* `tabWidth: 4` : Indentation de 4 espaces.
+* `semi: true` : Ajoute des points-virgules en fin d'instructions.
+* `printWidth: 120` : Limite la longueur des lignes à 120 caractères.
 
 ### 4. Fichier d'exclusion Prettier
 
@@ -77,8 +77,8 @@ _Justification :_ Rendre les commandes de formatage et de vérification facileme
     }
     ```
 
-  * `format` : Formate et écrit directement les modifications sur les fichiers cibles de `src/`.
-  * `format:check` : Analyse et signale les fichiers non conformes, sans les modifier (utile pour l'intégration continue).
+* `format` : Formate et écrit directement les modifications sur les fichiers cibles de `src/`.
+* `format:check` : Analyse et signale les fichiers non conformes, sans les modifier (utile pour l'intégration continue).
 
 ### 6. Intégration avec votre éditeur de texte (VS Code)
 

@@ -90,6 +90,70 @@ Pendant l'execution :
 7. Produire des commits au format `type: description`.
 8. Demander revue ou merger quand le scope et les criteres sont couverts.
 
+## Qualité du Code & Linters (Markdown)
+
+### Contexte et Objectif
+
+Le projet `webpage-to-markdown` contient divers documents d'analyse, des guides techniques et des templates au format Markdown. Afin de garantir un formatage uniforme, de faciliter la lecture et d'éviter les régressions visuelles lors des contributions, nous utilisons **markdownlint-cli2** pour valider tous les fichiers `.md`.
+
+### Justification de la Configuration et Dérogations
+
+La configuration par défaut de markdownlint a été adaptée aux spécificités de ce dépôt existant via le fichier `.markdownlint-cli2.jsonc`. Voici les règles désactivées et leurs justifications :
+
+- **MD013 (Line Length)** : Désactivée (`false`). Les documents du projet privilégient un retour à la ligne naturel (soft wrap) géré par l'éditeur de texte, plutôt que des retours à la ligne forcés à 80 caractères.
+- **MD029 (Ordered List Prefix)** : Désactivée (`false`). Les rapports d'analyse utilisent parfois des listes ordonnées dont la numérotation continue à travers différents blocs ou sections (ex. 5, 6, 7, etc.), ce qui est interprété par défaut comme une erreur mais s'affiche correctement sur GitHub.
+- **MD033 (Inline HTML)** : Désactivée (`false`). Utile pour intégrer des éléments HTML spécifiques dans les cellules de tableaux GFM (GitHub Flavored Markdown) au sein des documents d'analyse.
+- **MD036 (No Emphasis as Heading)** : Désactivée (`false`). Les documents d'analyse utilisent couramment des textes en gras isolés (ex. **Description :**, **Preuve :**) pour structurer le contenu sans en faire des titres réels au sens HTML.
+- **MD041 (First Line Heading)** : Désactivée (`false`). Les fichiers de template BMAD commencent par des blocs de citation (blockquotes) contenant des métadonnées par conception, et non par un titre de niveau 1.
+- **MD060 (Table Column Style)** : Désactivée (`false`). Permet de conserver des styles de tableaux compacts et personnalisés déjà présents dans le dépôt, qui s'affichent correctement.
+
+### Utilisation de l'outil
+
+Pour valider et corriger les fichiers Markdown locaux, suivez ces étapes :
+
+1. **Prérequis** : Assurez-vous d'utiliser Node.js version 22 ou supérieure (défini dans la propriété `engines` de `package.json`).
+2. **Installation** : Installez les dépendances de développement du projet si ce n'est pas déjà fait :
+
+   ```bash
+   npm install
+   ```
+
+3. **Exécuter la vérification** : Pour lancer l'analyse sur l'ensemble des fichiers Markdown du projet (hors `node_modules` et `.paperclip`) :
+
+   ```bash
+   npm run lint:md
+   ```
+
+4. **Correction automatique** : Pour corriger automatiquement les erreurs de formatage simples (telles que les espaces en fin de ligne, les lignes vides superflues ou les espacements autour des titres) :
+
+   ```bash
+   npm run lint:md:fix
+   ```
+
+### Fichier de Configuration
+
+Le comportement de l'outil est défini par le fichier de configuration `.markdownlint-cli2.jsonc` à la racine :
+
+```jsonc
+{
+  "config": {
+    "MD013": false,
+    "MD029": false,
+    "MD033": false,
+    "MD036": false,
+    "MD041": false,
+    "MD060": false
+  },
+  "globs": [
+    "**/*.md"
+  ],
+  "ignores": [
+    "**/node_modules/**",
+    "**/.paperclip/**"
+  ]
+}
+```
+
 ## Verification locale
 
 Pour ce projet, la verification minimale attendue est :
