@@ -53,8 +53,8 @@ ${captionText}
 
     initializeTheme() {
         const toggleBtn = document.getElementById('theme-toggle');
-        const _sunIcon = toggleBtn.querySelector('.sun-icon');
-        const _moonIcon = toggleBtn.querySelector('.moon-icon');
+        this.sunIcon = toggleBtn.querySelector('.sun-icon');
+        this.moonIcon = toggleBtn.querySelector('.moon-icon');
 
         // Check saved theme or system preference
         const savedTheme = localStorage.getItem('theme');
@@ -70,19 +70,16 @@ ${captionText}
     }
 
     setTheme(isDark) {
-        const sunIcon = document.querySelector('.sun-icon');
-        const moonIcon = document.querySelector('.moon-icon');
-
         if (isDark) {
             document.documentElement.setAttribute('data-theme', 'dark');
             localStorage.setItem('theme', 'dark');
-            sunIcon.style.display = 'block';
-            moonIcon.style.display = 'none';
+            this.sunIcon.style.display = 'block';
+            this.moonIcon.style.display = 'none';
         } else {
             document.documentElement.removeAttribute('data-theme');
             localStorage.setItem('theme', 'light');
-            sunIcon.style.display = 'none';
-            moonIcon.style.display = 'block';
+            this.sunIcon.style.display = 'none';
+            this.moonIcon.style.display = 'block';
         }
     }
 
@@ -138,16 +135,21 @@ ${captionText}
         if (isOpen) {
             panel.classList.remove('open');
             btn.classList.remove('active');
+            btn.setAttribute('aria-expanded', 'false');
         } else {
             panel.classList.add('open');
             btn.classList.add('active');
+            btn.setAttribute('aria-expanded', 'true');
         }
     }
 
     async restoreLastState() {
         try {
-            const _data = await chrome.storage.local.get('lastConversion');
-            // Logic to restore state if desired
+            const data = await chrome.storage.local.get('lastConversion');
+            if (!data.lastConversion) return;
+
+            document.getElementById('meta-url').textContent = data.lastConversion.url || '';
+            document.getElementById('conversion-meta').classList.remove('hidden');
         } catch (e) {
             console.log('Error reading storage', e);
         }
@@ -161,13 +163,14 @@ ${captionText}
             if (!tab || !tab.id || !tab.url) throw new Error('No active tab found');
 
             // Prevent scripting on restricted pages
+            const tabHost = (() => { try { return new URL(tab.url).hostname; } catch { return ''; } })();
             if (
                 tab.url.startsWith('chrome://') ||
                 tab.url.startsWith('chrome-extension://') ||
                 tab.url.startsWith('edge://') ||
                 tab.url.startsWith('about:') ||
-                tab.url.includes('chromewebstore.google.com') ||
-                tab.url.includes('chrome.google.com/webstore')
+                tabHost === 'chromewebstore.google.com' ||
+                tabHost === 'chrome.google.com'
             ) {
                 throw new Error('Cannot convert system pages or Web Store');
             }
@@ -342,7 +345,7 @@ date: ${date}
             a.download = `page-${timestamp}.md`;
             a.click();
 
-            URL.revokeObjectURL(url);
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
             this.showToast('Download started', 'success');
         } catch (error) {
             this.showToast('Download failed', 'error');

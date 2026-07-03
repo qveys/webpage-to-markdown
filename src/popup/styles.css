@@ -278,14 +278,9 @@ main {
 
 .conversion-meta {
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 6px 10px;
-    background-color: var(--secondary-bg);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius);
-    font-size: var(--fs-xs);
-    color: var(--text-muted);
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
     gap: 8px;
 }
 
@@ -294,7 +289,12 @@ main {
     align-items: center;
     gap: 4px;
     min-width: 0;
-    flex: 1;
+    padding: 6px 10px;
+    background-color: var(--secondary-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    font-size: var(--fs-xs);
+    color: var(--text-muted);
 }
 
 .meta-url {
