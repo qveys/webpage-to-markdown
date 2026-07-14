@@ -48,7 +48,7 @@ Persistent state in `chrome.storage.local`: `markdownSettings`, `captureSettings
 
 ## Permissions
 
-`activeTab` `scripting` `storage` `downloads` `downloads.ui` `tabs` `webNavigation` `sidePanel` `offscreen` `alarms`
+`activeTab` `scripting` `storage` `downloads` `downloads.ui` `webNavigation` `sidePanel` `offscreen` `alarms`, plus optional HTTP(S) host permissions requested per crawl origin.
 
 Notable: `sidePanel` for dashboard, `offscreen` for DOM parsing, `alarms` for crawl scheduling, `webNavigation` for crawl URL tracking.
 

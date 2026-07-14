@@ -6,7 +6,7 @@
 
   var DEFAULTS = {
     markdown: { frontmatter: false, headingStyle: 'atx', bulletListMarker: '-', codeBlockStyle: 'fenced' },
-    capture: { delay: 2000, urlTree: true, saveAssets: true },
+    capture: { delay: 2000, urlTree: true, saveAssets: true, maxAssetSizeMb: 10, maxSessionAssetSizeMb: 50 },
     crawl: { concurrency: 3, maxBlocks: 5, depth: 0 }
   };
 
@@ -164,6 +164,18 @@
     assetsCheck.checked = cap.saveAssets;
     this._refs.assets = assetsCheck;
 
+    var maxAssetSizeInput = el('input', {
+      className: 'form-input', type: 'number', id: 'sc-max-asset-size',
+      min: '1', max: '100', step: '1', value: String(cap.maxAssetSizeMb)
+    });
+    this._refs.maxAssetSize = maxAssetSizeInput;
+
+    var maxSessionAssetSizeInput = el('input', {
+      className: 'form-input', type: 'number', id: 'sc-max-session-asset-size',
+      min: '1', max: '1000', step: '1', value: String(cap.maxSessionAssetSizeMb)
+    });
+    this._refs.maxSessionAssetSize = maxSessionAssetSizeInput;
+
     var captureSection = el('div', { className: 'settings-section' },
       el('div', { className: 'section-label' }, t('settings.capture')),
       el('div', { className: 'card' },
@@ -178,6 +190,14 @@
         el('label', { className: 'form-checkbox-label' },
           assetsCheck,
           document.createTextNode(t('settings.assets'))
+        ),
+        el('div', { className: 'form-group mt-3' },
+          el('label', { className: 'form-label', 'for': 'sc-max-asset-size' }, t('settings.maxAssetSize')),
+          maxAssetSizeInput
+        ),
+        el('div', { className: 'form-group' },
+          el('label', { className: 'form-label', 'for': 'sc-max-session-asset-size' }, t('settings.maxSessionAssetSize')),
+          maxSessionAssetSizeInput
         )
       )
     );
@@ -310,6 +330,8 @@
     this._refs.delayCareful.addEventListener('change', save);
     this._refs.organize.addEventListener('change', save);
     this._refs.assets.addEventListener('change', save);
+    this._refs.maxAssetSize.addEventListener('change', save);
+    this._refs.maxSessionAssetSize.addEventListener('change', save);
 
     // Crawl controls
     this._refs.concurrency.addEventListener('change', save);
@@ -356,8 +378,14 @@
     var captureSettings = {
       delay: delayVal,
       urlTree: this._refs.organize.checked,
-      saveAssets: this._refs.assets.checked
+      saveAssets: this._refs.assets.checked,
+      maxAssetSizeMb: Math.min(100, Math.max(1, Number(this._refs.maxAssetSize.value) || 10)),
+      maxSessionAssetSizeMb: Math.min(1000, Math.max(1, Number(this._refs.maxSessionAssetSize.value) || 50))
     };
+    if (captureSettings.maxSessionAssetSizeMb < captureSettings.maxAssetSizeMb) {
+      captureSettings.maxSessionAssetSizeMb = captureSettings.maxAssetSizeMb;
+      this._refs.maxSessionAssetSize.value = String(captureSettings.maxSessionAssetSizeMb);
+    }
 
     var crawlSettings = {
       concurrency: Number(this._refs.concurrency.value) || 3,

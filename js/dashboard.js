@@ -10,6 +10,27 @@
   var DEFAULT_CAPTURE_SETTINGS = W2M.DEFAULT_CAPTURE_SETTINGS;
   var DEFAULT_CRAWL_SETTINGS = W2M.DEFAULT_CRAWL_SETTINGS;
   var defaultSessionFolder = W2M.defaultSettings.defaultSessionFolder;
+  var requestOriginPermission = W2M.defaultSettings.requestOriginPermission;
+
+  // Without the "tabs" permission, chrome.tabs.query only exposes tab.url once
+  // the origin is granted (or activeTab applies). Fall back to the service
+  // worker, which tracks each tab's URL via webNavigation events.
+  function getActiveTabUrl(callback) {
+    chrome.tabs.query({ active: true, lastFocusedWindow: true }, function (tabs) {
+      var tab = tabs && tabs[0];
+      if (tab && tab.url) {
+        callback(tab.url);
+        return;
+      }
+      chrome.runtime.sendMessage({ type: 'W2M_GET_ACTIVE_URL' }, function (res) {
+        if (chrome.runtime.lastError || !res || !res.ok) {
+          callback('');
+          return;
+        }
+        callback(res.url || '');
+      });
+    });
+  }
 
   function createSvgIcon(paths, width, height, fill, stroke) {
     var svg = document.createElementNS(SVG_NS, 'svg');
@@ -136,6 +157,19 @@
       var cb = el('input', { type: 'checkbox', className: 'form-checkbox' });
       cb.checked = !!currentVal;
       cb.addEventListener('change', function () {
+        if (storageKey === 'autoConvert' && cb.checked) {
+          getActiveTabUrl(function (url) {
+            requestOriginPermission(url, function (granted) {
+              if (!granted) {
+                cb.checked = false;
+                self._showToast(t('error.permission'));
+                return;
+              }
+              self._saveSettings({ autoConvert: true });
+            });
+          });
+          return;
+        }
         var patch = {};
         patch[storageKey] = cb.checked;
         self._saveSettings(patch);
@@ -848,9 +882,7 @@
 
   Dashboard.prototype._startCrawlFromActiveTab = function () {
     var self = this;
-    chrome.tabs.query({ active: true, lastFocusedWindow: true }, function (tabs) {
-      var tab = tabs && tabs[0];
-      var url = tab && tab.url ? tab.url : '';
+    getActiveTabUrl(function (url) {
       if (!url || !/^https?:\/\//.test(url)) {
         self._showToast(t('error.unavailable.message'));
         return;
@@ -858,28 +890,37 @@
 
       var folder = defaultSessionFolder(url);
 
-      chrome.storage.local.get(['captureSettings', 'crawlSettings'], function (data) {
-        var cap = Object.assign({}, DEFAULT_CAPTURE_SETTINGS, data.captureSettings || {});
-        var cr = Object.assign({}, DEFAULT_CRAWL_SETTINGS, data.crawlSettings || {});
+      requestOriginPermission(url, function (granted) {
+        if (!granted) {
+          self._showToast(t('error.permission'));
+          return;
+        }
 
-        chrome.runtime.sendMessage({
-          type: 'W2M_CRAWL_START',
-          startUrl: url,
-          folder: folder,
-          delay: cap.delay,
-          urlTree: !!cap.urlTree,
-          saveAssets: !!cap.saveAssets,
-          concurrency: Number(cr.concurrency) || DEFAULT_CRAWL_SETTINGS.concurrency,
-          maxBlocks: Number.isFinite(Number(cr.maxBlocks)) ? Number(cr.maxBlocks) : DEFAULT_CRAWL_SETTINGS.maxBlocks,
-          depth: Number.isFinite(Number(cr.depth)) ? Number(cr.depth) : DEFAULT_CRAWL_SETTINGS.depth
-        }, function (res) {
-          if (chrome.runtime.lastError || !res || !res.ok) {
-            self._showToast(t('toast.error'));
-            return;
-          }
-          self._setStatus('running');
-          self._applyMode('crawl');
-          if (self.port) self.port.postMessage({ type: 'crawl:get-status' });
+        chrome.storage.local.get(['captureSettings', 'crawlSettings'], function (data) {
+          var cap = Object.assign({}, DEFAULT_CAPTURE_SETTINGS, data.captureSettings || {});
+          var cr = Object.assign({}, DEFAULT_CRAWL_SETTINGS, data.crawlSettings || {});
+
+          chrome.runtime.sendMessage({
+            type: 'W2M_CRAWL_START',
+            startUrl: url,
+            folder: folder,
+            delay: cap.delay,
+            urlTree: !!cap.urlTree,
+            saveAssets: !!cap.saveAssets,
+            maxAssetSizeMb: cap.maxAssetSizeMb,
+            maxSessionAssetSizeMb: cap.maxSessionAssetSizeMb,
+            concurrency: Number(cr.concurrency) || DEFAULT_CRAWL_SETTINGS.concurrency,
+            maxBlocks: Number.isFinite(Number(cr.maxBlocks)) ? Number(cr.maxBlocks) : DEFAULT_CRAWL_SETTINGS.maxBlocks,
+            depth: Number.isFinite(Number(cr.depth)) ? Number(cr.depth) : DEFAULT_CRAWL_SETTINGS.depth
+          }, function (res) {
+            if (chrome.runtime.lastError || !res || !res.ok) {
+              self._showToast(t('toast.error'));
+              return;
+            }
+            self._setStatus('running');
+            self._applyMode('crawl');
+            if (self.port) self.port.postMessage({ type: 'crawl:get-status' });
+          });
         });
       });
     });

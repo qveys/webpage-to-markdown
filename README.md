@@ -190,12 +190,12 @@ git clone https://github.com/qveys/webpage-to-markdown.git
 |   💉 `scripting`    | Inject extraction scripts into pages                     |
 |    💾 `storage`     | Persist settings, session state, and crawl progress      |
 |   📥 `downloads`    | Save `.md` files and image assets                        |
-|     🔄 `tabs`       | Track tab navigation for auto-capture                    |
+|  🙈 `downloads.ui`  | Hide per-file download prompts only while a crawl runs   |
 | 🧭 `webNavigation`  | Detect page loads during sessions                        |
 |   📊 `sidePanel`    | Side-panel dashboard for single-page conversion and crawl monitoring |
 |   📄 `offscreen`    | Isolated DOM parsing for link extraction during crawl    |
 |    ⏰ `alarms`      | Keep Service Worker alive during crawl sessions          |
-| 🌐 `<all_urls>`     | Fetch and convert pages from any website during crawl    |
+| 🌐 Optional origins | Access only the site explicitly authorized for a crawl   |
 
 ---
 
