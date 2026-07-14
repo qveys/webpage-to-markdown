@@ -6,19 +6,24 @@ importScripts("/js/cleanup-markdown.js");
 importScripts("/js/markdown-output.js");
 importScripts("/js/safe-assets.js");
 
-// Reset session on every SW startup (including extension reload)
-// New timestamped folder on each startup, delay preserved
+// A service-worker restart must never leave Chrome's download UI disabled.
+chrome.downloads.setUiOptions({ enabled: true }).catch((err) => {
+  console.warn("[W2M] Unable to restore download UI on startup:", err.message);
+});
+
+// Initialize once. Service-worker wake-ups must preserve completed crawl results.
 chrome.storage.local.get("session", ({ session }) => {
-  const ts = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
-  chrome.storage.local.set({
-    session: {
-      active: false,
-      folder: `w2m-session-${ts}`,
-      delay: session?.delay ?? 2000,
-      capturedUrls: [], // New session on SW restart
-    },
-  });
-  chrome.action.setBadgeText({ text: "" });
+  if (!session) {
+    const ts = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
+    chrome.storage.local.set({
+      session: {
+        active: false,
+        folder: `w2m-session-${ts}`,
+        delay: 2000,
+        capturedUrls: [],
+      },
+    });
+  }
 });
 
 // ─── Extraction du contenu de la page ────────────────────────────────────────
@@ -1397,9 +1402,13 @@ async function closeOffscreen() {
 }
 
 // ─── Port-based messaging for crawl ──────────────────────
+let crawlRestorePromise = Promise.resolve(false);
 chrome.runtime.onConnect.addListener((port) => {
   if (port.name === "crawl") {
-    crawlEngine.addPort(port);
+    // Never expose the constructor's empty state while restoration is pending.
+    crawlRestorePromise
+      .catch((err) => console.warn("[W2M] Crawl state restore:", err.message))
+      .finally(() => crawlEngine.addPort(port));
   }
 });
 
@@ -1465,4 +1474,4 @@ async function shouldAllowSinglePageAutoDownload() {
   return crawlEngine.ports.size > 0;
 }
 
-crawlEngine.restoreState();
+crawlRestorePromise = crawlEngine.restoreState();
