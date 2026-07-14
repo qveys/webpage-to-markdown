@@ -1290,10 +1290,20 @@ async function downloadAssets(markdown, folder, mdPath, options = {}) {
       const maxSessionBytes = limits.maxSessionAssetSizeMb * 1024 * 1024;
       const remaining = maxSessionBytes - budget.used;
       if (remaining <= 0) throw new Error("Session image budget exceeded");
-      const asset = await W2M.safeAssets.fetchValidatedAsset(imgUrl, {
-        maxBytes: Math.min(maxAssetBytes, remaining),
-      });
-      W2M.safeAssets.reserveAssetBytes(budget, asset.bytes, maxSessionBytes);
+      // Reserve the upper bound before fetching so concurrent pages cannot
+      // collectively exceed the session budget; refund what the asset did not use.
+      const reservedBytes = Math.min(maxAssetBytes, remaining);
+      W2M.safeAssets.reserveAssetBytes(budget, reservedBytes, maxSessionBytes);
+      let asset;
+      try {
+        asset = await W2M.safeAssets.fetchValidatedAsset(imgUrl, {
+          maxBytes: reservedBytes,
+        });
+      } catch (fetchError) {
+        budget.used -= reservedBytes;
+        throw fetchError;
+      }
+      budget.used -= reservedBytes - asset.bytes;
 
       let localName = `${stem}-${id}${asset.extension}`.replace(/[/\\:*?"<>|]/g, "-");
       let n = 0;
