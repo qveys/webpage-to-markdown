@@ -11,6 +11,7 @@
   var DEFAULT_CAPTURE_SETTINGS = W2M.DEFAULT_CAPTURE_SETTINGS;
   var DEFAULT_CRAWL_SETTINGS = W2M.DEFAULT_CRAWL_SETTINGS;
   var defaultSessionFolder = W2M.defaultSettings.defaultSessionFolder;
+  var requestOriginPermission = W2M.defaultSettings.requestOriginPermission;
 
   function precrawlDelayLabel(ms) {
     if (ms <= 500) return t('precrawl.delay.fast');
@@ -975,60 +976,77 @@
     var self = this;
     var folder = options.folder || '';
 
-    chrome.storage.local.get(['captureSettings', 'crawlSettings'], function (data) {
-      var cap = Object.assign({}, DEFAULT_CAPTURE_SETTINGS, data.captureSettings || {});
-      var cr = Object.assign({}, DEFAULT_CRAWL_SETTINGS, data.crawlSettings || {});
-      cap.urlTree = !!options.urlTree;
-      cap.saveAssets = !!options.saveAssets;
-      chrome.storage.local.set({ captureSettings: cap });
-      chrome.runtime.sendMessage({
-        type: 'W2M_UPDATE_SESSION',
-        patch: { urlTree: cap.urlTree, saveAssets: cap.saveAssets }
-      }).catch(function (err) {
-        if (err.message && err.message.indexOf('Receiving end does not exist') === -1) {
-          console.warn('[W2M] sendMessage:', err.message);
-        }
-      });
-      var delay = cap.delay;
-      var depthNum = Number(cr.depth);
-      var depth = Number.isFinite(depthNum) ? depthNum : DEFAULT_CRAWL_SETTINGS.depth;
-      var concurrency = Number(cr.concurrency) || DEFAULT_CRAWL_SETTINGS.concurrency;
-      var maxBlocksRaw = cr.maxBlocks;
-      var maxBlocks = DEFAULT_CRAWL_SETTINGS.maxBlocks;
-      if (maxBlocksRaw !== undefined && maxBlocksRaw !== null) {
-        var mb = Number(maxBlocksRaw);
-        if (Number.isFinite(mb)) maxBlocks = mb;
+    requestOriginPermission(this.currentUrl, function (granted) {
+      if (!granted) {
+        state.navigate(STATES.ERROR, {
+          errorType: 'unavailable',
+          message: t('error.permission')
+        });
+        return;
       }
 
-      chrome.runtime.sendMessage({
-        type: 'W2M_CRAWL_START',
-        startUrl: self.currentUrl,
-        folder: folder,
-        delay: delay,
-        urlTree: options.urlTree,
-        saveAssets: options.saveAssets,
-        concurrency: concurrency,
-        maxBlocks: maxBlocks,
-        depth: depth
-      }, function (res) {
-        if (chrome.runtime.lastError) {
-          state.navigate(STATES.ERROR, { errorType: 'network' });
-          return;
+      chrome.storage.local.get(['captureSettings', 'crawlSettings'], function (data) {
+        var cap = Object.assign({}, DEFAULT_CAPTURE_SETTINGS, data.captureSettings || {});
+        var cr = Object.assign({}, DEFAULT_CRAWL_SETTINGS, data.crawlSettings || {});
+        cap.urlTree = !!options.urlTree;
+        cap.saveAssets = !!options.saveAssets;
+        chrome.storage.local.set({ captureSettings: cap });
+        chrome.runtime.sendMessage({
+          type: 'W2M_UPDATE_SESSION',
+          patch: {
+            urlTree: cap.urlTree,
+            saveAssets: cap.saveAssets,
+            maxAssetSizeMb: cap.maxAssetSizeMb,
+            maxSessionAssetSizeMb: cap.maxSessionAssetSizeMb
+          }
+        }).catch(function (err) {
+          if (err.message && err.message.indexOf('Receiving end does not exist') === -1) {
+            console.warn('[W2M] sendMessage:', err.message);
+          }
+        });
+        var delay = cap.delay;
+        var depthNum = Number(cr.depth);
+        var depth = Number.isFinite(depthNum) ? depthNum : DEFAULT_CRAWL_SETTINGS.depth;
+        var concurrency = Number(cr.concurrency) || DEFAULT_CRAWL_SETTINGS.concurrency;
+        var maxBlocksRaw = cr.maxBlocks;
+        var maxBlocks = DEFAULT_CRAWL_SETTINGS.maxBlocks;
+        if (maxBlocksRaw !== undefined && maxBlocksRaw !== null) {
+          var mb = Number(maxBlocksRaw);
+          if (Number.isFinite(mb)) maxBlocks = mb;
         }
-        if (res && res.ok) {
-          // Keep side panel and popup aligned on Crawl mode when a crawl starts.
-          chrome.storage.local.set({ dashboardMode: 'crawl' }, function () {
-            chrome.runtime.sendMessage({ type: 'W2M_APPLY_DASHBOARD_MODE', mode: 'crawl' }).catch(function (err) {
-              if (err && err.message && err.message.indexOf('Receiving end does not exist') === -1) {
-                console.warn('[W2M] sendMessage:', err.message);
-              }
+
+        chrome.runtime.sendMessage({
+          type: 'W2M_CRAWL_START',
+          startUrl: self.currentUrl,
+          folder: folder,
+          delay: delay,
+          urlTree: options.urlTree,
+          saveAssets: options.saveAssets,
+          maxAssetSizeMb: cap.maxAssetSizeMb,
+          maxSessionAssetSizeMb: cap.maxSessionAssetSizeMb,
+          concurrency: concurrency,
+          maxBlocks: maxBlocks,
+          depth: depth
+        }, function (res) {
+          if (chrome.runtime.lastError) {
+            state.navigate(STATES.ERROR, { errorType: 'network' });
+            return;
+          }
+          if (res && res.ok) {
+            // Keep side panel and popup aligned on Crawl mode when a crawl starts.
+            chrome.storage.local.set({ dashboardMode: 'crawl' }, function () {
+              chrome.runtime.sendMessage({ type: 'W2M_APPLY_DASHBOARD_MODE', mode: 'crawl' }).catch(function (err) {
+                if (err && err.message && err.message.indexOf('Receiving end does not exist') === -1) {
+                  console.warn('[W2M] sendMessage:', err.message);
+                }
+              });
             });
-          });
-          state.navigate(STATES.RUNNING, { url: self.currentUrl, folder: folder });
-          self.connectCrawlPort();
-        } else {
-          state.navigate(STATES.ERROR, { errorType: 'convert', message: (res && res.error) || 'Failed to start' });
-        }
+            state.navigate(STATES.RUNNING, { url: self.currentUrl, folder: folder });
+            self.connectCrawlPort();
+          } else {
+            state.navigate(STATES.ERROR, { errorType: 'convert', message: (res && res.error) || 'Failed to start' });
+          }
+        });
       });
     });
   };

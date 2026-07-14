@@ -38,6 +38,7 @@ class CrawlEngine {
     this.ports = new Set();
     this.logBuffer = [];
     this.downloadedAssets = new Map();
+    this.assetBudget = { used: 0 };
     this._broadcastTimer = null;
     this._abortController = null;
     /** @type {(() => Promise<void>) | null} */
@@ -139,6 +140,7 @@ class CrawlEngine {
     this.seenUrls = new Set();
     this.blockedUrls = [];
     this.downloadedAssets = new Map();
+    this.assetBudget = { used: 0 };
     this.consecutiveBlocks = 0;
     this.stats = {
       captured: 0,
@@ -211,6 +213,7 @@ class CrawlEngine {
     this.seenUrls = new Set();
     this.blockedUrls = [];
     this.downloadedAssets = new Map();
+    this.assetBudget = { used: 0 };
     this.lastPage = null;
     this.logBuffer = [];
     this.stats = { captured: 0, queued: 0, blocked: 0, startTime: null };
@@ -441,12 +444,21 @@ class CrawlEngine {
         pageUrl,
         pageLabel,
         downloadedAssets: this.downloadedAssets,
+        assetBudget: this.assetBudget,
+        maxAssetSizeMb: session.maxAssetSizeMb,
+        maxSessionAssetSizeMb: session.maxSessionAssetSizeMb,
         onAssetSaved: (info) => {
           this.log("asset", info.localName, {
             fileName: info.localName,
             assetUrl: info.imgUrl,
             pageUrl: info.pageUrl || pageUrl,
             pageLabel: info.pageLabel || pageLabel,
+          });
+        },
+        onAssetSkipped: (info) => {
+          this.log("skip", `Image skipped: ${info.reason}`, {
+            assetUrl: info.imgUrl,
+            pageUrl: info.pageUrl || pageUrl,
           });
         },
       });
@@ -456,7 +468,6 @@ class CrawlEngine {
     await w2mDownload({
       url: `data:text/markdown;charset=utf-8,${encoded}`,
       filename: `${folder}/${mdPath}`,
-      saveAs: false,
       conflictAction: "overwrite",
     });
   }
@@ -628,6 +639,7 @@ class CrawlEngine {
           blockedUrls: this.blockedUrls,
           config: this.config,
           scope: this.scope,
+          assetBytesUsed: this.assetBudget.used,
         },
       });
       await chrome.storage.session.set({
@@ -656,6 +668,7 @@ class CrawlEngine {
     this.blockedUrls = crawlState.blockedUrls || [];
     this.config = crawlState.config || this.config;
     this.scope = crawlState.scope || null;
+    this.assetBudget = { used: Number(crawlState.assetBytesUsed) || 0 };
     this.discoveryQueue = crawlQueue || [];
     this.stats.queued = this.discoveryQueue.length;
     // Rebuild seenUrls from captured + queued + blocked URLs
