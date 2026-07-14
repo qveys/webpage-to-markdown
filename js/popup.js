@@ -843,44 +843,21 @@
   App.prototype._setupTheme = function () {
     var self = this;
     var themeBtn = document.getElementById('btn-theme');
-    var iconTheme = document.getElementById('icon-theme');
-
-    // Load saved theme from chrome.storage.local
-    chrome.storage.local.get('theme', function (result) {
-      var systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      var isDark = result.theme === 'dark' || (!result.theme && systemDark);
-      self._applyTheme(isDark);
-    });
 
     themeBtn.addEventListener('click', function () {
-      self.isDark = !self.isDark;
-      self._applyTheme(self.isDark);
-      chrome.storage.local.set({ theme: self.isDark ? 'dark' : 'light' });
+      W2M.theme.toggleTheme();
     });
 
-    // Sync theme when changed from another page (e.g. dashboard)
-    chrome.storage.onChanged.addListener(function (changes, area) {
-      if (area === 'local' && changes.theme) {
-        self._applyTheme(changes.theme.newValue === 'dark');
-      }
+    W2M.theme.subscribe(function (theme) {
+      self._updateThemeIcon(theme);
     });
   };
 
-  App.prototype._applyTheme = function (isDark) {
-    this.isDark = isDark;
-    if (isDark) {
-      document.documentElement.setAttribute('data-theme', 'dark');
-    } else {
-      document.documentElement.removeAttribute('data-theme');
-    }
-    this._updateThemeIcon(isDark);
-  };
-
-  App.prototype._updateThemeIcon = function (isDark) {
+  App.prototype._updateThemeIcon = function (theme) {
     var btn = document.getElementById('btn-theme');
     if (!btn) return;
     while (btn.firstChild) btn.removeChild(btn.firstChild);
-    var svg = W2M.buildThemeIcon(isDark);
+    var svg = W2M.buildThemeIcon(W2M.theme.isDarkTheme(theme));
     svg.id = 'icon-theme';
     btn.appendChild(svg);
   };

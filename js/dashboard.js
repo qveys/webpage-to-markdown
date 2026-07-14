@@ -334,28 +334,15 @@
 
   Dashboard.prototype._initTheme = function () {
     var self = this;
-    chrome.storage.local.get('theme', function (r) {
-      var theme = r.theme || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-      document.documentElement.setAttribute('data-theme', theme);
-      self._updateThemeIcon(theme);
-    });
 
     if (this.$themeBtn) {
       this.$themeBtn.addEventListener('click', function () {
-        var cur = document.documentElement.getAttribute('data-theme');
-        var next = cur === 'dark' ? 'light' : 'dark';
-        document.documentElement.setAttribute('data-theme', next);
-        chrome.storage.local.set({ theme: next });
-        self._updateThemeIcon(next);
+        W2M.theme.toggleTheme();
       });
     }
 
-    chrome.storage.onChanged.addListener(function (changes, area) {
-      if (area === 'local' && changes.theme) {
-        var theme = changes.theme.newValue;
-        document.documentElement.setAttribute('data-theme', theme);
-        self._updateThemeIcon(theme);
-      }
+    W2M.theme.subscribe(function (theme) {
+      self._updateThemeIcon(theme);
     });
   };
 
@@ -366,7 +353,7 @@
     var parent = iconHost.parentNode;
     while (parent.firstChild) parent.removeChild(parent.firstChild);
 
-    var svg = W2M.buildThemeIcon(theme === 'dark');
+    var svg = W2M.buildThemeIcon(W2M.theme.isDarkTheme(theme));
     svg.id = 'dash-theme-icon';
     parent.appendChild(svg);
   };

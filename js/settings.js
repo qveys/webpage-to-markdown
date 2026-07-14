@@ -20,6 +20,7 @@
     };
     this._refs = {};
     this.debugCrawlPanel = false;
+    this.theme = W2M.theme.getCurrentTheme();
   }
 
   SettingsController.prototype.init = function () {
@@ -35,6 +36,13 @@
         // Skip re-render for our own saves
         if (self._ownSave) return;
         self.loadSettings();
+      });
+    }
+    if (!this._themeUnsubscribe) {
+      var controller = this;
+      this._themeUnsubscribe = W2M.theme.subscribe(function (theme) {
+        controller.theme = theme;
+        if (controller._refs.theme) controller._refs.theme.value = theme;
       });
     }
     this.loadSettings();
@@ -58,6 +66,28 @@
     var md = this.settings.markdown;
     var cap = this.settings.capture;
     var cr = this.settings.crawl;
+
+    // --- APPEARANCE SECTION ---
+    var themeSelect = el('select', { className: 'form-select', id: 'sc-theme' },
+      el('option', { value: 'light', textContent: t('settings.theme.light') }),
+      el('option', { value: 'dark', textContent: t('settings.theme.dark') }),
+      el('option', { value: 'github-dark', textContent: t('settings.theme.githubDark') }),
+      el('option', { value: 'monokai', textContent: t('settings.theme.monokai') }),
+      el('option', { value: 'agentmesh', textContent: t('settings.theme.agentmesh') })
+    );
+    themeSelect.value = this.theme;
+    this._refs.theme = themeSelect;
+
+    var appearanceSection = el('div', { className: 'settings-section' },
+      el('div', { className: 'section-label' }, t('settings.appearance')),
+      el('div', { className: 'card' },
+        el('div', { className: 'form-group mb-0' },
+          el('label', { className: 'form-label', 'for': 'sc-theme' }, t('settings.theme')),
+          themeSelect,
+          el('div', { className: 'form-hint' }, t('settings.theme.hint'))
+        )
+      )
+    );
 
     // --- MARKDOWN SECTION ---
     var frontmatterCheck = el('input', { className: 'form-checkbox', type: 'checkbox', id: 'sc-frontmatter' });
@@ -218,6 +248,7 @@
       )
     );
 
+    this.container.appendChild(appearanceSection);
     this.container.appendChild(markdownSection);
     this.container.appendChild(captureSection);
     this.container.appendChild(crawlSection);
@@ -262,6 +293,10 @@
   SettingsController.prototype._bindEvents = function () {
     var self = this;
     var save = function () { self.saveFromUI(); };
+
+    this._refs.theme.addEventListener('change', function () {
+      W2M.theme.setTheme(self._refs.theme.value);
+    });
 
     // Markdown controls
     this._refs.frontmatter.addEventListener('change', save);

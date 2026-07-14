@@ -158,7 +158,11 @@ graph LR
 
 ### 🎨 UI
 
-- 🌙 Light / dark theme toggle (shared across popup, dashboard, settings)
+- 🌙 Light, dark, GitHub dark, Monokai, and Amber Wire themes shared across popup, dashboard, and settings
+  - Choose the active theme from **Settings → Appearance**
+  - The sun/moon button switches between light mode and the last selected dark variant
+  - Monokai uses its pink (`#F92672`) as the primary accent while keeping its semantic green, orange, and cyan colors
+  - Amber Wire uses an amber signal color (`#F2A93B`) as the primary accent, with mint, blue, and violet supporting colors
 - 📊 Side-panel dashboard for single-page conversion and crawl monitoring
 - ⚙️ Dedicated settings page with markdown, capture, and crawl preferences
 - 🔒 Inputs disabled during active session to prevent misconfiguration
@@ -216,7 +220,7 @@ webpage-to-markdown/
 ├── dashboard.html             # Side-panel crawl dashboard
 ├── settings.html              # Options page
 ├── offscreen.html             # Offscreen document (DOM parsing)
-├── styles.css                 # Global styles (light/dark themes)
+├── styles.css                 # Global styles (light/dark/GitHub dark/Monokai/Amber Wire themes)
 ├── js/
 │   ├── background.js          # Service Worker (sessions, downloads, crawl)
 │   ├── popup.js               # Popup logic, state views, markdown converter
@@ -232,7 +236,7 @@ webpage-to-markdown/
 │   ├── default-settings.js    # Shared DEFAULT_*_SETTINGS + defaultSessionFolder()
 │   ├── single-conversion-result.js # Shared module for building the single-page conversion result UI (used by both popup and side panel)
 │   ├── theme-icon.js          # Shared sun/moon theme icon builder
-│   ├── theme-init.js          # Early theme detection (prevent flash)
+│   ├── theme-init.js          # Shared theme manager and early theme detection
 │   ├── turndown.js            # Turndown.js (vendored)
 │   ├── turndown-plugin-gfm.js # GFM plugin (vendored)
 │   └── Readability.js         # Mozilla Readability (vendored)
