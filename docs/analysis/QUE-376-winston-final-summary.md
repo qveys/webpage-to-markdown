@@ -39,10 +39,11 @@ Le périmètre fonctionnel actuel couvre l'essentiel des objectifs "Phase 2" dé
 
 ## 5. Alertes Critiques & Dette Technique (Priorité Amelia)
 
-Bien que le projet soit en excellente santé technique, deux points bloquent actuellement la fluidité du développement :
+Bien que le projet soit en excellente santé technique, un point principal reste à traiter avant de poursuivre :
 
-1. **Fragmentation des Tests** : Le projet tente d'utiliser `Vitest` (imports présents) mais la dépendance n'est pas installée dans `package.json`, et le script `npm test` utilise encore le runner natif Node.js. **Action : Installer Vitest et migrer 100% des tests.**
-2. **Moteur d'Extraction** : `Readability.js` est référencé comme cible mais est absent de `src/lib/`. L'extracteur actuel est un script personnalisé moins robuste. **Action : Intégrer la bibliothèque Readability officielle.**
+1. **Moteur d'Extraction** : `Readability.js` est référencé comme cible mais est absent de `src/lib/`. L'extracteur actuel est un script personnalisé moins robuste. **Action : Intégrer la bibliothèque Readability officielle.**
+
+*(Note : La fragmentation des tests a été résolue par la migration complète vers Vitest effectuée dans le cadre de [QUE-379](/QUE/issues/QUE-379)).*
 
 ## 6. Backlog Technique & Readiness (Phase 3)
 
@@ -54,7 +55,7 @@ Les documents suivants constituent le socle de transfert vers Amelia :
 
 ## 7. Conclusion
 
-Le socle technique est **approuvé**. La priorité immédiate doit être donnée à la stabilisation de l'infrastructure de test (STORY-001) avant de lancer les développements de la Phase 3.
+Le socle technique est **approuvé**. L'infrastructure de test ayant été stabilisée sur Vitest ([QUE-379](/QUE/issues/QUE-379)), le projet est prêt pour le lancement des développements fonctionnels de la Phase 3.
 
 ---
-*Rapport transmis au CTO pour arbitrage sur la standardisation des tests et lancement de la Phase 3.*
+*Rapport transmis au CTO pour arbitrage et lancement de la Phase 3.*

@@ -2,27 +2,22 @@
 >
 > **Auteur** : 🏗️ Winston (Architecte Système)
 > **Cible** : Amelia (Lead Dev)
-> **Statut** : Approuvé pour démarrage après correction de l'infra de test.
+> **Statut** : Approuvé pour démarrage (infrastructure de test migrée).
 
 ## 1. Contexte & Alignement
 
 Le projet a achevé son socle MV3 (Background + Side Panel). Contrairement aux rapports précédents, le **Service Worker est actif** et le **Side Panel est fonctionnel**.
 
-## 2. Dette Technique Prioritaire (STORY-001)
+## 2. Infrastructure de Test Standardisée (STORY-001)
 
-Le système de test est actuellement fragmenté et empêche la validation automatique en CI.
+L'infrastructure de test a été standardisée avec succès sur **Vitest** dans le cadre de [QUE-379](/QUE/issues/QUE-379).
 
-### Problème
+### Statut actuel
 
-- `tests/markdown-utils.test.js` utilise **Vitest** (ESM).
-- `tests/storage.test.js` utilise **node:test** (CommonJS via `require`).
-- `package.json` lance `node --test` qui échoue sur les imports Vitest.
-
-### Solution recommandée
-
-1. **Standardisation Vitest** : Abandonner `node:test` au profit de Vitest pour tout le projet (meilleur support ESM et mocks Chrome API).
-2. **Installation** : `npm install -D vitest`.
-3. **Migration** : Convertir `storage.test.js` en ESM et utiliser les API Vitest (`describe`, `it`, `expect`).
+- La dépendance `vitest` est installée dans `package.json`.
+- Le script `npm test` utilise désormais Vitest pour exécuter l'ensemble des tests.
+- Toutes les suites de tests unitaires ont été migrées vers la syntaxe ESM de Vitest.
+- La CI passe à 100% avec le nouveau runner de tests.
 
 ## 3. Contrats API & Messaging (Phase 3)
 
@@ -58,7 +53,7 @@ Pour les prochaines stories, Amelia doit suivre le schéma de messaging suivant 
 ## 5. Check-list de démarrage pour Amelia
 
 - [ ] Vérifier que `manifest.json` contient bien toutes les permissions nécessaires (`sidePanel`, `downloads`, `contextMenus`).
-- [ ] Installer `vitest` et s'assurer que `npm test` passe à 100%.
+- [ ] Confirmer le bon fonctionnement de `npm test` localement avec Vitest.
 - [ ] Découpler la logique Turndown de `popup.js` pour la rendre réutilisable par le Side Panel via `src/core/turndown-service.js`.
 
 ---
