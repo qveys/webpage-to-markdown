@@ -502,6 +502,24 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     sendResponse({ ok: true });
     return true;
   }
+  if (message.type === "W2M_GET_ACTIVE_URL") {
+    (async () => {
+      try {
+        const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+        if (tab?.url) {
+          sendResponse({ ok: true, url: tab.url });
+          return;
+        }
+        // Without the "tabs" permission, tab.url is hidden until the origin is
+        // granted — fall back to the URL tracked via webNavigation events.
+        const url = tab?.id ? await getNavigatedTabUrl(tab.id) : "";
+        sendResponse({ ok: true, url });
+      } catch (e) {
+        sendResponse({ ok: false, error: e.message });
+      }
+    })();
+    return true;
+  }
   if (message.type === "W2M_OPEN_DASHBOARD") {
     (async () => {
       try {
@@ -597,6 +615,31 @@ const pendingCaptures = new Map(); // tabId → timeoutId
 const pendingSingleCaptures = new Map(); // tabId → timeoutId for auto single-page convert
 const SINGLE_CONVERT_DEBOUNCE_MS = 1000; // debounce for single-page auto-convert on navigation
 let capturedUrls = new Set(); // URLs already processed in the current session
+
+// Main-frame URL last seen per tab. webNavigation exposes URLs without the
+// "tabs" permission, so the dashboard can still discover the current page
+// when chrome.tabs.query hides tab.url (origin not yet granted).
+let navigatedTabUrls = new Map(); // tabId → url
+
+function rememberTabUrl(tabId, url) {
+  navigatedTabUrls.set(tabId, url);
+  chrome.storage.session
+    .set({ navigatedTabUrls: [...navigatedTabUrls] })
+    .catch((err) => {
+      console.warn("[W2M] rememberTabUrl:", err.message);
+    });
+}
+
+async function getNavigatedTabUrl(tabId) {
+  if (navigatedTabUrls.size === 0) {
+    // Restore after a service worker restart.
+    const stored = await chrome.storage.session.get("navigatedTabUrls");
+    if (Array.isArray(stored.navigatedTabUrls)) {
+      navigatedTabUrls = new Map(stored.navigatedTabUrls);
+    }
+  }
+  return navigatedTabUrls.get(tabId) || "";
+}
 
 // Reload captured URLs from storage on SW startup
 chrome.storage.local.get("session", ({ session }) => {
@@ -734,6 +777,8 @@ chrome.webNavigation.onCompleted.addListener(async (details) => {
   const url = details.url;
   const isRestricted = navigationUrlIsRestricted(url);
 
+  if (!isRestricted) rememberTabUrl(details.tabId, url);
+
   const foregroundOk = await isForegroundActiveTab(details.tabId);
 
   // ─── Session auto-capture (existing behaviour) ──────────────────────────
@@ -809,6 +854,7 @@ chrome.webNavigation.onHistoryStateUpdated.addListener(async (details) => {
   if (details.frameId !== 0) return;
   const url = details.url;
   if (navigationUrlIsRestricted(url)) return;
+  rememberTabUrl(details.tabId, url);
   if (!(await isForegroundActiveTab(details.tabId))) return;
   await scheduleSinglePageAutoConvert(details.tabId, url);
 });
@@ -818,11 +864,17 @@ chrome.webNavigation.onReferenceFragmentUpdated.addListener(async (details) => {
   if (details.frameId !== 0) return;
   const url = details.url;
   if (navigationUrlIsRestricted(url)) return;
+  rememberTabUrl(details.tabId, url);
   if (!(await isForegroundActiveTab(details.tabId))) return;
   await scheduleSinglePageAutoConvert(details.tabId, url);
 });
 
 chrome.tabs.onRemoved.addListener((tabId) => {
+  if (navigatedTabUrls.delete(tabId)) {
+    chrome.storage.session
+      .set({ navigatedTabUrls: [...navigatedTabUrls] })
+      .catch(() => {});
+  }
   if (pendingCaptures.has(tabId)) {
     clearTimeout(pendingCaptures.get(tabId));
     pendingCaptures.delete(tabId);
@@ -1295,10 +1347,20 @@ async function downloadAssets(markdown, folder, mdPath, options = {}) {
       const maxSessionBytes = limits.maxSessionAssetSizeMb * 1024 * 1024;
       const remaining = maxSessionBytes - budget.used;
       if (remaining <= 0) throw new Error("Session image budget exceeded");
-      const asset = await W2M.safeAssets.fetchValidatedAsset(imgUrl, {
-        maxBytes: Math.min(maxAssetBytes, remaining),
-      });
-      W2M.safeAssets.reserveAssetBytes(budget, asset.bytes, maxSessionBytes);
+      // Reserve the upper bound before fetching so concurrent pages cannot
+      // collectively exceed the session budget; refund what the asset did not use.
+      const reservedBytes = Math.min(maxAssetBytes, remaining);
+      W2M.safeAssets.reserveAssetBytes(budget, reservedBytes, maxSessionBytes);
+      let asset;
+      try {
+        asset = await W2M.safeAssets.fetchValidatedAsset(imgUrl, {
+          maxBytes: reservedBytes,
+        });
+      } catch (fetchError) {
+        budget.used -= reservedBytes;
+        throw fetchError;
+      }
+      budget.used -= reservedBytes - asset.bytes;
 
       let localName = `${stem}-${id}${asset.extension}`.replace(/[/\\:*?"<>|]/g, "-");
       let n = 0;

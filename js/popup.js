@@ -979,7 +979,7 @@
     requestOriginPermission(this.currentUrl, function (granted) {
       if (!granted) {
         state.navigate(STATES.ERROR, {
-          errorType: 'unavailable',
+          errorType: 'permission',
           message: t('error.permission')
         });
         return;

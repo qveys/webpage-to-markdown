@@ -12,6 +12,26 @@
   var defaultSessionFolder = W2M.defaultSettings.defaultSessionFolder;
   var requestOriginPermission = W2M.defaultSettings.requestOriginPermission;
 
+  // Without the "tabs" permission, chrome.tabs.query only exposes tab.url once
+  // the origin is granted (or activeTab applies). Fall back to the service
+  // worker, which tracks each tab's URL via webNavigation events.
+  function getActiveTabUrl(callback) {
+    chrome.tabs.query({ active: true, lastFocusedWindow: true }, function (tabs) {
+      var tab = tabs && tabs[0];
+      if (tab && tab.url) {
+        callback(tab.url);
+        return;
+      }
+      chrome.runtime.sendMessage({ type: 'W2M_GET_ACTIVE_URL' }, function (res) {
+        if (chrome.runtime.lastError || !res || !res.ok) {
+          callback('');
+          return;
+        }
+        callback(res.url || '');
+      });
+    });
+  }
+
   function createSvgIcon(paths, width, height, fill, stroke) {
     var svg = document.createElementNS(SVG_NS, 'svg');
     svg.setAttribute('width', String(width || 16));
@@ -138,9 +158,7 @@
       cb.checked = !!currentVal;
       cb.addEventListener('change', function () {
         if (storageKey === 'autoConvert' && cb.checked) {
-          chrome.tabs.query({ active: true, lastFocusedWindow: true }, function (tabs) {
-            var tab = tabs && tabs[0];
-            var url = tab && tab.url ? tab.url : '';
+          getActiveTabUrl(function (url) {
             requestOriginPermission(url, function (granted) {
               if (!granted) {
                 cb.checked = false;
@@ -864,9 +882,7 @@
 
   Dashboard.prototype._startCrawlFromActiveTab = function () {
     var self = this;
-    chrome.tabs.query({ active: true, lastFocusedWindow: true }, function (tabs) {
-      var tab = tabs && tabs[0];
-      var url = tab && tab.url ? tab.url : '';
+    getActiveTabUrl(function (url) {
       if (!url || !/^https?:\/\//.test(url)) {
         self._showToast(t('error.unavailable.message'));
         return;
