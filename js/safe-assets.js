@@ -23,6 +23,32 @@
     );
   }
 
+  // XML character references (&#64;, &#x40;, &amp;…) are resolved by the XML
+  // parser before CSS is interpreted, so the safety regexes must also run on
+  // the decoded text. A few rounds cover nested encodings (e.g. &amp;#64;).
+  function decodeXmlCharacterReferences(text) {
+    const named = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'" };
+    let decoded = text;
+    for (let round = 0; round < 3; round++) {
+      const next = decoded.replace(
+        /&(?:#x([0-9a-f]+)|#(\d+)|(amp|lt|gt|quot|apos));/gi,
+        (match, hex, dec, name) => {
+          if (name) return named[name.toLowerCase()];
+          const code = parseInt(hex || dec, hex ? 16 : 10);
+          if (!Number.isFinite(code) || code > 0x10ffff) return match;
+          try {
+            return String.fromCodePoint(code);
+          } catch (_err) {
+            return match;
+          }
+        },
+      );
+      if (next === decoded) break;
+      decoded = next;
+    }
+    return decoded;
+  }
+
   function validatePassiveSvg(bytes) {
     let text;
     try {
@@ -35,27 +61,29 @@
     const forbiddenMarkup = /<!doctype|<!entity|<\?xml-stylesheet|<(?:script|foreignObject|iframe|object|embed|audio|video|link|animate|animateMotion|animateTransform|set)\b/i;
     const eventHandler = /\son[a-z][a-z0-9_-]*\s*=/i;
     const activeScheme = /(?:javascript\s*:|data\s*:\s*text\/html)/i;
-    const externalReference = /(?:href|xlink:href|src)\s*=\s*["']\s*(?!#|data:image\/(?:png|jpeg|gif|webp|avif);)[^"']+["']/i;
-    const cssNetworkReference = /(?:@import|url\s*\(\s*["']?(?!#|data:image\/))/i;
+    const externalReference = /(?:href|xlink:href|src)\s*=\s*["']\s*(?!#|data:image\/(?:png|jpeg|gif|webp|avif)[;,])[^"']+["']/i;
+    const cssNetworkReference = /(?:@import|url\s*\(\s*["']?(?!#|data:image\/(?:png|jpeg|gif|webp|avif)[;,]))/i;
     const unsafeCss = /(?:@|expression\s*\(|(?:-moz-binding|behavior)\s*:|image-set\s*\()/i;
 
-    const styleContents = [];
-    for (const match of text.matchAll(/<style\b[^>]*>([\s\S]*?)<\/style\s*>/gi)) {
-      styleContents.push(match[1]);
-    }
-    for (const match of text.matchAll(/\sstyle\s*=\s*(["'])([\s\S]*?)\1/gi)) {
-      styleContents.push(match[2]);
-    }
-    if (styleContents.some((css) =>
-      unsafeCss.test(css) || activeScheme.test(css) || cssNetworkReference.test(css)
-    )) {
-      throw new Error("SVG contains active or external content");
-    }
+    for (const candidate of [text, decodeXmlCharacterReferences(text)]) {
+      const styleContents = [];
+      for (const match of candidate.matchAll(/<style\b[^>]*>([\s\S]*?)<\/style\s*>/gi)) {
+        styleContents.push(match[1]);
+      }
+      for (const match of candidate.matchAll(/\sstyle\s*=\s*(["'])([\s\S]*?)\1/gi)) {
+        styleContents.push(match[2]);
+      }
+      if (styleContents.some((css) =>
+        unsafeCss.test(css) || activeScheme.test(css) || cssNetworkReference.test(css)
+      )) {
+        throw new Error("SVG contains active or external content");
+      }
 
-    if (forbiddenMarkup.test(text) || eventHandler.test(text) ||
-        activeScheme.test(text) || externalReference.test(text) ||
-        cssNetworkReference.test(text)) {
-      throw new Error("SVG contains active or external content");
+      if (forbiddenMarkup.test(candidate) || eventHandler.test(candidate) ||
+          activeScheme.test(candidate) || externalReference.test(candidate) ||
+          cssNetworkReference.test(candidate)) {
+        throw new Error("SVG contains active or external content");
+      }
     }
   }
 
@@ -147,7 +175,7 @@
       throw new Error(`Origin is not authorized: ${parsed.origin}`);
     }
 
-    const maxBytes = Math.min(options.maxBytes || MAX_ASSET_BYTES, MAX_ASSET_BYTES);
+    const maxBytes = Math.min(options.maxBytes ?? MAX_ASSET_BYTES, MAX_ASSET_BYTES);
     const fetchImpl = options.fetchImpl || fetch;
     const response = await fetchImpl(parsed.href, {
       credentials: "omit",

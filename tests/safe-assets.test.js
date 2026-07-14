@@ -79,6 +79,12 @@ describe('safe asset validation', () => {
 
     const importedStyle = new TextEncoder().encode('<svg xmlns="http://www.w3.org/2000/svg"><style>@import "https://evil.test/a.css";</style></svg>');
     assert.throws(() => validatePassiveSvg(importedStyle), /active or external content/);
+
+    const encodedImport = new TextEncoder().encode('<svg xmlns="http://www.w3.org/2000/svg"><style>&#64;import "https://evil.test/a.css";</style></svg>');
+    assert.throws(() => validatePassiveSvg(encodedImport), /active or external content/);
+
+    const svgDataUrlCss = new TextEncoder().encode('<svg xmlns="http://www.w3.org/2000/svg"><rect style="fill:url(data:image/svg+xml,%3Csvg onload=alert(1)%3E)"/></svg>');
+    assert.throws(() => validatePassiveSvg(svgDataUrlCss), /active or external content/);
   });
 
   test('reserves the session budget atomically', () => {
