@@ -119,16 +119,16 @@
 +-----------------------------------------------+
 ```
 
-| Feature                      | Description                                                                 |
-| ---------------------------- | --------------------------------------------------------------------------- |
-| 🔗 **Automatic Discovery**   | Follows links within the same scope (domain / path prefix)                  |
-| ⚡ **Concurrent Workers**    | Configurable concurrency (default 3) for parallel page fetching             |
-| 🛡️ **Anti-bot Detection**   | Detects CAPTCHAs and 403/429 blocks, pauses automatically                  |
-| 🔄 **Pause / Resume / Retry** | Full crawl lifecycle controls from popup and dashboard                     |
-| 📊 **Live Dashboard**        | Side-panel with real-time progress, activity log, blocked URL management    |
-| 🔍 **Debug Panel**           | Inspect captured pages, queue state, and crawl engine internals             |
-| 💾 **State Persistence**     | Crawl survives Service Worker restarts via `chrome.storage`                 |
-| 📏 **Depth Control**         | Limit crawl depth (0 = unlimited, or 1–5 levels)                           |
+| Feature                       | Description                                                              |
+| ----------------------------- | ------------------------------------------------------------------------ |
+| 🔗 **Automatic Discovery**    | Follows links within the same scope (domain / path prefix)               |
+| ⚡ **Concurrent Workers**     | Configurable concurrency (default 3) for parallel page fetching          |
+| 🛡️ **Anti-bot Detection**     | Detects CAPTCHAs and 403/429 blocks, pauses automatically                |
+| 🔄 **Pause / Resume / Retry** | Full crawl lifecycle controls from popup and dashboard                   |
+| 📊 **Live Dashboard**         | Side-panel with real-time progress, activity log, blocked URL management |
+| 🔍 **Debug Panel**            | Inspect captured pages, queue state, and crawl engine internals          |
+| 💾 **State Persistence**      | Crawl survives Service Worker restarts via `chrome.storage`              |
+| 📏 **Depth Control**          | Limit crawl depth (0 = unlimited, or 1–5 levels)                         |
 
 ---
 
@@ -195,18 +195,18 @@ npm run format:check
 
 ## 🔐 Permissions
 
-|     Permission      | Why?                                                     |
-| :-----------------: | -------------------------------------------------------- |
-|   🔓 `activeTab`    | Access current page content                              |
-|   💉 `scripting`    | Inject extraction scripts into pages                     |
-|    💾 `storage`     | Persist settings, session state, and crawl progress      |
-|   📥 `downloads`    | Save `.md` files and image assets                        |
-|     🔄 `tabs`       | Track tab navigation for auto-capture                    |
-| 🧭 `webNavigation`  | Detect page loads during sessions                        |
-|   📊 `sidePanel`    | Side-panel dashboard for single-page conversion and crawl monitoring |
-|   📄 `offscreen`    | Isolated DOM parsing for link extraction during crawl    |
-|    ⏰ `alarms`      | Keep Service Worker alive during crawl sessions          |
-| 🌐 `<all_urls>`     | Fetch and convert pages from any website during crawl    |
+|     Permission     | Why?                                                                 |
+| :----------------: | -------------------------------------------------------------------- |
+|   🔓 `activeTab`   | Access current page content                                          |
+|   💉 `scripting`   | Inject extraction scripts into pages                                 |
+|    💾 `storage`    | Persist settings, session state, and crawl progress                  |
+|   📥 `downloads`   | Save `.md` files and image assets                                    |
+|     🔄 `tabs`      | Track tab navigation for auto-capture                                |
+| 🧭 `webNavigation` | Detect page loads during sessions                                    |
+|   📊 `sidePanel`   | Side-panel dashboard for single-page conversion and crawl monitoring |
+|   📄 `offscreen`   | Isolated DOM parsing for link extraction during crawl                |
+|    ⏰ `alarms`     | Keep Service Worker alive during crawl sessions                      |
+|  🌐 `<all_urls>`   | Fetch and convert pages from any website during crawl                |
 
 ---
 
