@@ -30,9 +30,12 @@ jobs:
         run: |
           node <<'EOF'
           const fs = require("fs");
+          const commandBoundary = new RegExp(
+            "^" + process.env.TRIAGE_COMMAND.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "(\\s|$)",
+          );
           const requested =
             process.env.EVENT_NAME === "issue_comment" &&
-            process.env.COMMENT_BODY.startsWith(process.env.TRIAGE_COMMAND) &&
+            commandBoundary.test(process.env.COMMENT_BODY) &&
             process.env.HAS_PULL_REQUEST === "true" &&
             JSON.parse(process.env.ALLOWED_ASSOCIATIONS).includes(process.env.AUTHOR_ASSOCIATION);
 
@@ -76,6 +79,9 @@ jobs:
             const authorizedAssociations = JSON.parse(
               process.env.MANUAL_TRIAGE_ALLOWED_ASSOCIATIONS
             );
+            const commandBoundary = new RegExp(
+              "^" + triageCommand.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "(\\s|$)"
+            );
 
             const emojiPoolByType = {
               feat: ["✨", "🎉", "🚀", "💡", "🌟"],
@@ -101,7 +107,8 @@ jobs:
             if (context.eventName === "issue_comment") {
               // Re-check authorization in-script to keep the mutation step safe even if job gating changes later.
               const isAuthorizedTriageComment =
-                context.payload.comment?.body?.startsWith(triageCommand) &&
+                Boolean(context.payload.comment?.body) &&
+                commandBoundary.test(context.payload.comment.body) &&
                 context.payload.issue?.pull_request &&
                 authorizedAssociations.includes(context.payload.comment.author_association);
               if (!isAuthorizedTriageComment) {
