@@ -244,6 +244,17 @@ webpage-to-markdown/
 
 ---
 
+## Development
+
+For documentation quality checks:
+
+- **Check markdown linting**: `npm run lint:md`
+- **Auto-fix markdown issues**: `npm run lint:md:fix`
+
+For more details, see the [Markdownlint guide](docs/markdownlint-guide.md).
+
+---
+
 ## 🤝 Contributing
 
 Contributions welcome! Open an issue or submit a PR. By participating you agree to the [PR template](.github/PULL_REQUEST_TEMPLATE.md) and one of the [issue forms](.github/ISSUE_TEMPLATE/).
