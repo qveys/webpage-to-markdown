@@ -3,9 +3,12 @@
   "version": "1.8.0",
   "private": true,
   "scripts": {
-    "test": "jest"
+    "test": "jest",
+    "lint": "eslint js/ tests/ jest.config.js"
   },
   "devDependencies": {
+    "eslint": "^10.7.0",
+    "globals": "^17.7.0",
     "jest": "^29.0.0"
   },
   "overrides": {
