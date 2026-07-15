@@ -15,6 +15,7 @@ env:
 jobs:
   triage-gate:
     runs-on: ubuntu-latest
+    permissions: {}
     outputs:
       manual_triage_requested: ${{ steps.gate.outputs.manual_triage_requested }}
     steps:
@@ -98,6 +99,7 @@ jobs:
             const { owner, repo } = context.repo;
             let issue = context.payload.pull_request ?? context.payload.issue;
             if (context.eventName === "issue_comment") {
+              // Re-check authorization in-script to keep the mutation step safe even if job gating changes later.
               const isAuthorizedTriageComment =
                 context.payload.comment?.body?.startsWith(triageCommand) &&
                 context.payload.issue?.pull_request &&
@@ -107,12 +109,17 @@ jobs:
                 return;
               }
 
-              const response = await github.rest.issues.get({
-                owner,
-                repo,
-                issue_number: context.payload.issue.number,
-              });
-              issue = response.data;
+              try {
+                const response = await github.rest.issues.get({
+                  owner,
+                  repo,
+                  issue_number: context.payload.issue.number,
+                });
+                issue = response.data;
+              } catch (error) {
+                core.setFailed(`Failed to load issue/PR #${context.payload.issue.number}: ${error.message}`);
+                return;
+              }
             }
             if (!issue) {
               core.info("No issue or pull_request payload found; skipping.");
