@@ -1,70 +1,69 @@
-# Guide Markdownlint
+# Markdownlint Guide
 
-Ce document clarifie l'état actuel de Markdownlint dans ce dépôt
-et la façon recommandée de l'utiliser sans introduire
-d'informations obsolètes.
+This guide documents the current Markdownlint situation in this
+repository and the recommended way to use it without relying on
+outdated setup details.
 
-## État actuel du dépôt
+## Current repository state
 
-- Le dépôt contient beaucoup de documentation Markdown (`README.md`,
-  `docs/`, templates GitHub, notes de migration).
-- Le `package.json` ne déclare actuellement **aucun** script `lint:md`
-  ou `lint:md:fix`.
-- Aucune configuration versionnée de type `.markdownlint.json`,
-  `.markdownlint.yaml` ou `.markdownlint-cli2.jsonc` n'est présente
-  à la racine du projet.
-- Les vérifications automatisées existantes portent aujourd'hui
-  sur les tests Jest (`npm test`).
+- The repository contains a large amount of Markdown documentation,
+  including `README.md`, files under `docs/`, and GitHub templates.
+- `package.json` does not currently define `lint:md`
+  or `lint:md:fix` scripts.
+- No versioned Markdownlint config file is present at the repository
+  root (`.markdownlint.json`, `.markdownlint.yaml`,
+  or `.markdownlint-cli2.jsonc`).
+- The existing automated checks currently cover Jest tests
+  through `npm test`.
 
-En conséquence, il ne faut pas supposer que Markdownlint fait déjà
-partie de la toolchain locale ou de la CI.
+Because of that, Markdownlint should not be described as part of the
+default local workflow or CI until the repository actually adds that
+integration.
 
-## Pourquoi utiliser Markdownlint ici
+## Why Markdownlint is still useful
 
-Markdownlint reste utile pour :
+Markdownlint is still useful for:
 
-- harmoniser les titres, listes et blocs de code ;
-- détecter les erreurs de syntaxe Markdown les plus fréquentes ;
-- limiter les régressions de formatage lors des mises à jour
-  de la documentation.
+- keeping headings, lists, and fenced code blocks consistent;
+- catching common Markdown syntax issues early;
+- reducing formatting regressions during documentation updates.
 
-## Utilisation recommandée
+## Recommended usage
 
-Si vous voulez vérifier ponctuellement la documentation sans modifier
-la configuration du projet, utilisez `npx` :
+For occasional checks, run Markdownlint with `npx` instead of
+documenting npm scripts that do not exist in the repository:
 
 ```bash
 npx markdownlint-cli2 "**/*.md"
 ```
 
-Pour tenter une correction automatique locale :
+To try local auto-fixes:
 
 ```bash
 npx markdownlint-cli2 --fix "**/*.md"
 ```
 
-Ces commandes téléchargent l'outil à la demande si nécessaire
-et évitent de documenter des scripts npm inexistants.
+These commands download the tool on demand when needed and keep the
+documentation aligned with the current project setup.
 
-## Bonnes pratiques pour ce dépôt
+## Repository-specific guidance
 
-- Vérifier en priorité les fichiers modifiés plutôt que tout le dépôt
-  lors d'une petite contribution.
-- Relire les corrections automatiques sur les listes, tableaux
-  et blocs HTML inline avant de valider.
-- Éviter d'imposer une mise en forme massive si elle n'apporte
-  pas de valeur fonctionnelle ou documentaire.
+- Prefer checking the files you changed instead of reformatting the
+  entire repository during a small documentation update.
+- Review auto-fixes carefully when lists, tables, or inline HTML are
+  involved.
+- Avoid large formatting-only rewrites unless they provide clear value.
 
-## Si une intégration permanente est ajoutée plus tard
+## If permanent integration is added later
 
-Si le projet adopte officiellement Markdownlint plus tard,
-la documentation devra être mise à jour en même temps que :
+If the project adopts Markdownlint officially later, update this guide
+at the same time as:
 
-1. l'ajout de la dépendance dans `package.json` ;
-2. l'ajout des scripts npm associés ;
-3. la création d'un fichier de configuration versionné ;
-4. l'éventuelle intégration dans la CI.
+1. adding the dependency to `package.json`;
+2. adding npm scripts for linting and auto-fixing;
+3. committing a versioned Markdownlint config file;
+4. wiring the check into CI if needed.
 
-Tant que ces éléments ne sont pas présents dans le dépôt,
-la documentation doit rester descriptive et ne pas annoncer
-une intégration déjà en place.
+Until those changes exist in the repository, the documentation should
+describe Markdownlint as an optional ad hoc check, not as an existing
+built-in workflow.
