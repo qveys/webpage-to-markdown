@@ -1,6 +1,6 @@
 # Guide Markdownlint
 
-Ce document clarifie l'etat actuel de Markdownlint dans ce depot
+Ce document clarifie l'etat actuel de Markdownlint dans ce dépôt
 et la facon recommandee de l'utiliser sans introduire
 d'informations obsoletes.
 
@@ -15,7 +15,7 @@ d'informations obsoletes.
 - Les verifications automatisees existantes portent aujourd'hui
   sur les tests Jest (`npm test`).
 
-En consequence, il ne faut pas supposer que Markdownlint fait deja
+En conséquence, il ne faut pas supposer que Markdownlint fait déjà
 partie de la toolchain locale ou de la CI.
 
 ## Pourquoi utiliser Markdownlint ici
@@ -23,7 +23,7 @@ partie de la toolchain locale ou de la CI.
 Markdownlint reste utile pour :
 
 - harmoniser les titres, listes et blocs de code ;
-- detecter les erreurs de syntaxe Markdown les plus frequentes ;
+- détecter les erreurs de syntaxe Markdown les plus fréquentes ;
 - limiter les regressions de formatage lors des mises a jour de la documentation.
 
 ## Utilisation recommandee
@@ -56,13 +56,13 @@ et evitent de documenter des scripts npm inexistants.
 ## Si une integration permanente est ajoutee plus tard
 
 Si le projet adopte officiellement Markdownlint plus tard,
-la documentation devra etre mise a jour en meme temps que :
+la documentation devra être mise a jour en même temps que :
 
 1. l'ajout de la dependance dans `package.json` ;
 2. l'ajout des scripts npm associes ;
 3. la creation d'un fichier de configuration versionne ;
-4. l'eventuelle integration dans la CI.
+4. l'éventuelle integration dans la CI.
 
-Tant que ces elements ne sont pas presents dans le depot,
+Tant que ces éléments ne sont pas présents dans le dépôt,
 la documentation doit rester descriptive et ne pas annoncer
 une integration deja en place.
