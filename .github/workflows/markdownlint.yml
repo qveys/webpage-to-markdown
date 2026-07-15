@@ -9,6 +9,9 @@ on:
       - edited
       - ready_for_review
 
+permissions:
+  contents: read
+
 jobs:
   markdownlint:
     runs-on: ubuntu-latest
