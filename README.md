@@ -49,7 +49,7 @@
 
 > Start a session, browse normally — every page you visit is automatically captured and saved.
 
-```
+```text
 +-----------------------------------------------+
 |  Start session                                |
 |  Folder: my-docs/    Delay: 2000ms            |
@@ -69,7 +69,7 @@
 +-----------------------------------------------+
 |  Stop session       12 pages captured         |
 +-----------------------------------------------+
-```
+```text
 
 | Feature                    | Description                                                                    |
 | -------------------------- | ------------------------------------------------------------------------------ |
@@ -86,7 +86,7 @@
 
 > Give a starting URL, the extension discovers and converts every linked page automatically.
 
-```
+```text
 +-----------------------------------------------+
 |  Start crawl: https://example.com/docs        |
 |  Concurrency: 3      Depth: unlimited         |
@@ -117,7 +117,7 @@
 +-----------------------------------------------+
 |  Crawl done       42 pages · 3 blocked        |
 +-----------------------------------------------+
-```
+```text
 
 | Feature                      | Description                                                                 |
 | ---------------------------- | --------------------------------------------------------------------------- |
@@ -144,7 +144,7 @@ graph LR
     D --> F[🔄 Turndown.js]
     F --> G[🧹 cleanupMarkdown]
     G --> H[📝 Markdown]
-```
+```text
 
 - 📰 **Mozilla Readability.js** — robust article extraction used by Firefox Reader View
 - 📊 **GFM tables** via turndown-plugin-gfm
@@ -209,7 +209,7 @@ git clone https://github.com/qveys/webpage-to-markdown.git
 
 ## 📁 Project Structure
 
-```
+```text
 webpage-to-markdown/
 ├── manifest.json              # Extension manifest (V3)
 ├── popup.html                 # Popup UI

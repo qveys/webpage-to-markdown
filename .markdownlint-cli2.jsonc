@@ -1,0 +1,20 @@
+{
+  "config": {
+    "MD013": false,
+    "MD029": false,
+    "MD033": false,
+    "MD036": false,
+    "MD041": false,
+    "MD060": false
+  },
+  "globs": [
+    "**/*.md"
+  ],
+  "ignores": [
+    "node_modules",
+    ".paperclip",
+    "AGENTS.md",
+    "CLAUDE.md",
+    "docs/superpowers/**/*.md"
+  ]
+}
