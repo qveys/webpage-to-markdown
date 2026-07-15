@@ -178,6 +178,21 @@ git clone https://github.com/qveys/webpage-to-markdown.git
 
 ---
 
+## 🧰 Development Tooling
+
+```bash
+npm ci
+npm test
+npm run format
+npm run format:check
+```
+
+- `npm test` runs the Jest test suite
+- `npm run format` formats the repository with Prettier
+- `npm run format:check` verifies formatting without modifying files
+
+---
+
 ## 🔐 Permissions
 
 |     Permission      | Why?                                                     |
