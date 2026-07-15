@@ -37,6 +37,7 @@ jobs:
               "feat", "fix", "docs", "style", "refactor", "perf",
               "test", "chore", "ci", "build", "revert",
             ];
+            const authorizedAssociations = ["OWNER", "MEMBER", "COLLABORATOR"];
 
             const emojiPoolByType = {
               feat: ["✨", "🎉", "🚀", "💡", "🌟"],
@@ -60,6 +61,15 @@ jobs:
             const { owner, repo } = context.repo;
             let issue = context.payload.pull_request ?? context.payload.issue;
             if (context.eventName === "issue_comment") {
+              const isAuthorizedTriageComment =
+                context.payload.comment?.body?.startsWith("/triage") &&
+                context.payload.issue?.pull_request &&
+                authorizedAssociations.includes(context.payload.comment.author_association);
+              if (!isAuthorizedTriageComment) {
+                core.info("Unauthorized or unsupported triage comment; skipping.");
+                return;
+              }
+
               const response = await github.rest.issues.get({
                 owner,
                 repo,
