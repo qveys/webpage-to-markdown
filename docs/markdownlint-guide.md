@@ -1,116 +1,53 @@
-# Guide technique : Configuration et utilisation de Markdownlint
+# Guide Markdownlint
 
-Ce guide detaille la mise en place, la configuration et l'utilisation de **Markdownlint** au sein de ce depot pour assurer la qualite et la coherence de la documentation en Markdown.
+Ce document clarifie l'etat actuel de Markdownlint dans ce depot et la facon recommandee de l'utiliser sans introduire d'informations obsoletes.
 
----
+## Etat actuel du depot
 
-## Contexte et objectifs (Pourquoi Markdownlint ?)
+- Le depot contient beaucoup de documentation Markdown (`README.md`, `docs/`, templates GitHub, notes de migration).
+- Le `package.json` ne declare actuellement **aucun** script `lint:md` ou `lint:md:fix`.
+- Aucune configuration versionnee de type `.markdownlint.json`, `.markdownlint.yaml` ou `.markdownlint-cli2.jsonc` n'est presente a la racine du projet.
+- Les verifications automatisees existantes portent aujourd'hui sur les tests Jest (`npm test`).
 
-Le projet `webpage-to-markdown` contient une quantite importante de documentation en Markdown (analyses de commits, architectures, specifications, templates de processus BMAD, etc.). Afin d'eviter la derive du style de documentation, l'introduction d'incoherences de formatage, et pour automatiser la detection des erreurs de syntaxe, nous avons integre l'outil **Markdownlint** (via `markdownlint-cli2`).
+En consequence, il ne faut pas supposer que Markdownlint fait deja partie de la toolchain locale ou de la CI.
 
-L'objectif de cette integration est de :
+## Pourquoi utiliser Markdownlint ici
 
-- Garantir une structure uniforme pour tous les fichiers `.md`.
-- Eviter les regressions de formatage lors des contributions futures.
-- Integrer des validations automatiques en integration continue (CI).
+Markdownlint reste utile pour :
 
----
+- harmoniser les titres, listes et blocs de code ;
+- detecter les erreurs de syntaxe Markdown les plus frequentes ;
+- limiter les regressions de formatage lors des mises a jour de la documentation.
 
-## Justification de la configuration et derogations aux regles
+## Utilisation recommandee
 
-Nous utilisons une configuration personnalisee de Markdownlint definie dans le fichier `.markdownlint-cli2.jsonc`. Certaines regles par defaut de Markdownlint ont ete desactivees ou adaptees pour correspondre au style d'ecriture existant du depot et eviter des modifications de masse inutiles sur des fichiers deja conformes et lisibles.
-
-Voici la liste des regles modifiees et leurs justifications :
-
-### `MD013` (Line Length) : Desactivee (`false`)
-
-- **Justification :** La documentation existante utilise un retour a la ligne naturel (soft wrapping) sans sauts de ligne forces. Imposer une limite stricte de 80 ou 120 caracteres par ligne necessiterait un reformatage massif de toute la prose, ce qui nuirait a la lisibilite et a l'historique git.
-
-### `MD029` (Ordered list item prefix) : Desactivee (`false`)
-
-- **Justification :** Les documents d'analyse du depot (notamment les syntheses de commits ou de structure) utilisent des listes ordonnees dont la numerotation se poursuit de maniere logique d'une section a l'autre (ex. 5, 6, 7...). Markdownlint impose par defaut de commencer chaque liste par `1.` ou d'avoir des chiffres croissants consecutifs stricts a partir de 1 dans chaque sous-bloc. La desactiver permet de conserver ce style de redaction qui s'affiche correctement sur GitHub.
-
-### `MD033` (No Inline HTML) : Desactivee (`false`)
-
-- **Justification :** L'usage de balises HTML en ligne est necessaire dans certains tableaux de nos documents d'analyse pour formater correctement les sauts de ligne ou inserer des badges/liens au format GitHub Flavored Markdown (GFM).
-
-### `MD036` (No emphasis as heading) : Desactivee (`false`)
-
-- **Justification :** Nos rapports d'analyse utilisent frequemment du texte en gras (ex. `**Description**`, `**Preuve**`) en guise de sous-titres visuels legers au sein de sections structurees. Cette mise en forme est intentionnelle et preferee a l'utilisation de titres de niveau 5 ou 6.
-
-### `MD041` (First line in a file should be a top-level heading) : Desactivee (`false`)
-
-- **Justification :** Nos fichiers de templates (dans `docs/templates/bmad/`) debutent par des blocs de citation (blockquotes) ou du frontmatter par conception, plutot que par un titre de niveau 1 (`#`).
-
-### `MD060` (Table column style) : Desactivee (`false`)
-
-- **Justification :** Les tableaux dans les analyses de commits existantes possedent des alignements et des styles de colonnes varies qui s'affichent parfaitement sur GitHub mais declenchent de fausses alertes sur Markdownlint.
-
----
-
-## Guide d'installation et d'utilisation (Checklist)
-
-Pour executer et utiliser Markdownlint sur le depot, suivez les etapes concises ci-dessous :
-
-### Etape 1 : Installation des dependances
-
-Installez les dependances de developpement du projet (Markdownlint y est deja inclus en tant que `markdownlint-cli2`).
+Si vous voulez verifier ponctuellement la documentation sans modifier la configuration du projet, utilisez `npx` :
 
 ```bash
-npm install
+npx markdownlint-cli2 "**/*.md"
 ```
 
-### Etape 2 : Lancer la verification (Linting)
-
-Pour analyser tous les fichiers Markdown du depot et detecter d'eventuelles erreurs :
+Pour tenter une correction automatique locale :
 
 ```bash
-npm run lint:md
+npx markdownlint-cli2 --fix "**/*.md"
 ```
 
-### Etape 3 : Correction automatique des erreurs
+Ces commandes telechargent l'outil a la demande si necessaire et evitent de documenter des scripts npm inexistants.
 
-Pour corriger automatiquement la majorite des erreurs de style (espaces superflus, lignes vides incorrectes, etc.) :
+## Bonnes pratiques pour ce depot
 
-```bash
-npm run lint:md:fix
-```
+- Verifier en priorite les fichiers modifies plutot que tout le depot lors d'une petite contribution.
+- Relire les corrections automatiques sur les listes, tableaux et blocs HTML inline avant de valider.
+- Eviter d'imposer une mise en forme massive si elle n'apporte pas de valeur fonctionnelle ou documentaire.
 
----
+## Si une integration permanente est ajoutee plus tard
 
-## Fichiers de configuration et exemples de commandes
+Si le projet adopte officiellement Markdownlint plus tard, la documentation devra etre mise a jour en meme temps que :
 
-### Fichier `.markdownlint-cli2.jsonc` (Configuration finale)
+1. l'ajout de la dependance dans `package.json` ;
+2. l'ajout des scripts npm associes ;
+3. la creation d'un fichier de configuration versionne ;
+4. l'eventuelle integration dans la CI.
 
-Ce fichier est place a la racine du depot et regit le comportement de l'analyseur :
-
-```json
-{
-  "config": {
-    "MD013": false,
-    "MD029": false,
-    "MD033": false,
-    "MD036": false,
-    "MD041": false,
-    "MD060": false
-  },
-  "globs": [
-    "**/*.md"
-  ],
-  "ignores": [
-    "node_modules",
-    ".paperclip"
-  ]
-}
-```
-
-### Scripts definis dans le `package.json`
-
-Les commandes de verification et de correction sont definies comme suit dans la section `scripts` du `package.json` :
-
-```json
-"scripts": {
-  "lint:md": "markdownlint-cli2",
-  "lint:md:fix": "markdownlint-cli2 --fix"
-}
-```
+Tant que ces elements ne sont pas presents dans le depot, la documentation doit rester descriptive et ne pas annoncer une integration deja en place.

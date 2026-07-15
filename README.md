@@ -248,8 +248,8 @@ webpage-to-markdown/
 
 For documentation quality checks:
 
-- **Check markdown linting**: `npm run lint:md`
-- **Auto-fix markdown issues**: `npm run lint:md:fix`
+- **Check markdown linting**: `npx markdownlint-cli2 "**/*.md"`
+- **Auto-fix markdown issues**: `npx markdownlint-cli2 --fix "**/*.md"`
 
 For more details, see the [Markdownlint guide](docs/markdownlint-guide.md).
 
