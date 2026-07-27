@@ -1442,10 +1442,12 @@ chrome.commands.onCommand.addListener((command) => {
         url.startsWith("chrome://") ||
         url.startsWith("chrome-extension://") ||
         url.startsWith("edge://") ||
-        url.startsWith("about:") ||
-        url.includes("chrome.google.com/webstore") ||
-        url.includes("chromewebstore.google.com")
+        url.startsWith("about:")
       ) return;
+      try {
+        const host = new URL(url).hostname;
+        if (host === "chromewebstore.google.com" || host === "chrome.google.com") return;
+      } catch (_) { return; }
       const res = await extractMarkdownFromTab(tab.id, url);
       if (!res || !res.success) return;
       await chrome.storage.local.set({
