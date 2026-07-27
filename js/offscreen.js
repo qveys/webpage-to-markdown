@@ -153,7 +153,9 @@ async function parseAndConvert(pageUrl, html) {
 
     content = _clean.innerHTML;
 
-    const markdown = convertToMarkdown(title, content);
+    const { markdownSettings } = await chrome.storage.local.get("markdownSettings");
+    const includeImages = !markdownSettings || markdownSettings.includeImages !== false;
+    const markdown = convertToMarkdown(title, content, { includeImages });
 
     return { url: pageUrl, links, markdown, title };
   } catch (err) {
@@ -243,7 +245,10 @@ function extractLinks(doc, pageUrl) {
 
 // ─── Convert HTML to Markdown via TurndownService ────────────────────────────
 
-function convertToMarkdown(title, html) {
+function convertToMarkdown(title, html, options) {
+  const opts = options || {};
+  const includeImages = opts.includeImages !== false;
+
   const service = new TurndownService({
     headingStyle: "atx",
     hr: "---",
@@ -283,6 +288,10 @@ function convertToMarkdown(title, html) {
   service.addRule("figures", {
     filter: "figure",
     replacement: (content, node) => {
+      if (!includeImages) {
+        const cap = node.querySelector("figcaption");
+        return cap ? cap.textContent : "";
+      }
       const img = node.querySelector("img");
       if (img) {
         const alt = img.getAttribute("alt") || "";
@@ -293,6 +302,13 @@ function convertToMarkdown(title, html) {
       return content;
     },
   });
+
+  if (!includeImages) {
+    service.addRule("stripImages", {
+      filter: "img",
+      replacement: () => "",
+    });
+  }
 
   // Constrain small images to their rendered size via HTML <img> tag
   service.addRule("constrainSmallImages", {

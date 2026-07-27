@@ -855,6 +855,22 @@ html.w2m-sidepanel .app {
   gap: var(--space-3);
 }
 
+.inline-option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--type-caption);
+  color: var(--text-muted);
+  cursor: pointer;
+  user-select: none;
+  padding: 4px 0;
+}
+
+.inline-option input[type='checkbox'] {
+  width: 14px;
+  height: 14px;
+}
+
 .view-home__history {
   margin-top: var(--space-5);
   padding-top: var(--space-4);

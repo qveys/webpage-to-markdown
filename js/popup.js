@@ -78,20 +78,33 @@
 
     service.keep(['iframe', 'script', 'style']);
 
+    var includeImages = this.settings.includeImages !== false;
+
     service.addRule('figures', {
       filter: 'figure',
       replacement: function (content, node) {
+        if (!includeImages) {
+          var caption = node.querySelector('figcaption');
+          return caption ? caption.textContent : '';
+        }
         var img = node.querySelector('img');
-        var caption = node.querySelector('figcaption');
+        var figCaption = node.querySelector('figcaption');
         if (img) {
           var alt = img.getAttribute('alt') || '';
           var src = img.getAttribute('src') || '';
-          var captionText = caption ? caption.textContent : '';
+          var captionText = figCaption ? figCaption.textContent : '';
           return '\n\n![' + alt + '](' + src + ')\n' + captionText + '\n\n';
         }
         return content;
       }
     });
+
+    if (!includeImages) {
+      service.addRule('stripImages', {
+        filter: 'img',
+        replacement: function () { return ''; }
+      });
+    }
 
     // Skip tiny images (icons < 16px) -- pure noise
     service.addRule('skipTinyImages', {
@@ -328,6 +341,20 @@
         actions.appendChild(el('button', { className: 'btn btn-primary btn-full', id: 'btn-convert', textContent: t('home.cta'), onClick: function () { app.handleConvert(); } }));
         actions.appendChild(el('button', { className: 'btn btn-secondary btn-full', textContent: t('home.crawl'), onClick: function () { state.navigate(STATES.PRECRAWL, { url: app.currentUrl }); } }));
         container.appendChild(actions);
+
+        var imgCb = el('input', { type: 'checkbox', id: 'setting-images', checked: app.converter.settings.includeImages !== false ? 'checked' : '' });
+        var imgLabel = el('label', { className: 'inline-option', title: 'Include images in the Markdown output' });
+        imgLabel.appendChild(imgCb);
+        imgLabel.appendChild(el('span', { textContent: 'Images' }));
+        imgCb.addEventListener('change', function () {
+          app.converter.settings.includeImages = imgCb.checked;
+          chrome.storage.local.get('markdownSettings', function (data) {
+            var s = data.markdownSettings || {};
+            s.includeImages = imgCb.checked;
+            chrome.storage.local.set({ markdownSettings: s });
+          });
+        });
+        container.appendChild(imgLabel);
         if (data && data.lastConversion) {
           var hist = el('div', { className: 'view-home__history text-muted' }, t('home.history') + ' ' + data.lastConversion.url + ' — ' + formatTimeAgo(data.lastConversion.timestamp));
           container.appendChild(hist);
