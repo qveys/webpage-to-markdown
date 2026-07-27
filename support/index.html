@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Support et questions fréquentes pour MarkdownVault sur iOS et iPadOS."
+    />
+    <title>Support / FAQ — MarkdownVault</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        line-height: 1.6;
+      }
+
+      body {
+        margin: 0;
+        background: #f5f7fb;
+        color: #182033;
+      }
+
+      main {
+        width: min(760px, calc(100% - 32px));
+        margin: 40px auto;
+        padding: 32px;
+        box-sizing: border-box;
+        background: #ffffff;
+        border: 1px solid #dce2ee;
+        border-radius: 16px;
+        box-shadow: 0 12px 36px rgb(20 31 55 / 8%);
+      }
+
+      h1,
+      h2,
+      h3 {
+        line-height: 1.25;
+      }
+
+      h1 {
+        margin-top: 0;
+      }
+
+      h2 {
+        margin-top: 40px;
+        padding-top: 24px;
+        border-top: 1px solid #dce2ee;
+      }
+
+      h3 {
+        margin-top: 28px;
+        margin-bottom: 6px;
+      }
+
+      p {
+        margin-top: 6px;
+      }
+
+      a {
+        color: #3157c8;
+      }
+
+      .meta,
+      footer {
+        color: #59657a;
+        font-size: 0.95rem;
+      }
+
+      .summary {
+        padding: 20px;
+        background: #eef3ff;
+        border-radius: 12px;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        body {
+          background: #111624;
+          color: #eef2fb;
+        }
+
+        main {
+          background: #191f2f;
+          border-color: #333d54;
+          box-shadow: none;
+        }
+
+        h2 {
+          border-color: #333d54;
+        }
+
+        a {
+          color: #9eb8ff;
+        }
+
+        .meta,
+        footer {
+          color: #b4bfd3;
+        }
+
+        .summary {
+          background: #222d49;
+        }
+      }
+
+      @media (max-width: 560px) {
+        main {
+          width: 100%;
+          margin: 0;
+          padding: 24px 20px;
+          border: 0;
+          border-radius: 0;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>Support / FAQ — MarkdownVault</h1>
+        <p class="meta">
+          iOS / iPadOS · Dernière mise à jour : 18 juillet 2026
+        </p>
+      </header>
+
+      <section class="summary" lang="en" aria-labelledby="english-summary">
+        <h2 id="english-summary">English summary</h2>
+        <p>
+          MarkdownVault converts web pages you choose into Markdown and keeps
+          them in an encrypted on-device vault. There is no MarkdownVault
+          account and no MarkdownVault cloud in v1.
+        </p>
+        <ul>
+          <li><strong>Account required?</strong> No.</li>
+          <li>
+            <strong>Where is my data?</strong> On your iPhone or iPad,
+            encrypted.
+          </li>
+          <li><strong>iCloud sync?</strong> Not in v1.</li>
+          <li><strong>Offline reading?</strong> Yes, after capture.</li>
+          <li>
+            <strong>Export?</strong> Use Share / Export to save a
+            <code>.md</code> file.
+          </li>
+          <li>
+            <strong>Delete data?</strong> Delete documents in the library, or
+            remove the app to wipe its local vault.
+          </li>
+        </ul>
+      </section>
+
+      <section aria-labelledby="faq">
+        <h2 id="faq">Questions fréquentes</h2>
+
+        <h3>Qu’est-ce que MarkdownVault ?</h3>
+        <p>
+          MarkdownVault est une app iOS qui convertit des pages web en Markdown
+          et les range dans un coffre chiffré local. L’app est local-first :
+          aucun compte MarkdownVault et aucun serveur MarkdownVault ne sont
+          nécessaires en v1.
+        </p>
+
+        <h3>Dois-je créer un compte ?</h3>
+        <p>
+          Non. Au premier lancement, vous créez et déverrouillez un coffre sur
+          l’appareil avec un code local et/ou Face ID ou Touch ID.
+        </p>
+
+        <h3>Où sont mes documents ?</h3>
+        <p>
+          Sur votre iPhone ou iPad, chiffrés. Les clés restent dans le Trousseau
+          iOS. Le développeur n’y a pas accès.
+        </p>
+
+        <h3>La biométrie envoie-t-elle mes données Face ID ?</h3>
+        <p>
+          Non. iOS gère Face ID et Touch ID ; l’app reçoit seulement un résultat
+          de succès ou d’échec. Un code de repli local reste disponible.
+        </p>
+
+        <h3>Pourquoi l’app utilise-t-elle le réseau ?</h3>
+        <p>
+          Uniquement quand vous lancez une capture. La requête part vers le site
+          que vous indiquez, pas vers des serveurs MarkdownVault.
+        </p>
+
+        <h3>Puis-je lire mes notes hors ligne ?</h3>
+        <p>
+          Oui. Une fois capturées, les notes du coffre sont consultables en mode
+          avion.
+        </p>
+
+        <h3>Comment exporter un fichier Markdown ?</h3>
+        <p>
+          Utilisez <strong>Partager / Exporter</strong>, puis choisissez la
+          destination, par exemple Fichiers ou une autre app. Une fois exporté,
+          le fichier n’est plus protégé par le coffre.
+        </p>
+
+        <h3>Comment supprimer mes données ?</h3>
+        <ul>
+          <li>Supprimez des documents depuis la bibliothèque ; ou</li>
+          <li>Désinstallez l’app pour effacer le coffre local.</li>
+        </ul>
+
+        <h3>Y a-t-il une synchronisation multi-appareils ou iCloud ?</h3>
+        <p>
+          Non en v1. Cette fonctionnalité est volontairement hors scope et ne
+          fait l’objet d’aucun engagement actuel.
+        </p>
+
+        <h3>Utilisez-vous des analytics, de la publicité ou du tracking ?</h3>
+        <p>
+          Aucun SDK tiers d’analytics, de publicité ou d’attribution n’est
+          intégré en v1. Seuls d’éventuels rapports de crash Apple, selon vos
+          réglages système, peuvent être transmis à Apple.
+        </p>
+
+        <h3>Où trouver la politique de confidentialité ?</h3>
+        <p>
+          Consultez la
+          <a href="../privacy/">Privacy Policy de MarkdownVault</a>.
+        </p>
+
+        <h3>Comment contacter le support ?</h3>
+        <p>
+          Quentin Veys, développeur individuel<br />
+          Email :
+          <a href="mailto:quentinveys@gmail.com"
+            >quentinveys@gmail.com</a
+          >
+        </p>
+      </section>
+
+      <footer>
+        <p>
+          MarkdownVault ne propose pas de synchronisation iCloud, de compte
+          cloud ou de synchronisation multi-appareils en v1.
+        </p>
+      </footer>
+    </main>
+  </body>
+</html>
