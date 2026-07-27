@@ -20,7 +20,9 @@ global.chrome = {
   storage: { local: makeStorage('local'), session: makeStorage('session') },
   alarms: { create: jest.fn(), clear: jest.fn() },
   downloads: { download: jest.fn(), setUiOptions: jest.fn(() => Promise.resolve()) },
-  runtime: { sendMessage: jest.fn(() => Promise.resolve()), lastError: null },
+  runtime: { sendMessage: jest.fn(() => Promise.resolve()), lastError: null, connect: jest.fn(() => ({ onMessage: { addListener: jest.fn() }, onDisconnect: { addListener: jest.fn() }, postMessage: jest.fn(), disconnect: jest.fn() })) },
+  commands: { getAll: jest.fn(() => Promise.resolve([{ name: 'convert-page', shortcut: 'Alt+Shift+M' }])), onCommand: { addListener: jest.fn() } },
+  tabs: { query: jest.fn(() => Promise.resolve([])), create: jest.fn() },
   action: { setBadgeText: jest.fn(), setBadgeBackgroundColor: jest.fn() },
 };
 

@@ -326,6 +326,9 @@
         container.appendChild(el('h1', { className: 'heading-lg view-home__title', textContent: t('home.title') }));
         var actions = el('div', { className: 'view-home__actions' });
         actions.appendChild(el('button', { className: 'btn btn-primary btn-full', id: 'btn-convert', textContent: t('home.cta'), onClick: function () { app.handleConvert(); } }));
+        if (app && app.shortcutLabel) {
+          actions.appendChild(el('div', { className: 'shortcut-hint text-muted' }, el('kbd', { className: 'kbd-badge', textContent: app.shortcutLabel })));
+        }
         actions.appendChild(el('button', { className: 'btn btn-secondary btn-full', textContent: t('home.crawl'), onClick: function () { state.navigate(STATES.PRECRAWL, { url: app.currentUrl }); } }));
         container.appendChild(actions);
         if (data && data.lastConversion) {
@@ -730,10 +733,12 @@
     this.toastTimeout = null;
     this.isDark = false;
     this.elapsedInterval = null;
+    this.shortcutLabel = '';
   }
 
   App.prototype.init = function () {
     var self = this;
+    self._loadShortcut();
 
     // Initialize locale
     W2M.i18n.initLocale().then(function () {
@@ -759,6 +764,19 @@
         });
       });
     });
+  };
+
+  App.prototype._loadShortcut = function () {
+    var self = this;
+    if (!chrome.commands || !chrome.commands.getAll) return;
+    chrome.commands.getAll().then(function (commands) {
+      for (var i = 0; i < commands.length; i++) {
+        if (commands[i].name === 'convert-page' && commands[i].shortcut) {
+          self.shortcutLabel = W2M.formatShortcut(commands[i].shortcut);
+          break;
+        }
+      }
+    }).catch(function () {});
   };
 
   App.prototype._setupViews = function () {

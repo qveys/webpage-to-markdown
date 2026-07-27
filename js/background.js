@@ -1429,3 +1429,34 @@ async function shouldAllowSinglePageAutoDownload() {
 }
 
 crawlEngine.restoreState();
+
+// ─── Keyboard shortcut (manifest commands) ──────────────────────────────────
+chrome.commands.onCommand.addListener((command) => {
+  if (command !== "convert-page") return;
+  (async () => {
+    try {
+      const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+      if (!tab || !tab.id || !tab.url) return;
+      const url = tab.url;
+      if (
+        url.startsWith("chrome://") ||
+        url.startsWith("chrome-extension://") ||
+        url.startsWith("edge://") ||
+        url.startsWith("about:") ||
+        url.includes("chrome.google.com/webstore") ||
+        url.includes("chromewebstore.google.com")
+      ) return;
+      const res = await extractMarkdownFromTab(tab.id, url);
+      if (!res || !res.success) return;
+      await chrome.storage.local.set({
+        lastConversion: { url, markdown: res.markdown, timestamp: Date.now() },
+      });
+      chrome.runtime.sendMessage({
+        type: "W2M_SINGLE_RESULT", ok: true,
+        markdown: res.markdown, title: res.title, url,
+      }).catch(() => {});
+    } catch (err) {
+      console.error("[W2M] Shortcut conversion failed:", err);
+    }
+  })();
+});
