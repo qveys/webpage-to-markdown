@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Beta TestFlight — MarkdownVault</title>
+  <meta name="description" content="Rejoignez le programme beta TestFlight de MarkdownVault iOS.">
+  <style>
+    :root {
+      --bg: #f7f4ef;
+      --ink: #1a1a1a;
+      --muted: #5a5a5a;
+      --accent: #0f5c4c;
+      --accent-light: #e8f2ef;
+      --rule: #d9d2c5;
+      --error: #b33a3a;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+      background:
+        radial-gradient(1200px 600px at 10% -10%, #e8f2ef 0%, transparent 55%),
+        linear-gradient(180deg, #fbf9f5 0%, var(--bg) 40%, #efe9df 100%);
+      color: var(--ink);
+      line-height: 1.65;
+    }
+    main {
+      max-width: 38rem;
+      margin: 0 auto;
+      padding: 2.5rem 1.25rem 4rem;
+    }
+    h1 { font-size: 1.75rem; margin-bottom: 0.5rem; }
+    .subtitle { color: var(--muted); margin-bottom: 2rem; }
+    form { display: flex; flex-direction: column; gap: 1.25rem; }
+    label { font-weight: 600; display: block; margin-bottom: 0.3rem; }
+    .hint { font-size: 0.85rem; color: var(--muted); margin-bottom: 0.3rem; }
+    input, select, textarea {
+      width: 100%; padding: 0.6rem 0.75rem;
+      border: 1px solid var(--rule); border-radius: 6px;
+      font-size: 1rem; font-family: inherit;
+      background: #fff;
+    }
+    input:focus, select:focus, textarea:focus {
+      outline: none; border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-light);
+    }
+    .checkbox-group { display: flex; align-items: flex-start; gap: 0.5rem; }
+    .checkbox-group input { width: auto; margin-top: 0.3rem; }
+    button[type="submit"] {
+      background: var(--accent); color: #fff;
+      border: none; border-radius: 6px;
+      padding: 0.75rem 1.5rem; font-size: 1rem;
+      font-weight: 600; cursor: pointer;
+      margin-top: 0.5rem;
+    }
+    button[type="submit"]:hover { background: #0a4a3d; }
+    .notice {
+      font-size: 0.8rem; color: var(--muted);
+      border-top: 1px solid var(--rule);
+      padding-top: 1rem; margin-top: 1rem;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Rejoignez la beta MarkdownVault</h1>
+    <p class="subtitle">Programme TestFlight iOS — places limitées (20 testeurs)</p>
+
+    <form action="https://formsubmit.co/quentinveys@gmail.com" method="POST">
+      <!-- FormSubmit config -->
+      <input type="hidden" name="_subject" value="[MarkdownVault Beta] Nouvelle inscription">
+      <input type="hidden" name="_template" value="table">
+      <input type="hidden" name="_captcha" value="true">
+      <input type="hidden" name="_next" value="https://qveys.github.io/webpage-to-markdown/beta/merci.html">
+      <input type="text" name="_honey" style="display:none">
+
+      <div>
+        <label for="name">Nom / Pseudo</label>
+        <input type="text" id="name" name="name" required placeholder="Ex: Marie D.">
+      </div>
+
+      <div>
+        <label for="email">Email</label>
+        <p class="hint">Utilisé uniquement pour l'invitation TestFlight. Transmis via FormSubmit.co pour le traitement du formulaire.</p>
+        <input type="email" id="email" name="email" required placeholder="votre@email.com">
+      </div>
+
+      <div>
+        <label for="device">Modèle iPhone</label>
+        <input type="text" id="device" name="device" required placeholder="Ex: iPhone 15 Pro, iPhone SE 3">
+      </div>
+
+      <div>
+        <label for="ios_version">Version iOS</label>
+        <select id="ios_version" name="ios_version" required>
+          <option value="">Sélectionner...</option>
+          <option value="18.x">iOS 18.x</option>
+          <option value="17.x">iOS 17.x</option>
+          <option value="16.x">iOS 16.x (minimum)</option>
+        </select>
+      </div>
+
+      <div>
+        <label for="profile">Votre profil</label>
+        <p class="hint">Choisissez le plus proche de votre usage.</p>
+        <select id="profile" name="profile" required>
+          <option value="">Sélectionner...</option>
+          <option value="A-power-user">A — Power user : notes quotidiennes, PKM, Obsidian/Notion</option>
+          <option value="B-casual">B — Casual : quelques notes, bookmarks web occasionnels</option>
+          <option value="C-security-first">C — Security-first : vault chiffré, données sensibles</option>
+        </select>
+      </div>
+
+      <div>
+        <label for="usage">Fréquence d'usage prévue</label>
+        <select id="usage" name="usage" required>
+          <option value="">Sélectionner...</option>
+          <option value="daily">Quotidien</option>
+          <option value="weekly">Plusieurs fois par semaine</option>
+          <option value="occasional">Occasionnel</option>
+        </select>
+      </div>
+
+      <div>
+        <label for="source">Comment avez-vous entendu parler de MarkdownVault ?</label>
+        <input type="text" id="source" name="source" placeholder="Ex: Reddit, Hacker News, Twitter, ami...">
+      </div>
+
+      <div class="checkbox-group">
+        <input type="checkbox" id="consent" name="consent" value="oui" required>
+        <label for="consent" style="font-weight: normal;">
+          J'accepte de participer au programme beta TestFlight. Mon email sera utilisé
+          uniquement pour l'invitation TestFlight, transmis via FormSubmit.co pour le traitement du formulaire,
+          et supprimé à la fin du programme.
+          <a href="../privacy/" style="color: var(--accent);">Politique de confidentialité</a>
+        </label>
+      </div>
+
+      <button type="submit">S'inscrire à la beta</button>
+    </form>
+
+    <p class="notice">
+      Vos données sont traitées conformément au RGPD. Base légale : consentement.
+      Responsable : Quentin Veys. Durée : jusqu'à la fin du programme beta.
+      Droit d'accès, rectification, suppression : quentinveys@gmail.com
+    </p>
+  </main>
+</body>
+</html>
