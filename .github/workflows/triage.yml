@@ -14,11 +14,14 @@ env:
 
 jobs:
   triage-gate:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64]
     permissions: {}
     outputs:
       manual_triage_requested: ${{ steps.gate.outputs.manual_triage_requested }}
     steps:
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 20
       - id: gate
         env:
           EVENT_NAME: ${{ github.event_name }}
@@ -48,7 +51,7 @@ jobs:
   label:
     needs: triage-gate
     if: github.event_name == 'pull_request_target' || needs.triage-gate.outputs.manual_triage_requested == 'true'
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, openclaw]
     permissions:
       contents: read
       pull-requests: write
@@ -63,7 +66,7 @@ jobs:
   normalize-title:
     needs: triage-gate
     if: github.event_name == 'issues' || (github.event_name == 'pull_request_target' && github.event.action != 'synchronize') || needs.triage-gate.outputs.manual_triage_requested == 'true'
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, openclaw]
     permissions:
       issues: write
       pull-requests: write
