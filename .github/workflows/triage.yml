@@ -14,7 +14,7 @@ env:
 
 jobs:
   triage-gate:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     permissions: {}
     outputs:
       manual_triage_requested: ${{ steps.gate.outputs.manual_triage_requested }}
@@ -48,7 +48,7 @@ jobs:
   label:
     needs: triage-gate
     if: github.event_name == 'pull_request_target' || needs.triage-gate.outputs.manual_triage_requested == 'true'
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     permissions:
       contents: read
       pull-requests: write
@@ -63,7 +63,7 @@ jobs:
   normalize-title:
     needs: triage-gate
     if: github.event_name == 'issues' || (github.event_name == 'pull_request_target' && github.event.action != 'synchronize') || needs.triage-gate.outputs.manual_triage_requested == 'true'
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     permissions:
       issues: write
       pull-requests: write
