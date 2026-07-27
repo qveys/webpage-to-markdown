@@ -19,6 +19,9 @@ jobs:
     outputs:
       manual_triage_requested: ${{ steps.gate.outputs.manual_triage_requested }}
     steps:
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 20
       - id: gate
         env:
           EVENT_NAME: ${{ github.event_name }}
