@@ -17,8 +17,8 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/qveys/webpage-to-markdown/actions/workflows/test.yml"><img src="https://img.shields.io/github/actions/workflow/status/qveys/webpage-to-markdown/test.yml?branch=main&style=flat-square&label=tests&logo=jest" alt="Tests" /></a>
-  <a href="https://github.com/qveys/webpage-to-markdown/security/code-scanning"><img src="https://img.shields.io/badge/CodeQL-enabled-blue?style=flat-square&logo=github" alt="CodeQL" /></a>
+  <a href="https://github.com/qveys/webpage-to-markdown/actions/workflows/test.yml"><img src="https://img.shields.io/github/actions/workflow/status/qveys/webpage-to-markdown/test.yml?branch=main&style=flat-square&label=tests&logo=nodedotjs" alt="Tests" /></a>
+  <a href="https://github.com/qveys/webpage-to-markdown/security/code-scanning"><img src="https://img.shields.io/github/actions/workflow/status/qveys/webpage-to-markdown/codeql.yml?branch=main&style=flat-square&label=CodeQL&logo=github" alt="CodeQL" /></a>
   <a href="https://github.com/qveys/webpage-to-markdown/releases/latest"><img src="https://img.shields.io/github/v/release/qveys/webpage-to-markdown?style=flat-square&logo=github" alt="Latest release" /></a>
   <img src="https://img.shields.io/badge/Manifest-V3-blue?style=flat-square&logo=googlechrome" alt="Manifest V3" />
   <a href="LICENSE"><img src="https://img.shields.io/github/license/qveys/webpage-to-markdown?style=flat-square" alt="MIT License" /></a>

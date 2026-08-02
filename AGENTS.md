@@ -8,7 +8,7 @@ Chrome Extension (Manifest V3) that converts webpages to Markdown. Supports sing
 
 ## Development
 
-No bundler or build step for the shipped extension (load unpacked source). `package.json` exists for **tests / dev tooling only** (`npm test`, `npx jest`). Load directly in Chrome:
+No bundler or build step for the shipped extension (load unpacked source). `package.json` exists for **tests / dev tooling only** (`npm test`, using Node's built-in test runner). Load directly in Chrome:
 1. `chrome://extensions/` → Developer mode → "Load unpacked" → select repo root
 2. Reload extension after changes (or Ctrl+R on the extensions page)
 
@@ -87,5 +87,5 @@ Two PreToolUse hooks protect the codebase:
 - Single-page auto-convert uses `webNavigation.onCompleted` for full loads; SPAs and in-page navigations also need `onHistoryStateUpdated` and `onReferenceFragmentUpdated`. Prefer `tabs.get` plus `windows.getLastFocused` over `tabs.query({ active: true, lastFocusedWindow: true })` when deciding if the navigated tab is the foreground active tab.
 - Single-page auto-download runs only when the side panel dashboard is connected (crawl `runtime.connect` port active) and `dashboardMode === 'single'` in `chrome.storage.local`.
 - The popup can open the side panel on the Single Page tab by setting `dashboardMode` to `single`, opening the panel, and sending `W2M_APPLY_DASHBOARD_MODE` (see `openDashboardSinglePage`); `W2M_OPEN_DASHBOARD` may carry `mode: 'single' | 'crawl'`.
-- Run tests with `npm test`, or `npx jest` when `jest` is not on `PATH`.
+- Run tests with `npm test` (Node's built-in `node:test` runner; no npm test dependency).
 - Machine-local Cursor hook state lives under `.cursor/hooks/state/` and is listed in `.gitignore`.

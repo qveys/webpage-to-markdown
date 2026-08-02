@@ -1,10 +1,12 @@
 const fs = require('fs');
 const vm = require('vm');
 const path = require('path');
+const { describe, test, before } = require('node:test');
+const assert = require('node:assert/strict');
 
 let urlToPath;
 
-beforeAll(() => {
+before(() => {
   const bgCode = fs.readFileSync(
     path.resolve(__dirname, '../js/background.js'),
     'utf8',
@@ -19,33 +21,33 @@ beforeAll(() => {
 describe('urlToPath', () => {
   test('splits a multi-segment URL into dirs and filename', () => {
     const result = urlToPath('https://example.com/docs/api/intro');
-    expect(result.dirs).toEqual(['example.com', 'docs', 'api']);
-    expect(result.filename).toBe('intro');
+    assert.deepEqual(result.dirs, ['example.com', 'docs', 'api']);
+    assert.equal(result.filename, 'intro');
   });
 
   test('includes query params in filename', () => {
     const result = urlToPath('https://example.com/page?tab=ios&ref=1');
-    expect(result.filename).toContain('page');
-    expect(result.filename).toContain('--');
-    expect(result.filename).toContain('tab');
-    expect(result.filename).toContain('ios');
+    assert.ok(result.filename.includes('page'));
+    assert.ok(result.filename.includes('--'));
+    assert.ok(result.filename.includes('tab'));
+    assert.ok(result.filename.includes('ios'));
   });
 
   test('returns fallback for invalid URL', () => {
     const result = urlToPath('not a url');
-    expect(result.dirs).toEqual([]);
-    expect(result.filename).toBe('page');
+    assert.deepEqual(result.dirs, []);
+    assert.equal(result.filename, 'page');
   });
 
   test('root path returns index as filename', () => {
     const result = urlToPath('https://example.com/');
-    expect(result.dirs).toEqual(['example.com']);
-    expect(result.filename).toBe('index');
+    assert.deepEqual(result.dirs, ['example.com']);
+    assert.equal(result.filename, 'index');
   });
 
   test('hostname with special chars is cleaned', () => {
     const result = urlToPath('https://my-site.example.com/about');
-    expect(result.dirs[0]).toBe('my-site.example.com');
-    expect(result.filename).toBe('about');
+    assert.equal(result.dirs[0], 'my-site.example.com');
+    assert.equal(result.filename, 'about');
   });
 });
