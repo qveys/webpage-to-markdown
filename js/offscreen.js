@@ -196,7 +196,9 @@ function resolveUrls(doc, pageUrl) {
       !href.startsWith("http") &&
       !href.startsWith("mailto:") &&
       !href.startsWith("#") &&
-      !href.startsWith("javascript:")
+      !href.startsWith("javascript:") &&
+      !href.startsWith("data:") &&
+      !href.startsWith("vbscript:")
     ) {
       try {
         a.setAttribute("href", new URL(href, pageUrl).href);
@@ -218,6 +220,8 @@ function extractLinks(doc, pageUrl) {
     if (
       href.startsWith("mailto:") ||
       href.startsWith("javascript:") ||
+      href.startsWith("data:") ||
+      href.startsWith("vbscript:") ||
       href.startsWith("#")
     ) {
       return;
