@@ -303,6 +303,7 @@
     this._lastBlockedKey = '';
     this._reconnectAttempts = 0;
     this._activeUrl = '';
+    this._activeUrlToken = 0;
 
     this._initLocale();
   }
@@ -320,17 +321,41 @@
       self._checkShowSettings();
       self._initDebugMode();
       self._refreshActiveUrl();
+      self._watchActiveTab();
     });
   };
 
-  // Cache the active tab URL once at startup so permission prompts triggered
-  // later by a user gesture (checkbox toggle, crawl button) can call
+  // Cache the active tab URL so permission prompts triggered later by a user
+  // gesture (checkbox toggle, crawl button) can call
   // chrome.permissions.request() synchronously — an async chrome.tabs.query()
   // hop in between would drop the transient user-activation state and make
   // Chrome reject the request with "must be called during a user gesture".
+  //
+  // Quick tab switches leave several lookups in flight, and getActiveTabUrl()
+  // may fall back to the service worker, so replies can arrive out of order.
+  // Only the newest request is allowed to write, otherwise a slow older reply
+  // would restore the very stale URL this cache exists to avoid.
   Dashboard.prototype._refreshActiveUrl = function () {
     var self = this;
-    getActiveTabUrl(function (url) { self._activeUrl = url; });
+    var token = ++this._activeUrlToken;
+    getActiveTabUrl(function (url) {
+      if (token !== self._activeUrlToken) return;
+      self._activeUrl = url;
+    });
+  };
+
+  // The side panel outlives tab switches, so the cached URL has to follow the
+  // active tab. Without this, switching tabs after opening the panel leaves
+  // _activeUrl pointing at the previous tab and silently crawls it.
+  Dashboard.prototype._watchActiveTab = function () {
+    var self = this;
+    if (!chrome.tabs) return;
+    chrome.tabs.onActivated.addListener(function () {
+      self._refreshActiveUrl();
+    });
+    chrome.tabs.onUpdated.addListener(function (tabId, changeInfo, tab) {
+      if (changeInfo.url && tab && tab.active) self._refreshActiveUrl();
+    });
   };
 
   Dashboard.prototype._getActiveUrl = function () {
