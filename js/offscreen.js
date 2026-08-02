@@ -218,6 +218,8 @@ function extractLinks(doc, pageUrl) {
     if (
       href.startsWith("mailto:") ||
       href.startsWith("javascript:") ||
+      href.startsWith("data:") ||
+      href.startsWith("vbscript:") ||
       href.startsWith("#")
     ) {
       return;
