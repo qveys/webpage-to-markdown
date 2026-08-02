@@ -158,11 +158,10 @@ graph LR
 
 ### 🎨 UI
 
-- 🌙 Light, dark, GitHub dark, Monokai, and Amber Wire themes shared across popup, dashboard, and settings
+- 🌙 Light, dark, Midnight Blue, Synthwave, Solarized Dark, Catppuccin, Dracula, Nord, Vercel, Retro Terminal, and Paper themes shared across popup, dashboard, and settings
   - Choose the active theme from **Settings → Appearance**
   - The sun/moon button switches between light mode and the last selected dark variant
-  - Monokai uses its pink (`#F92672`) as the primary accent while keeping its semantic green, orange, and cyan colors
-  - Amber Wire uses an amber signal color (`#F2A93B`) as the primary accent, with mint, blue, and violet supporting colors
+  - Theme palettes share semantic surface, content, interaction, and feedback tokens
 - 📊 Side-panel dashboard for single-page conversion and crawl monitoring
 - ⚙️ Dedicated settings page with markdown, capture, and crawl preferences
 - 🔒 Inputs disabled during active session to prevent misconfiguration
@@ -220,7 +219,7 @@ webpage-to-markdown/
 ├── dashboard.html             # Side-panel crawl dashboard
 ├── settings.html              # Options page
 ├── offscreen.html             # Offscreen document (DOM parsing)
-├── styles.css                 # Global styles (light/dark/GitHub dark/Monokai/Amber Wire themes)
+├── styles.css                 # Global token-driven interface themes
 ├── js/
 │   ├── background.js          # Service Worker (sessions, downloads, crawl)
 │   ├── popup.js               # Popup logic, state views, markdown converter

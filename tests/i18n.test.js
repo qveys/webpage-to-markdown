@@ -28,6 +28,20 @@ describe('t() translation lookup', () => {
   test('interpolates parameters', () => {
     assert.equal(t('result.meta', { size: '1 Ko', words: 42 }), 'Taille : 1 Ko · 42 mots');
   });
+
+  test('includes labels for every interface theme', () => {
+    assert.equal(t('settings.theme.light'), 'Clair');
+    assert.equal(t('settings.theme.dark'), 'Sombre');
+    assert.equal(t('settings.theme.midnightBlue'), 'Bleu nuit');
+    assert.equal(t('settings.theme.synthwave'), 'Synthwave');
+    assert.equal(t('settings.theme.solarizedDark'), 'Solarized sombre');
+    assert.equal(t('settings.theme.catppuccin'), 'Catppuccin');
+    assert.equal(t('settings.theme.dracula'), 'Dracula');
+    assert.equal(t('settings.theme.nord'), 'Nord');
+    assert.equal(t('settings.theme.vercel'), 'Vercel');
+    assert.equal(t('settings.theme.retroTerminal'), 'Terminal rétro');
+    assert.equal(t('settings.theme.paper'), 'Papier');
+  });
 });
 
 describe('formatDuration()', () => {
