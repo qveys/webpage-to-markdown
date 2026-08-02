@@ -312,7 +312,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             !tab.url.startsWith("chrome-extension://") &&
             !tab.url.startsWith("edge://") &&
             !tab.url.startsWith("about:") &&
-            !tab.url.includes("chrome.google.com/webstore")
+            !isWebStoreUrl(tab.url)
           ) {
             // Check if the page was already captured
             if (capturedUrls.has(tab.url)) {
@@ -532,8 +532,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           url.startsWith("chrome-extension://") ||
           url.startsWith("edge://") ||
           url.startsWith("about:") ||
-          url.includes("chrome.google.com/webstore") ||
-          url.includes("chromewebstore.google.com")
+          isWebStoreUrl(url)
         ) {
           throw new Error("Cannot convert system pages or Web Store");
         }
@@ -595,14 +594,22 @@ async function addCapturedUrl(url) {
   await setSession({ capturedUrls: [...capturedUrls] });
 }
 
+function isWebStoreUrl(url) {
+  try {
+    const { hostname } = new URL(url);
+    return hostname === "chrome.google.com" || hostname === "chromewebstore.google.com";
+  } catch (e) {
+    return false;
+  }
+}
+
 function navigationUrlIsRestricted(url) {
   return (
     url.startsWith("chrome://") ||
     url.startsWith("chrome-extension://") ||
     url.startsWith("edge://") ||
     url.startsWith("about:") ||
-    url.includes("chrome.google.com/webstore") ||
-    url.includes("chromewebstore.google.com")
+    isWebStoreUrl(url)
   );
 }
 
