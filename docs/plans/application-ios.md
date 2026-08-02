@@ -39,7 +39,7 @@ inspectResponse({ status, contentType, html }) -> PageDisposition
 
 Le core restera composé de scripts JavaScript directement chargeables, sans bundler nécessaire à l’exécution. Les deux dépôts consommateurs l’intégreront comme sous-module Git, verrouillé sur un tag et un SHA. Leur CI refusera un sous-module non initialisé ou une version de schéma incompatible.
 
-Avant extraction, figer des fixtures et snapshots de référence. Les 93 tests actuellement verts constitueront le minimum de non-régression. Les modifications non validées déjà présentes dans le worktree de l’extension devront être préservées et intégrées depuis une branche propre, sans reset destructif.
+Avant extraction, figer des fixtures et snapshots de référence. Les tests actuellement verts constitueront le minimum de non-régression. Les modifications non validées déjà présentes dans le worktree de l’extension devront être préservées et intégrées depuis une branche propre, sans reset destructif.
 
 ### Application native
 
@@ -198,7 +198,7 @@ Les crawls utilisent toujours `credentials: omit`. Les sites nécessitant une co
 1. **Core partagé**
    - Créer le dépôt core, fixtures, snapshots et API versionnée.
    - Migrer l’extension Chrome vers le sous-module sans changement fonctionnel.
-   - Obtenir les mêmes sorties Markdown et garder les 93 tests verts.
+   - Obtenir les mêmes sorties Markdown et garder tous les tests verts.
 
 2. **Fondations iOS**
    - Créer le projet Xcode, les trois targets, App Group, Core Data, services de fichiers et schémas de messages.
