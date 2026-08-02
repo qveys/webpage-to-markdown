@@ -6,7 +6,7 @@
 
   var DEFAULTS = {
     markdown: { frontmatter: false, headingStyle: 'atx', bulletListMarker: '-', codeBlockStyle: 'fenced' },
-    capture: { delay: 2000, urlTree: true, saveAssets: true },
+    capture: { delay: 2000, urlTree: true, saveAssets: true, maxAssetSizeMb: 10, maxSessionAssetSizeMb: 50 },
     crawl: { concurrency: 3, maxBlocks: 5, depth: 0 }
   };
 
@@ -20,6 +20,7 @@
     };
     this._refs = {};
     this.debugCrawlPanel = false;
+    this.theme = W2M.theme.getCurrentTheme();
   }
 
   SettingsController.prototype.init = function () {
@@ -35,6 +36,13 @@
         // Skip re-render for our own saves
         if (self._ownSave) return;
         self.loadSettings();
+      });
+    }
+    if (!this._themeUnsubscribe) {
+      var controller = this;
+      this._themeUnsubscribe = W2M.theme.subscribe(function (theme) {
+        controller.theme = theme;
+        if (controller._refs.theme) controller._refs.theme.value = theme;
       });
     }
     this.loadSettings();
@@ -58,6 +66,28 @@
     var md = this.settings.markdown;
     var cap = this.settings.capture;
     var cr = this.settings.crawl;
+
+    // --- APPEARANCE SECTION ---
+    var themeSelect = el('select', { className: 'form-select', id: 'sc-theme' },
+      el('option', { value: 'light', textContent: t('settings.theme.light') }),
+      el('option', { value: 'dark', textContent: t('settings.theme.dark') }),
+      el('option', { value: 'github-dark', textContent: t('settings.theme.githubDark') }),
+      el('option', { value: 'monokai', textContent: t('settings.theme.monokai') }),
+      el('option', { value: 'agentmesh', textContent: t('settings.theme.agentmesh') })
+    );
+    themeSelect.value = this.theme;
+    this._refs.theme = themeSelect;
+
+    var appearanceSection = el('div', { className: 'settings-section' },
+      el('div', { className: 'section-label' }, t('settings.appearance')),
+      el('div', { className: 'card' },
+        el('div', { className: 'form-group mb-0' },
+          el('label', { className: 'form-label', 'for': 'sc-theme' }, t('settings.theme')),
+          themeSelect,
+          el('div', { className: 'form-hint' }, t('settings.theme.hint'))
+        )
+      )
+    );
 
     // --- MARKDOWN SECTION ---
     var frontmatterCheck = el('input', { className: 'form-checkbox', type: 'checkbox', id: 'sc-frontmatter' });
@@ -134,6 +164,18 @@
     assetsCheck.checked = cap.saveAssets;
     this._refs.assets = assetsCheck;
 
+    var maxAssetSizeInput = el('input', {
+      className: 'form-input', type: 'number', id: 'sc-max-asset-size',
+      min: '1', max: '100', step: '1', value: String(cap.maxAssetSizeMb)
+    });
+    this._refs.maxAssetSize = maxAssetSizeInput;
+
+    var maxSessionAssetSizeInput = el('input', {
+      className: 'form-input', type: 'number', id: 'sc-max-session-asset-size',
+      min: '1', max: '1000', step: '1', value: String(cap.maxSessionAssetSizeMb)
+    });
+    this._refs.maxSessionAssetSize = maxSessionAssetSizeInput;
+
     var captureSection = el('div', { className: 'settings-section' },
       el('div', { className: 'section-label' }, t('settings.capture')),
       el('div', { className: 'card' },
@@ -148,6 +190,14 @@
         el('label', { className: 'form-checkbox-label' },
           assetsCheck,
           document.createTextNode(t('settings.assets'))
+        ),
+        el('div', { className: 'form-group mt-3' },
+          el('label', { className: 'form-label', 'for': 'sc-max-asset-size' }, t('settings.maxAssetSize')),
+          maxAssetSizeInput
+        ),
+        el('div', { className: 'form-group' },
+          el('label', { className: 'form-label', 'for': 'sc-max-session-asset-size' }, t('settings.maxSessionAssetSize')),
+          maxSessionAssetSizeInput
         )
       )
     );
@@ -218,6 +268,7 @@
       )
     );
 
+    this.container.appendChild(appearanceSection);
     this.container.appendChild(markdownSection);
     this.container.appendChild(captureSection);
     this.container.appendChild(crawlSection);
@@ -263,6 +314,10 @@
     var self = this;
     var save = function () { self.saveFromUI(); };
 
+    this._refs.theme.addEventListener('change', function () {
+      W2M.theme.setTheme(self._refs.theme.value);
+    });
+
     // Markdown controls
     this._refs.frontmatter.addEventListener('change', save);
     this._refs.heading.addEventListener('change', save);
@@ -275,6 +330,8 @@
     this._refs.delayCareful.addEventListener('change', save);
     this._refs.organize.addEventListener('change', save);
     this._refs.assets.addEventListener('change', save);
+    this._refs.maxAssetSize.addEventListener('change', save);
+    this._refs.maxSessionAssetSize.addEventListener('change', save);
 
     // Crawl controls
     this._refs.concurrency.addEventListener('change', save);
@@ -321,8 +378,14 @@
     var captureSettings = {
       delay: delayVal,
       urlTree: this._refs.organize.checked,
-      saveAssets: this._refs.assets.checked
+      saveAssets: this._refs.assets.checked,
+      maxAssetSizeMb: Math.min(100, Math.max(1, Number.isFinite(Number(this._refs.maxAssetSize.value)) ? Number(this._refs.maxAssetSize.value) : 10)),
+      maxSessionAssetSizeMb: Math.min(1000, Math.max(1, Number.isFinite(Number(this._refs.maxSessionAssetSize.value)) ? Number(this._refs.maxSessionAssetSize.value) : 50))
     };
+    if (captureSettings.maxSessionAssetSizeMb < captureSettings.maxAssetSizeMb) {
+      captureSettings.maxSessionAssetSizeMb = captureSettings.maxAssetSizeMb;
+      this._refs.maxSessionAssetSize.value = String(captureSettings.maxSessionAssetSizeMb);
+    }
 
     var crawlSettings = {
       concurrency: Number(this._refs.concurrency.value) || 3,
