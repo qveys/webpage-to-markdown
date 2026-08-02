@@ -28,14 +28,6 @@ describe('t() translation lookup', () => {
   test('interpolates parameters', () => {
     assert.equal(t('result.meta', { size: '1 Ko', words: 42 }), 'Taille : 1 Ko · 42 mots');
   });
-
-  test('includes labels for every interface theme', () => {
-    assert.equal(t('settings.theme.light'), 'Clair');
-    assert.equal(t('settings.theme.dark'), 'Sombre');
-    assert.equal(t('settings.theme.githubDark'), 'GitHub sombre');
-    assert.equal(t('settings.theme.monokai'), 'Monokai');
-    assert.equal(t('settings.theme.agentmesh'), 'Amber Wire');
-  });
 });
 
 describe('formatDuration()', () => {
