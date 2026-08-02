@@ -1343,19 +1343,6 @@
         el('span', { className: 'dash-debug__logicon', textContent: meta.emoji, 'aria-hidden': 'true' }),
         el('span', { className: 'dash-debug__loglabel', textContent: t(meta.labelKey) }),
         el('span', { className: 'dash-debug__logpopover-message', textContent: message }));
-        var dismissTimer = null;
-        popover.addEventListener('toggle', function (event) {
-          if (dismissTimer) clearTimeout(dismissTimer);
-          dismissTimer = null;
-          if (event.newState === 'open') {
-            dismissTimer = setTimeout(function () {
-              dismissTimer = null;
-              if (popover.isConnected && popover.matches(':popover-open')) {
-                popover.hidePopover();
-              }
-            }, 3000);
-          }
-        });
         c.appendChild(popover);
       });
       truncNote('logs', snap.logs.length, snap.totalLogs);
