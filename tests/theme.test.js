@@ -119,6 +119,24 @@ test('custom theme tokens and early theme loading are wired into every UI', () =
   assert.match(css, /\[data-theme="synthwave"\][\s\S]*?--primary:\s*330 80% 72%/);
   assert.match(css, /\[data-theme="paper"\][\s\S]*?--background:\s*40 40% 95%/);
 
+  // Every theme must declare the full token set, otherwise a palette silently
+  // falls back to :root values for whatever it forgot to override.
+  const declaredTokens = new Map();
+  for (const [, name, body] of css.matchAll(/\[data-theme="([^"]+)"\]\s*\{([^}]*)\}/g)) {
+    const tokens = declaredTokens.get(name) || new Set();
+    for (const [, token] of body.matchAll(/(--[a-z0-9-]+)\s*:/g)) tokens.add(token);
+    declaredTokens.set(name, tokens);
+  }
+  const requiredTokens = declaredTokens.get('dark');
+  assert.equal(requiredTokens.size, 34);
+  assert.ok(requiredTokens.has('--void-crimson'));
+  themeNames.forEach((name) => {
+    const tokens = declaredTokens.get(name);
+    assert.ok(tokens, `${name} has no [data-theme="${name}"] block`);
+    const missing = [...requiredTokens].filter((token) => !tokens.has(token));
+    assert.deepEqual(missing, [], `${name} is missing tokens: ${missing.join(', ')}`);
+  });
+
   ['popup.html', 'dashboard.html', 'settings.html'].forEach((filename) => {
     const html = fs.readFileSync(path.join(__dirname, '..', filename), 'utf8');
     const themeInitIndex = html.indexOf('js/theme-init.js');
