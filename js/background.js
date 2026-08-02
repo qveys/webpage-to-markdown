@@ -7,9 +7,13 @@ importScripts("/js/markdown-output.js");
 importScripts("/js/safe-assets.js");
 
 // A service-worker restart must never leave Chrome's download UI disabled.
-chrome.downloads.setUiOptions({ enabled: true }).catch((err) => {
+try {
+  chrome.downloads.setUiOptions({ enabled: true }).catch((err) => {
+    console.warn("[W2M] Unable to restore download UI on startup:", err.message);
+  });
+} catch (err) {
   console.warn("[W2M] Unable to restore download UI on startup:", err.message);
-});
+}
 
 // Initialize once. Service-worker wake-ups must preserve completed crawl results.
 chrome.storage.local.get("session", ({ session }) => {
