@@ -11,10 +11,10 @@ reports are taken seriously — thank you for taking the time to send one.
 Only the latest published release is supported. Fixes land on `main` and ship in the
 next release; there are no backports to earlier tags.
 
-| Version               | Supported |
-| --------------------- | :-------: |
-| Latest release (`main`) |    ✅     |
-| Any earlier tag       |    ❌     |
+| Version                  | Supported |
+| ------------------------ | :-------: |
+| Latest published release |    ✅     |
+| Any earlier tag          |    ❌     |
 
 Before reporting, update to the latest version and confirm the issue still reproduces.
 
