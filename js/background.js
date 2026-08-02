@@ -6,19 +6,28 @@ importScripts("/js/cleanup-markdown.js");
 importScripts("/js/markdown-output.js");
 importScripts("/js/safe-assets.js");
 
-// Reset session on every SW startup (including extension reload)
-// New timestamped folder on each startup, delay preserved
-chrome.storage.local.get("session", ({ session }) => {
-  const ts = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
-  chrome.storage.local.set({
-    session: {
-      active: false,
-      folder: `w2m-session-${ts}`,
-      delay: session?.delay ?? 2000,
-      capturedUrls: [], // New session on SW restart
-    },
+// A service-worker restart must never leave Chrome's download UI disabled.
+try {
+  chrome.downloads.setUiOptions({ enabled: true }).catch((err) => {
+    console.warn("[W2M] Unable to restore download UI on startup:", err.message);
   });
-  chrome.action.setBadgeText({ text: "" });
+} catch (err) {
+  console.warn("[W2M] Unable to restore download UI on startup:", err.message);
+}
+
+// Initialize once. Service-worker wake-ups must preserve completed crawl results.
+chrome.storage.local.get("session", ({ session }) => {
+  if (!session) {
+    const ts = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
+    chrome.storage.local.set({
+      session: {
+        active: false,
+        folder: `w2m-session-${ts}`,
+        delay: 2000,
+        capturedUrls: [],
+      },
+    });
+  }
 });
 
 // ─── Extraction du contenu de la page ────────────────────────────────────────
@@ -1467,6 +1476,10 @@ async function closeOffscreen() {
 // ─── Port-based messaging for crawl ──────────────────────
 chrome.runtime.onConnect.addListener((port) => {
   if (port.name === "crawl") {
+    // Register the port immediately: Chrome does not buffer messages for a
+    // late onMessage listener, so the dashboard's initial crawl:get-status /
+    // crawl:get-debug-snapshot requests must not be dropped. restoreState()
+    // re-broadcasts the accurate snapshot once storage has loaded.
     crawlEngine.addPort(port);
   }
 });
@@ -1533,4 +1546,4 @@ async function shouldAllowSinglePageAutoDownload() {
   return crawlEngine.ports.size > 0;
 }
 
-crawlEngine.restoreState();
+crawlEngine.restoreState().catch((err) => console.warn("[W2M] Crawl state restore:", err.message));

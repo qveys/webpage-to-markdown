@@ -61,6 +61,14 @@ class CrawlEngine {
     }
   }
 
+  async _setDownloadUiEnabled(enabled) {
+    try {
+      await chrome.downloads.setUiOptions({ enabled });
+    } catch (e) {
+      console.warn("[CrawlEngine] setUiOptions:", e.message);
+    }
+  }
+
   // ─── Live config update ─────────────────────────────────────────────────────
 
   updateConfig(patch) {
@@ -151,11 +159,12 @@ class CrawlEngine {
 
     this.enqueue(startUrl, 0);
     chrome.alarms.create("crawl-keepalive", { periodInMinutes: 0.4 });
-    // Hide Chrome download UI during crawl
-    try { chrome.downloads.setUiOptions({ enabled: false }); } catch (e) { console.warn('[W2M] setUiOptions:', e.message); }
+    await this._setDownloadUiEnabled(false);
     this._abortController = new AbortController();
     this.status = "running";
     this.log("info", `Crawl started: ${startUrl}`);
+    // Replace the previous completed snapshot before workers begin.
+    await this.saveState();
     this.broadcastStatus(true);
     this.spawnWorkers();
   }
@@ -196,8 +205,7 @@ class CrawlEngine {
     this.discoveryQueue = [];
     this.stats.queued = 0;
     chrome.alarms.clear("crawl-keepalive");
-    // Re-enable Chrome download UI
-    try { chrome.downloads.setUiOptions({ enabled: true }); } catch (e) { console.warn('[W2M] setUiOptions:', e.message); }
+    await this._setDownloadUiEnabled(true);
     clearTimeout(this._broadcastTimer);
     this._broadcastTimer = null;
     this.log("info", "Crawl stopped");
@@ -259,6 +267,7 @@ class CrawlEngine {
           this.log("info", "Crawl complete");
           this.status = "stopped";
           chrome.alarms.clear("crawl-keepalive");
+          await this._setDownloadUiEnabled(true);
           await this.saveState();
           this.broadcastStatus(true);
           await this._invokeSessionEnded();
@@ -679,8 +688,13 @@ class CrawlEngine {
     this.log("info", "State restored");
 
     if (this.status === "running") {
+      await this._setDownloadUiEnabled(false);
       this.spawnWorkers();
     }
+
+    // A connected dashboard may have received the constructor's empty state
+    // before storage finished loading. Always publish the restored snapshot.
+    this.broadcastStatus(true);
 
     return true;
   }

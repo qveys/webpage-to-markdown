@@ -816,6 +816,7 @@ html.w2m-sidepanel .app {
 
 .badge {
   display: inline-flex;
+  flex-shrink: 0;
   align-items: center;
   gap: var(--space-1);
   padding: 2px var(--space-2);
@@ -823,6 +824,7 @@ html.w2m-sidepanel .app {
   font-size: var(--type-caption);
   font-family: var(--font-sans);
   font-weight: var(--weight-medium);
+  white-space: nowrap;
 }
 
 .badge--live {
@@ -1494,13 +1496,108 @@ html.w2m-sidepanel .app {
 }
 
 .dash-debug__logline {
-  padding: var(--space-2);
+  --log-color: var(--feedback-info);
+  --log-background: var(--feedback-info-subtle);
+  display: grid;
+  grid-template-columns: 48px 20px max-content minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: 6px var(--space-2);
   border-bottom: 1px solid var(--border-default);
-  font-size: 12px;
+  border-top: 0;
+  border-right: 0;
+  border-left: 3px solid var(--log-color);
+  background: var(--log-background);
+  color: var(--text-primary);
+  font-size: 10px;
+  text-align: left;
+  cursor: pointer;
 }
 
-.dash-debug__logline:last-child {
+.dash-debug__logline:last-of-type {
   border-bottom: none;
+}
+
+.dash-debug__logline:focus-visible {
+  outline: 2px solid var(--interactive-primary);
+  outline-offset: -2px;
+}
+
+.dash-debug__logline--capture {
+  --log-color: var(--feedback-success);
+  --log-background: var(--feedback-success-subtle);
+}
+
+.dash-debug__logline--asset {
+  --log-color: #8b5cf6;
+  --log-background: color-mix(in srgb, #8b5cf6 12%, var(--surface-primary));
+}
+
+.dash-debug__logline--skip,
+.dash-debug__logline--warn {
+  --log-color: var(--feedback-warning);
+  --log-background: var(--feedback-warning-subtle);
+}
+
+.dash-debug__logline--blocked,
+.dash-debug__logline--error {
+  --log-color: var(--feedback-error);
+  --log-background: var(--feedback-error-subtle);
+}
+
+.dash-debug__logicon {
+  line-height: 1.5;
+  text-align: center;
+}
+
+.dash-debug__logtime {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.dash-debug__loglabel {
+  color: var(--log-color);
+  font-weight: var(--weight-semibold);
+  text-transform: uppercase;
+}
+
+.dash-debug__logmessage {
+  min-width: 0;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dash-debug__logpopover {
+  inset: auto var(--space-3) var(--space-3);
+  width: calc(100% - (2 * var(--space-3)));
+  max-width: 620px;
+  max-height: 45vh;
+  margin: 0 auto;
+  padding: var(--space-3);
+  overflow: auto;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface-elevated);
+  color: var(--text-primary);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.dash-debug__logpopover:popover-open {
+  display: grid;
+  grid-template-columns: 48px 20px max-content minmax(0, 1fr);
+  align-items: start;
+  gap: var(--space-2);
+}
+
+.dash-debug__logpopover-message {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .dash-debug__pre {
@@ -1581,6 +1678,10 @@ html.w2m-sidepanel .app {
 
 .mb-1 {
   margin-bottom: var(--space-1);
+}
+
+.mb-0 {
+  margin-bottom: 0;
 }
 
 .mb-2 {

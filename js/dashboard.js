@@ -1323,13 +1323,49 @@
     }
 
     if (tab === 'logs') {
-      var logs = snap.logs || [];
+      var logs = (snap.logs || []).slice().reverse();
       var typeF = this._debugEls.logSelect.value;
       if (typeF) logs = logs.filter(function (l) { return l.type === typeF; });
       if (filter) logs = logs.filter(function (l) { return (String(l.message || '')).toLowerCase().indexOf(filter) !== -1; });
-      logs.forEach(function (l) {
-        var line = '[' + (l.type || '') + '] ' + (l.message || '');
-        c.appendChild(el('div', { className: 'dash-debug__logline monospace', textContent: line, title: line }));
+      var logTypes = {
+        info: { emoji: '\u2139\uFE0F', labelKey: 'debug.log.info' },
+        capture: { emoji: '\u2705', labelKey: 'debug.log.capture' },
+        asset: { emoji: '\uD83D\uDDBC\uFE0F', labelKey: 'debug.log.asset' },
+        skip: { emoji: '\u23ED\uFE0F', labelKey: 'debug.log.skip' },
+        blocked: { emoji: '\uD83D\uDEE1\uFE0F', labelKey: 'debug.log.blocked' },
+        warn: { emoji: '\u26A0\uFE0F', labelKey: 'debug.log.warn' },
+        error: { emoji: '\u274C', labelKey: 'debug.log.error' }
+      };
+      logs.forEach(function (l, index) {
+        var rawType = String(l.type || 'info').toLowerCase();
+        var safeType = Object.prototype.hasOwnProperty.call(logTypes, rawType) ? rawType : 'info';
+        var meta = logTypes[safeType];
+        var message = String(l.message || '');
+        var logDate = new Date(Number(l.timestamp));
+        var time = Number.isNaN(logDate.getTime()) ? '--:--:--' : logDate.toTimeString().slice(0, 8);
+        var line = time + ' [' + rawType + '] ' + message;
+        var popoverId = 'dash-log-popover-' + index;
+        c.appendChild(el('button', {
+          type: 'button',
+          className: 'dash-debug__logline dash-debug__logline--' + safeType + ' monospace',
+          title: line,
+          'aria-label': line,
+          popovertarget: popoverId
+        },
+        el('span', { className: 'dash-debug__logtime', textContent: time }),
+        el('span', { className: 'dash-debug__logicon', textContent: meta.emoji, 'aria-hidden': 'true' }),
+        el('span', { className: 'dash-debug__loglabel', textContent: t(meta.labelKey) }),
+        el('span', { className: 'dash-debug__logmessage', textContent: message })));
+        var popover = el('div', {
+          id: popoverId,
+          className: 'dash-debug__logpopover monospace',
+          popover: 'auto'
+        },
+        el('span', { className: 'dash-debug__logtime', textContent: time }),
+        el('span', { className: 'dash-debug__logicon', textContent: meta.emoji, 'aria-hidden': 'true' }),
+        el('span', { className: 'dash-debug__loglabel', textContent: t(meta.labelKey) }),
+        el('span', { className: 'dash-debug__logpopover-message', textContent: message }));
+        c.appendChild(popover);
       });
       truncNote('logs', snap.logs.length, snap.totalLogs);
       return;
