@@ -1,0 +1,47 @@
+name: CodeQL
+
+# Static analysis for the extension's own JavaScript. Free on public repos
+# (no GitHub Advanced Security needed). Vendored libraries are excluded:
+# they are upstream code we do not patch, so their alerts are not actionable
+# here — report those upstream instead (see SECURITY.md).
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Weekly run catches new queries shipped after the last commit.
+    - cron: "27 4 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    name: Analyze JavaScript
+    runs-on: [self-hosted, Linux, X64]
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@f205ea1c3313d32999d8d6a48b4f6530d4437b38 # v4.37.4
+        with:
+          languages: javascript-typescript
+          queries: security-extended
+          config: |
+            paths-ignore:
+              - js/Readability.js
+              - js/turndown.js
+              - js/turndown-plugin-gfm.js
+              - node_modules
+
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@f205ea1c3313d32999d8d6a48b4f6530d4437b38 # v4.37.4
+        with:
+          category: "/language:javascript-typescript"
