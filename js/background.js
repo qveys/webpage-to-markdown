@@ -233,8 +233,14 @@ function originPermissionPattern(url) {
 }
 
 function normalizeAssetLimits(source = {}) {
-  const maxAssetSizeMb = Math.min(100, Math.max(1, Number(source.maxAssetSizeMb) || 10));
-  const requestedSessionMb = Math.min(1000, Math.max(1, Number(source.maxSessionAssetSizeMb) || 50));
+  const maxAssetSizeMb = Math.min(
+    100,
+    Math.max(1, Number.isFinite(Number(source.maxAssetSizeMb)) ? Number(source.maxAssetSizeMb) : 10),
+  );
+  const requestedSessionMb = Math.min(
+    1000,
+    Math.max(1, Number.isFinite(Number(source.maxSessionAssetSizeMb)) ? Number(source.maxSessionAssetSizeMb) : 50),
+  );
   return {
     maxAssetSizeMb,
     maxSessionAssetSizeMb: Math.max(maxAssetSizeMb, requestedSessionMb),

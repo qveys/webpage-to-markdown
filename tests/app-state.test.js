@@ -3,10 +3,10 @@ const { describe, test, before, beforeEach, mock } = require('node:test');
 const assert = require('node:assert/strict');
 const { loadModule } = require('./setup/load-module');
 
-// Jest sandboxes the global scope, so `global.window = global` only sets it
-// on Jest's fake global. vm.runInThisContext runs in the real V8 global, so
-// we must poke `window` there for the IIFE-based source files to find it,
-// then pull the exports back into Jest's scope.
+// Node's test runner sandboxes the global scope, so `global.window = global`
+// only sets it on the runner's fake global. vm.runInThisContext runs in the
+// real V8 global, so we must poke `window` there for the IIFE-based source
+// files to find it, then pull the exports back into the runner's scope.
 let STATES, TRANSITIONS, AppState;
 
 before(() => {

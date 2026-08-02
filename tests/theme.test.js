@@ -110,6 +110,10 @@ test('custom theme tokens and early theme loading are wired into every UI', () =
 
   ['popup.html', 'dashboard.html', 'settings.html'].forEach((filename) => {
     const html = fs.readFileSync(path.join(__dirname, '..', filename), 'utf8');
-    assert.ok(html.indexOf('js/theme-init.js') < html.indexOf('styles.css'));
+    const themeInitIndex = html.indexOf('js/theme-init.js');
+    const stylesIndex = html.indexOf('styles.css');
+    assert.ok(themeInitIndex !== -1, `${filename} is missing js/theme-init.js`);
+    assert.ok(stylesIndex !== -1, `${filename} is missing styles.css`);
+    assert.ok(themeInitIndex < stylesIndex);
   });
 });

@@ -112,11 +112,16 @@
   }
 
   function bytesToBase64(bytes) {
-    let binary = "";
+    // Build the intermediate binary string from an array of chunks joined
+    // once, instead of repeated `+=` concatenation, to avoid the extra
+    // allocation/copy pressure that grows with multi-MB assets (up to the
+    // 100 MiB per-asset cap) in the memory-constrained service worker.
     const chunkSize = 0x8000;
+    const chunks = [];
     for (let offset = 0; offset < bytes.length; offset += chunkSize) {
-      binary += String.fromCharCode.apply(null, bytes.subarray(offset, offset + chunkSize));
+      chunks.push(String.fromCharCode.apply(null, bytes.subarray(offset, offset + chunkSize)));
     }
+    const binary = chunks.join("");
     if (typeof btoa === "function") return btoa(binary);
     return Buffer.from(bytes).toString("base64");
   }

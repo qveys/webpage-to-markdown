@@ -149,7 +149,6 @@ class CrawlEngine {
     this.blockedUrls = [];
     this.downloadedAssets = new Map();
     this.assetBudget = { used: 0 };
-    this.logBuffer = [];
     this.consecutiveBlocks = 0;
     this.stats = {
       captured: 0,
@@ -650,7 +649,6 @@ class CrawlEngine {
           config: this.config,
           scope: this.scope,
           assetBytesUsed: this.assetBudget.used,
-          logs: this.logBuffer.slice(-500),
         },
       });
       await chrome.storage.session.set({
@@ -680,9 +678,6 @@ class CrawlEngine {
     this.config = crawlState.config || this.config;
     this.scope = crawlState.scope || null;
     this.assetBudget = { used: Number(crawlState.assetBytesUsed) || 0 };
-    this.logBuffer = Array.isArray(crawlState.logs)
-      ? crawlState.logs.slice(-500)
-      : [];
     this.discoveryQueue = crawlQueue || [];
     this.stats.queued = this.discoveryQueue.length;
     // Rebuild seenUrls from captured + queued + blocked URLs

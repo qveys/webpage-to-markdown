@@ -76,12 +76,19 @@
   }
 
   function init() {
+    var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+    // Seed a synchronous guess before the async storage read resolves, so
+    // the initial paint and any early subscribe() calls don't flash 'light'
+    // for users who chose a dark theme. The callback below refines this
+    // with the persisted preference once chrome.storage.local resolves.
+    applyTheme(resolveInitialTheme(null, preferredDarkTheme, prefersDark));
+
     chrome.storage.local.get(['theme', 'darkTheme'], function (result) {
       result = result || {};
       preferredDarkTheme = normalizeDarkTheme(
         result.darkTheme || (isDarkTheme(result.theme) ? result.theme : null)
       );
-      var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
       applyTheme(resolveInitialTheme(result.theme, preferredDarkTheme, prefersDark));
     });
 
