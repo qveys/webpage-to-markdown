@@ -1468,13 +1468,13 @@ async function closeOffscreen() {
 }
 
 // ─── Port-based messaging for crawl ──────────────────────
-let crawlRestorePromise = Promise.resolve(false);
 chrome.runtime.onConnect.addListener((port) => {
   if (port.name === "crawl") {
-    // Never expose the constructor's empty state while restoration is pending.
-    crawlRestorePromise
-      .catch((err) => console.warn("[W2M] Crawl state restore:", err.message))
-      .finally(() => crawlEngine.addPort(port));
+    // Register the port immediately: Chrome does not buffer messages for a
+    // late onMessage listener, so the dashboard's initial crawl:get-status /
+    // crawl:get-debug-snapshot requests must not be dropped. restoreState()
+    // re-broadcasts the accurate snapshot once storage has loaded.
+    crawlEngine.addPort(port);
   }
 });
 
@@ -1540,4 +1540,4 @@ async function shouldAllowSinglePageAutoDownload() {
   return crawlEngine.ports.size > 0;
 }
 
-crawlRestorePromise = crawlEngine.restoreState();
+crawlEngine.restoreState().catch((err) => console.warn("[W2M] Crawl state restore:", err.message));
