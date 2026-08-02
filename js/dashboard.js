@@ -303,6 +303,7 @@
     this._lastBlockedKey = '';
     this._reconnectAttempts = 0;
     this._activeUrl = '';
+    this._activeUrlToken = 0;
 
     this._initLocale();
   }
@@ -329,9 +330,18 @@
   // chrome.permissions.request() synchronously — an async chrome.tabs.query()
   // hop in between would drop the transient user-activation state and make
   // Chrome reject the request with "must be called during a user gesture".
+  //
+  // Quick tab switches leave several lookups in flight, and getActiveTabUrl()
+  // may fall back to the service worker, so replies can arrive out of order.
+  // Only the newest request is allowed to write, otherwise a slow older reply
+  // would restore the very stale URL this cache exists to avoid.
   Dashboard.prototype._refreshActiveUrl = function () {
     var self = this;
-    getActiveTabUrl(function (url) { self._activeUrl = url; });
+    var token = ++this._activeUrlToken;
+    getActiveTabUrl(function (url) {
+      if (token !== self._activeUrlToken) return;
+      self._activeUrl = url;
+    });
   };
 
   // The side panel outlives tab switches, so the cached URL has to follow the
