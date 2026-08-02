@@ -71,9 +71,15 @@
     var themeSelect = el('select', { className: 'form-select', id: 'sc-theme' },
       el('option', { value: 'light', textContent: t('settings.theme.light') }),
       el('option', { value: 'dark', textContent: t('settings.theme.dark') }),
-      el('option', { value: 'github-dark', textContent: t('settings.theme.githubDark') }),
-      el('option', { value: 'monokai', textContent: t('settings.theme.monokai') }),
-      el('option', { value: 'agentmesh', textContent: t('settings.theme.agentmesh') })
+      el('option', { value: 'midnight-blue', textContent: t('settings.theme.midnightBlue') }),
+      el('option', { value: 'synthwave', textContent: t('settings.theme.synthwave') }),
+      el('option', { value: 'solarized-dark', textContent: t('settings.theme.solarizedDark') }),
+      el('option', { value: 'catppuccin', textContent: t('settings.theme.catppuccin') }),
+      el('option', { value: 'dracula', textContent: t('settings.theme.dracula') }),
+      el('option', { value: 'nord', textContent: t('settings.theme.nord') }),
+      el('option', { value: 'vercel', textContent: t('settings.theme.vercel') }),
+      el('option', { value: 'retro-terminal', textContent: t('settings.theme.retroTerminal') }),
+      el('option', { value: 'paper', textContent: t('settings.theme.paper') })
     );
     themeSelect.value = this.theme;
     this._refs.theme = themeSelect;

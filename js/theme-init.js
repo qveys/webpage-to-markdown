@@ -2,8 +2,19 @@
 (function () {
   'use strict';
 
-  var VALID_THEMES = ['light', 'dark', 'github-dark', 'monokai', 'agentmesh'];
-  var VALID_DARK_THEMES = ['dark', 'github-dark', 'monokai', 'agentmesh'];
+  var VALID_THEMES = [
+    'light', 'dark', 'midnight-blue', 'synthwave', 'solarized-dark',
+    'catppuccin', 'dracula', 'nord', 'vercel', 'retro-terminal', 'paper'
+  ];
+  var VALID_DARK_THEMES = [
+    'dark', 'midnight-blue', 'synthwave', 'solarized-dark',
+    'catppuccin', 'dracula', 'nord', 'vercel', 'retro-terminal'
+  ];
+  var LEGACY_THEMES = {
+    'github-dark': 'midnight-blue',
+    monokai: 'synthwave',
+    agentmesh: 'solarized-dark'
+  };
   var currentTheme = 'light';
   var preferredDarkTheme = 'dark';
   var listeners = [];
@@ -13,15 +24,17 @@
   }
 
   function normalizeTheme(theme) {
+    theme = LEGACY_THEMES[theme] || theme;
     return includes(VALID_THEMES, theme) ? theme : null;
   }
 
   function normalizeDarkTheme(theme) {
-    return includes(VALID_DARK_THEMES, theme) ? theme : 'dark';
+    var normalizedTheme = normalizeTheme(theme);
+    return includes(VALID_DARK_THEMES, normalizedTheme) ? normalizedTheme : 'dark';
   }
 
   function isDarkTheme(theme) {
-    return includes(VALID_DARK_THEMES, theme);
+    return includes(VALID_DARK_THEMES, normalizeTheme(theme));
   }
 
   function resolveInitialTheme(storedTheme, storedDarkTheme, prefersDark) {

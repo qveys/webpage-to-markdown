@@ -59,15 +59,23 @@ function loadTheme(initialStorage, prefersDark) {
 describe('theme manager', () => {
   test('accepts exactly the supported themes', () => {
     const { theme } = loadTheme({}, false);
-    assert.equal(theme.normalizeTheme('light'), 'light');
-    assert.equal(theme.normalizeTheme('dark'), 'dark');
-    assert.equal(theme.normalizeTheme('github-dark'), 'github-dark');
-    assert.equal(theme.normalizeTheme('monokai'), 'monokai');
-    assert.equal(theme.normalizeTheme('agentmesh'), 'agentmesh');
-    assert.equal(theme.isDarkTheme('monokai'), true);
-    assert.equal(theme.isDarkTheme('agentmesh'), true);
-    assert.equal(theme.nextTheme('light', 'monokai'), 'monokai');
+    const supportedThemes = [
+      'light', 'dark', 'midnight-blue', 'synthwave', 'solarized-dark',
+      'catppuccin', 'dracula', 'nord', 'vercel', 'retro-terminal', 'paper',
+    ];
+    supportedThemes.forEach((name) => assert.equal(theme.normalizeTheme(name), name));
+    supportedThemes.slice(1, -1).forEach((name) => assert.equal(theme.isDarkTheme(name), true));
+    assert.equal(theme.isDarkTheme('paper'), false);
+    assert.equal(theme.nextTheme('light', 'synthwave'), 'synthwave');
+    assert.deepEqual(Array.from(theme.THEMES), supportedThemes);
     assert.equal(theme.normalizeTheme('unknown'), null);
+  });
+
+  test('migrates identifiers from the previous custom themes', () => {
+    const { theme } = loadTheme({}, false);
+    assert.equal(theme.normalizeTheme('github-dark'), 'midnight-blue');
+    assert.equal(theme.normalizeTheme('monokai'), 'synthwave');
+    assert.equal(theme.normalizeTheme('agentmesh'), 'solarized-dark');
   });
 
   test('uses the system preference when no valid theme is stored', () => {
@@ -78,35 +86,56 @@ describe('theme manager', () => {
   });
 
   test('restores the last selected dark variant after a light theme', () => {
-    const runtime = loadTheme({ theme: 'github-dark', darkTheme: 'github-dark' }, false);
+    const runtime = loadTheme({ theme: 'catppuccin', darkTheme: 'catppuccin' }, false);
     runtime.theme.toggleTheme();
     assert.equal(runtime.theme.getCurrentTheme(), 'light');
     runtime.theme.toggleTheme();
-    assert.equal(runtime.theme.getCurrentTheme(), 'github-dark');
-    assert.equal(runtime.stored.darkTheme, 'github-dark');
+    assert.equal(runtime.theme.getCurrentTheme(), 'catppuccin');
+    assert.equal(runtime.stored.darkTheme, 'catppuccin');
   });
 
   test('updates the active theme from an external storage change', () => {
     const runtime = loadTheme({ theme: 'light', darkTheme: 'dark' }, false);
-    runtime.emitStorage({ theme: { oldValue: 'light', newValue: 'github-dark' } });
-    assert.equal(runtime.theme.getCurrentTheme(), 'github-dark');
-    assert.equal(runtime.theme.getDarkTheme(), 'github-dark');
-    assert.equal(runtime.documentElement.attributes['data-theme'], 'github-dark');
+    runtime.emitStorage({ theme: { oldValue: 'light', newValue: 'midnight-blue' } });
+    assert.equal(runtime.theme.getCurrentTheme(), 'midnight-blue');
+    assert.equal(runtime.theme.getDarkTheme(), 'midnight-blue');
+    assert.equal(runtime.documentElement.attributes['data-theme'], 'midnight-blue');
     assert.equal(runtime.documentElement.style.colorScheme, 'dark');
   });
 });
 
 test('custom theme tokens and early theme loading are wired into every UI', () => {
   const css = fs.readFileSync(path.join(__dirname, '../styles.css'), 'utf8');
-  assert.match(css, /\[data-theme="github-dark"\]/);
-  assert.match(css, /--surface-primary:\s*#0d1117/);
-  assert.match(css, /--text-primary:\s*#f0f6fc/);
-  assert.match(css, /--feedback-info:\s*#4493f8/);
-  assert.match(css, /\[data-theme="monokai"\]/);
-  assert.match(css, /--interactive-primary:\s*#f92672/);
-  assert.match(css, /\[data-theme="agentmesh"\]/);
-  assert.match(css, /--interactive-primary:\s*#f2a93b/);
-  assert.match(css, /--interactive-secondary:\s*#b69cff/);
+  const themeNames = [
+    'dark', 'midnight-blue', 'synthwave', 'solarized-dark', 'catppuccin',
+    'dracula', 'nord', 'vercel', 'retro-terminal', 'paper',
+  ];
+  themeNames.forEach((name) => {
+    assert.match(css, new RegExp(`\\[data-theme="${name}"\\]`));
+  });
+  assert.match(css, /--background:\s*0 0% 100%/);
+  assert.match(css, /--primary:\s*240 5\.9% 10%/);
+  assert.match(css, /--surface-primary:\s*hsl\(var\(--background\)\)/);
+  assert.match(css, /\[data-theme="synthwave"\][\s\S]*?--primary:\s*330 80% 72%/);
+  assert.match(css, /\[data-theme="paper"\][\s\S]*?--background:\s*40 40% 95%/);
+
+  // Every theme must declare the full token set, otherwise a palette silently
+  // falls back to :root values for whatever it forgot to override.
+  const declaredTokens = new Map();
+  for (const [, name, body] of css.matchAll(/\[data-theme="([^"]+)"\]\s*\{([^}]*)\}/g)) {
+    const tokens = declaredTokens.get(name) || new Set();
+    for (const [, token] of body.matchAll(/(--[a-z0-9-]+)\s*:/g)) tokens.add(token);
+    declaredTokens.set(name, tokens);
+  }
+  const requiredTokens = declaredTokens.get('dark');
+  assert.equal(requiredTokens.size, 34);
+  assert.ok(requiredTokens.has('--void-crimson'));
+  themeNames.forEach((name) => {
+    const tokens = declaredTokens.get(name);
+    assert.ok(tokens, `${name} has no [data-theme="${name}"] block`);
+    const missing = [...requiredTokens].filter((token) => !tokens.has(token));
+    assert.deepEqual(missing, [], `${name} is missing tokens: ${missing.join(', ')}`);
+  });
 
   ['popup.html', 'dashboard.html', 'settings.html'].forEach((filename) => {
     const html = fs.readFileSync(path.join(__dirname, '..', filename), 'utf8');
