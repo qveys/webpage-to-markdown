@@ -115,6 +115,8 @@ Useful context when assessing a finding:
   (`js/offscreen.js`), which has no privileged extension APIs beyond messaging.
 - **Supply chain.** GitHub Actions are pinned to commit SHAs, Dependabot watches the
   dev dependencies, and `npm audit --omit=dev --audit-level=high` gates every PR.
+- **Static analysis.** CodeQL code scanning (default setup) runs on every pull request
+  and on a weekly schedule.
 
 ---
 
