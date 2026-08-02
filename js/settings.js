@@ -379,8 +379,8 @@
       delay: delayVal,
       urlTree: this._refs.organize.checked,
       saveAssets: this._refs.assets.checked,
-      maxAssetSizeMb: Math.min(100, Math.max(1, Number(this._refs.maxAssetSize.value) || 10)),
-      maxSessionAssetSizeMb: Math.min(1000, Math.max(1, Number(this._refs.maxSessionAssetSize.value) || 50))
+      maxAssetSizeMb: Math.min(100, Math.max(1, Number.isFinite(Number(this._refs.maxAssetSize.value)) ? Number(this._refs.maxAssetSize.value) : 10)),
+      maxSessionAssetSizeMb: Math.min(1000, Math.max(1, Number.isFinite(Number(this._refs.maxSessionAssetSize.value)) ? Number(this._refs.maxSessionAssetSize.value) : 50))
     };
     if (captureSettings.maxSessionAssetSizeMb < captureSettings.maxAssetSizeMb) {
       captureSettings.maxSessionAssetSizeMb = captureSettings.maxAssetSizeMb;
