@@ -83,9 +83,10 @@
   // SINGLE PAGE PANEL
   // =============================================
 
-  function SinglePagePanel(container, showToast) {
+  function SinglePagePanel(container, showToast, getActiveUrl) {
     this.$container = container;
     this._showToast = showToast;
+    this._getActiveUrl = getActiveUrl;
     this._state = 'idle'; // idle | converting | success | error
     this._result = null;  // { markdown, title, url }
     this._errorMsg = '';
@@ -158,15 +159,17 @@
       cb.checked = !!currentVal;
       cb.addEventListener('change', function () {
         if (storageKey === 'autoConvert' && cb.checked) {
-          getActiveTabUrl(function (url) {
-            requestOriginPermission(url, function (granted) {
-              if (!granted) {
-                cb.checked = false;
-                self._showToast(t('error.permission'));
-                return;
-              }
-              self._saveSettings({ autoConvert: true });
-            });
+          // Call requestOriginPermission() synchronously with the URL cached
+          // by the Dashboard — an async getActiveTabUrl() hop here would lose
+          // the user gesture and make Chrome reject the permission prompt.
+          var url = self._getActiveUrl ? self._getActiveUrl() : '';
+          requestOriginPermission(url, function (granted) {
+            if (!granted) {
+              cb.checked = false;
+              self._showToast(t('error.permission'));
+              return;
+            }
+            self._saveSettings({ autoConvert: true });
           });
           return;
         }
@@ -299,6 +302,7 @@
     this._debugFilterTimer = null;
     this._lastBlockedKey = '';
     this._reconnectAttempts = 0;
+    this._activeUrl = '';
 
     this._initLocale();
   }
@@ -315,7 +319,22 @@
       self._loadSession();
       self._checkShowSettings();
       self._initDebugMode();
+      self._refreshActiveUrl();
     });
+  };
+
+  // Cache the active tab URL once at startup so permission prompts triggered
+  // later by a user gesture (checkbox toggle, crawl button) can call
+  // chrome.permissions.request() synchronously — an async chrome.tabs.query()
+  // hop in between would drop the transient user-activation state and make
+  // Chrome reject the request with "must be called during a user gesture".
+  Dashboard.prototype._refreshActiveUrl = function () {
+    var self = this;
+    getActiveTabUrl(function (url) { self._activeUrl = url; });
+  };
+
+  Dashboard.prototype._getActiveUrl = function () {
+    return this._activeUrl;
   };
 
   Dashboard.prototype._cacheElements = function () {
@@ -862,7 +881,7 @@
 
     // Lazy-build the single-page panel the first time the mode is selected
     if (isSingle && this.$singleView && !this._singlePanel) {
-      this._singlePanel = new SinglePagePanel(this.$singleView, this._showToast.bind(this));
+      this._singlePanel = new SinglePagePanel(this.$singleView, this._showToast.bind(this), this._getActiveUrl.bind(this));
       this._singlePanel.init();
     }
   };
@@ -882,45 +901,48 @@
 
   Dashboard.prototype._startCrawlFromActiveTab = function () {
     var self = this;
-    getActiveTabUrl(function (url) {
-      if (!url || !/^https?:\/\//.test(url)) {
-        self._showToast(t('error.unavailable.message'));
+    var url = this._activeUrl;
+    if (!url || !/^https?:\/\//.test(url)) {
+      self._showToast(t('error.unavailable.message'));
+      return;
+    }
+
+    var folder = defaultSessionFolder(url);
+
+    // requestOriginPermission() must run synchronously within this click
+    // handler's call stack — no async hop before it — or Chrome rejects the
+    // prompt for lacking a user gesture. The active URL is refreshed ahead
+    // of time via _refreshActiveUrl() for exactly this reason.
+    requestOriginPermission(url, function (granted) {
+      if (!granted) {
+        self._showToast(t('error.permission'));
         return;
       }
 
-      var folder = defaultSessionFolder(url);
+      chrome.storage.local.get(['captureSettings', 'crawlSettings'], function (data) {
+        var cap = Object.assign({}, DEFAULT_CAPTURE_SETTINGS, data.captureSettings || {});
+        var cr = Object.assign({}, DEFAULT_CRAWL_SETTINGS, data.crawlSettings || {});
 
-      requestOriginPermission(url, function (granted) {
-        if (!granted) {
-          self._showToast(t('error.permission'));
-          return;
-        }
-
-        chrome.storage.local.get(['captureSettings', 'crawlSettings'], function (data) {
-          var cap = Object.assign({}, DEFAULT_CAPTURE_SETTINGS, data.captureSettings || {});
-          var cr = Object.assign({}, DEFAULT_CRAWL_SETTINGS, data.crawlSettings || {});
-
-          chrome.runtime.sendMessage({
-            type: 'W2M_CRAWL_START',
-            startUrl: url,
-            folder: folder,
-            delay: cap.delay,
-            urlTree: !!cap.urlTree,
-            saveAssets: !!cap.saveAssets,
-            maxAssetSizeMb: cap.maxAssetSizeMb,
-            maxSessionAssetSizeMb: cap.maxSessionAssetSizeMb,
-            concurrency: Number(cr.concurrency) || DEFAULT_CRAWL_SETTINGS.concurrency,
-            maxBlocks: Number.isFinite(Number(cr.maxBlocks)) ? Number(cr.maxBlocks) : DEFAULT_CRAWL_SETTINGS.maxBlocks,
-            depth: Number.isFinite(Number(cr.depth)) ? Number(cr.depth) : DEFAULT_CRAWL_SETTINGS.depth
-          }, function (res) {
-            if (chrome.runtime.lastError || !res || !res.ok) {
-              self._showToast(t('toast.error'));
-              return;
-            }
-            self._setStatus('running');
-            self._applyMode('crawl');
-            if (self.port) self.port.postMessage({ type: 'crawl:get-status' });
-          });
+        chrome.runtime.sendMessage({
+          type: 'W2M_CRAWL_START',
+          startUrl: url,
+          folder: folder,
+          delay: cap.delay,
+          urlTree: !!cap.urlTree,
+          saveAssets: !!cap.saveAssets,
+          maxAssetSizeMb: cap.maxAssetSizeMb,
+          maxSessionAssetSizeMb: cap.maxSessionAssetSizeMb,
+          concurrency: Number(cr.concurrency) || DEFAULT_CRAWL_SETTINGS.concurrency,
+          maxBlocks: Number.isFinite(Number(cr.maxBlocks)) ? Number(cr.maxBlocks) : DEFAULT_CRAWL_SETTINGS.maxBlocks,
+          depth: Number.isFinite(Number(cr.depth)) ? Number(cr.depth) : DEFAULT_CRAWL_SETTINGS.depth
+        }, function (res) {
+          if (chrome.runtime.lastError || !res || !res.ok) {
+            self._showToast(t('toast.error'));
+            return;
+          }
+          self._setStatus('running');
+          self._applyMode('crawl');
+          if (self.port) self.port.postMessage({ type: 'crawl:get-status' });
         });
       });
     });
@@ -1064,7 +1086,7 @@
       }
       if (msg && msg.type === 'W2M_SINGLE_RESULT') {
         if (!self._singlePanel) {
-          self._singlePanel = new SinglePagePanel(self.$singleView, self._showToast.bind(self));
+          self._singlePanel = new SinglePagePanel(self.$singleView, self._showToast.bind(self), self._getActiveUrl.bind(self));
           self._singlePanel.init();
         }
         if (msg.ok) {
