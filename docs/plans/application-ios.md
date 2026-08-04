@@ -84,7 +84,27 @@ Modèles principaux :
 - `PendingImport` : URL partagée, application source, état rapide/interactif et erreur.
 - `SettingsSnapshot` : réglages Markdown, capture, crawl, thème, langue et synchronisation.
 
-Toutes les écritures venant des extensions seront transactionnelles. Les fichiers seront écrits atomiquement avant que l’enregistrement Core Data soit marqué comme terminé.
+#### Coordination Core Data entre processus
+
+Le store partagé activera `NSPersistentHistoryTrackingKey` et `NSPersistentStoreRemoteChangeNotificationPostOptionKey`. Chaque target (application, Safari Extension, Share Extension) traitera les transactions de persistent history après notification `remote-change` et au démarrage, puis sauvegardera son jeton d’historique dans un enregistrement dédié dans l’App Group.
+
+Politique de fusion déterministe :
+
+- `ConversionRecord`, `CaptureSession`, `CrawlJob` et `CrawlItem` sont adressés par UUID.
+- Chaque requête d’extension et chaque retry utilise un UUID d’opération stable.
+- L’UUID d’opération sert de clé d’unicité et d’idempotence pour `PendingImport` (pas `source URL + timestamp`, instable entre retries).
+- Une URL normalisée séparée permet la déduplication côté utilisateur.
+- Les réglages utilisent `last-writer-wins` au niveau du champ, avec `updatedAt` monotone et identifiant du writer comme bris d’égalité.
+- Pour les états de capture et crawl, les règles de transition sont explicites : un writer retardataire ne peut pas ramener un enregistrement d’un état terminal vers un état non-terminal.
+
+Séquence d’écriture atomique :
+
+1. Écrire le fichier Markdown ou asset dans un chemin temporaire.
+2. Renommer atomiquement vers le chemin final.
+3. Sauvegarder la transaction Core Data avec l’UUID d’opération, le chemin final, le checksum et l’état `completed`.
+4. Au retry, requêter par UUID d’opération avant de créer un nouvel enregistrement.
+5. Si un fichier existe mais qu’aucune transaction Core Data `completed` n’est trouvée, valider le checksum et terminer ou supprimer le fichier orphelin.
+6. Après traitement du persistent history, réconcilier les opérations incomplètes et supprimer les fichiers temporaires.
 
 La synchronisation iCloud utilisera la base privée CloudKit :
 
@@ -92,7 +112,7 @@ La synchronisation iCloud utilisera la base privée CloudKit :
 - synchronisation des réglages, métadonnées d’historique et Markdown sous forme de `CKAsset` ;
 - union des historiques par UUID ;
 - réglages résolus par dernière modification ;
-- tombstones de suppression conservés 30 jours ;
+- suppression par delete-wins versionné : chaque UUID porte une version logique monotone et un état de suppression. À la fusion, l'état avec la version la plus haute l'emporte ; à version égale, la suppression gagne. Les tombstones sont synchronisés comme métadonnées sans expiration fixe. Une restauration ultérieure crée un nouvel enregistrement avec une version supérieure ;
 - assets, cookies, journaux debug et archives ZIP toujours locaux ;
 - désactiver iCloud conserve toutes les données locales.
 
@@ -170,18 +190,68 @@ L’onboarding expliquera comment activer l’extension Safari et autoriser les 
 
 ### Auto-capture et crawl
 
-Reproduire la machine d’état actuelle :
+Reproduire la machine d’état actuelle avec des machines séparées pour le job et les items.
+
+#### Machine d’état du job
+
+États actifs : `running`, `paused`, `restoring`, `retrying`.
+États terminaux : `completed`, `failed`, `cancelled`, `expired`.
+`stopped` désigne un job inactif sans exécution en cours ; il ne remplace pas une raison terminale.
 
 ```text
-stopped -> running -> paused -> running -> completed/stopped
+stopped -> running                 démarrage
+running -> paused                  pause utilisateur, cinq blocages consécutifs ou checkpoint arrière-plan
+paused -> running                  reprise utilisateur
+running|paused -> retrying         retry global
+retrying -> running                file de retry acceptée
+running|paused|retrying -> cancelled  arrêt utilisateur
+running -> completed               file vide et aucun item retryable restant
+running|paused|retrying -> failed  erreur irrécupérable de stockage ou configuration
+paused -> restoring                redémarrage app ou récupération depuis checkpoint
+restoring -> running               checkpoint valide et items en attente réenfilés
+restoring -> failed                checkpoint invalide ou données locales indisponibles
+running -> expired                 iOS met fin au temps d’exécution accordé
+expired -> restoring               prochain lancement app ou prochaine exécution arrière-plan
 ```
 
-Le crawl conservera :
+`expired` doit préserver le checkpoint sans supprimer les items en attente. La prochaine exécution entre en `restoring`, valide l’état persisté, puis réenfile uniquement les items non terminés.
 
-- même origine et préfixe de chemin ;
+Après un kill ou une terminaison forcée (pas de transition fiable au moment de la terminaison) :
+
+```text
+persisté running|paused|retrying -> restoring -> running|paused|failed
+```
+
+Restaurer `paused` quand le checkpoint enregistre une pause utilisateur ou une pause de blocage. Sinon, restaurer `running` seulement après reprise utilisateur ou exécution arrière-plan iOS accordée.
+
+#### Machine d’état des items
+
+États actifs : `queued`, `fetching`, `converting`, `retrying`.
+États terminaux : `completed`, `blocked`, `failed`, `cancelled`, `dismissed`.
+
+```text
+queued -> fetching                 worker défile l’item
+fetching -> converting             réponse validée
+converting -> completed            Markdown et assets persistés atomiquement
+fetching|converting -> retrying    erreur réseau transitoire, HTTP 429, erreur de conversion récupérable
+retrying -> queued                 backoff expiré ou retry utilisateur
+fetching -> blocked                CAPTCHA, blocage politique, blocage d’accès non-retryable
+fetching|converting|retrying -> failed  limite de retry atteinte ou erreur irrécupérable
+queued|fetching|converting|retrying -> cancelled  annulation du job
+blocked|failed -> queued           retry individuel ou global
+blocked|failed -> dismissed        dismiss utilisateur
+```
+
+`dismissed` est terminal pour le job courant. Un retry global ne réenfile pas les items dismissed. Un nouveau crawl peut créer un nouvel item pour la même URL.
+
+En cas d’expiration système, les items en vol sont persistés comme `queued` ou `retrying` avec un enregistrement de tentative (jamais comme `fetching` ou `converting` permanent), pour une récupération déterministe.
+
+#### Comportement du crawl
+
+- Même origine et préfixe de chemin ;
 - profondeur 0 ou 1–5 ;
-- concurrence configurable, valeur par défaut 3 ;
-- délai par défaut 1 seconde ;
+- concurrence configurable, valeur par défaut trois ;
+- délai par défaut une seconde ;
 - FIFO, déduplication et exclusion des assets ;
 - 403/429/CAPTCHA, pause après cinq blocages consécutifs ;
 - pause, reprise, arrêt, retry individuel/global et dismiss ;
