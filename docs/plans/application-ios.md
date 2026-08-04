@@ -91,8 +91,8 @@ Le store partagé activera `NSPersistentHistoryTrackingKey` et `NSPersistentStor
 Politique de fusion déterministe :
 
 - `ConversionRecord`, `CaptureSession`, `CrawlJob` et `CrawlItem` sont adressés par UUID.
-- Chaque requête d’extension et chaque retry utilise un UUID d’opération stable.
-- L’UUID d’opération sert de clé d’unicité et d’idempotence pour `PendingImport` (pas `source URL + timestamp`, instable entre retries).
+- Chaque requête d’extension et chaque retry utilise un `operationId` persistant, lié explicitement au `requestId` Safari (ou à un identifiant d’opération distinct et stable transporté à travers les retries).
+- `PendingImport` déclare une contrainte d’unicité Core Data sur `operationId`. L’insertion utilise un upsert atomique (fetch-or-create dans une seule transaction `performAndWait`) au lieu d’une séquence requêter-puis-créer, éliminant la course entre retries concurrents.
 - Une URL normalisée séparée permet la déduplication côté utilisateur.
 - Les réglages utilisent `last-writer-wins` au niveau du champ, avec `updatedAt` monotone et identifiant du writer comme bris d’égalité.
 - Pour les états de capture et crawl, les règles de transition sont explicites : un writer retardataire ne peut pas ramener un enregistrement d’un état terminal vers un état non-terminal.
@@ -101,8 +101,8 @@ Séquence d’écriture atomique :
 
 1. Écrire le fichier Markdown ou asset dans un chemin temporaire.
 2. Renommer atomiquement vers le chemin final.
-3. Sauvegarder la transaction Core Data avec l’UUID d’opération, le chemin final, le checksum et l’état `completed`.
-4. Au retry, requêter par UUID d’opération avant de créer un nouvel enregistrement.
+3. Sauvegarder la transaction Core Data avec l’`operationId`, le chemin final, le checksum et l’état `completed` via upsert atomique (contrainte d’unicité sur `operationId`).
+4. Au retry, l’upsert atomique détecte l’enregistrement existant par `operationId` et met à jour au lieu de créer un doublon.
 5. Si un fichier existe mais qu’aucune transaction Core Data `completed` n’est trouvée, valider le checksum et terminer ou supprimer le fichier orphelin.
 6. Après traitement du persistent history, réconcilier les opérations incomplètes et supprimer les fichiers temporaires.
 
@@ -228,6 +228,8 @@ Restaurer `paused` quand le checkpoint enregistre une pause utilisateur ou une p
 
 États actifs : `queued`, `fetching`, `converting`, `retrying`.
 États terminaux : `completed`, `blocked`, `failed`, `cancelled`, `dismissed`.
+
+Chaque `CrawlItem` porte un `attemptGeneration` monotone (entier incrémenté à chaque transition vers `fetching` ou `retrying -> queued`). Un worker capture la génération courante au démarrage. Avant toute transition d'état et toute écriture de fichier, le worker vérifie que sa génération capturée correspond à la génération courante de l'item ; si elle diverge (annulation, expiration ou nouveau retry intervenu), la transition est rejetée et le résultat abandonné. Cela empêche un worker obsolète d'enregistrer un fichier ou de marquer `completed` après une annulation ou un retry concurrent.
 
 ```text
 queued -> fetching                 worker défile l’item
