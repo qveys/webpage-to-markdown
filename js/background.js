@@ -1093,7 +1093,7 @@ function extractAndConvert(options) {
         const src = tweetLinks.length
           ? tweetLinks[tweetLinks.length - 1].href
           : "";
-        el.innerHTML = `<p>${text}</p>${src ? `<p><a href="${src}">Source</a></p>` : ""}`;
+        el.innerHTML = `<p>${escapeHtml(text)}</p>${src ? `<p><a href="${escapeHtml(src)}">Source</a></p>` : ""}`;
       });
 
     // Remove social share/follow widgets by class patterns
