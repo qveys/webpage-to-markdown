@@ -1,7 +1,7 @@
 name: ✨ Feature request
 description: Suggest a new capability or improvement.
 labels:
-  - "✨ Type: Feature"
+  - "🚀 Type: Feature"
 body:
   - type: textarea
     id: problem
