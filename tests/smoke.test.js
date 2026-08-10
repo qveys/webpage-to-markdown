@@ -1,4 +1,7 @@
+const { test } = require('node:test');
+const assert = require('node:assert/strict');
+
 test('chrome mock is available', () => {
-  expect(global.chrome).toBeDefined();
-  expect(global.chrome.storage.local.get).toBeDefined();
+  assert.notEqual(global.chrome, undefined);
+  assert.notEqual(global.chrome.storage.local.get, undefined);
 });
