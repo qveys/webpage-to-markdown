@@ -326,16 +326,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             active: true,
             lastFocusedWindow: true,
           });
-          if (
-            tab &&
-            tab.id &&
-            tab.url &&
-            !tab.url.startsWith("chrome://") &&
-            !tab.url.startsWith("chrome-extension://") &&
-            !tab.url.startsWith("edge://") &&
-            !tab.url.startsWith("about:") &&
-            !tab.url.includes("chrome.google.com/webstore")
-          ) {
+          if (tab && tab.id && tab.url && !navigationUrlIsRestricted(tab.url)) {
             // Check if the page was already captured
             if (capturedUrls.has(tab.url)) {
               return;
@@ -571,14 +562,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
         if (!tab || !tab.id || !tab.url) throw new Error("No active tab found");
         const url = tab.url;
-        if (
-          url.startsWith("chrome://") ||
-          url.startsWith("chrome-extension://") ||
-          url.startsWith("edge://") ||
-          url.startsWith("about:") ||
-          url.includes("chrome.google.com/webstore") ||
-          url.includes("chromewebstore.google.com")
-        ) {
+        if (navigationUrlIsRestricted(url)) {
           throw new Error("Cannot convert system pages or Web Store");
         }
         const res = await extractMarkdownFromTab(tab.id, url);
@@ -664,14 +648,27 @@ async function addCapturedUrl(url) {
   await setSession({ capturedUrls: [...capturedUrls] });
 }
 
+function isChromeWebStoreUrl(url) {
+  try {
+    const parsedUrl = new URL(url);
+    return (
+      parsedUrl.hostname === "chromewebstore.google.com" ||
+      (parsedUrl.hostname === "chrome.google.com" &&
+        parsedUrl.pathname.startsWith("/webstore"))
+    );
+  } catch (_err) {
+    return false;
+  }
+}
+
 function navigationUrlIsRestricted(url) {
   return (
     url.startsWith("chrome://") ||
     url.startsWith("chrome-extension://") ||
     url.startsWith("edge://") ||
     url.startsWith("about:") ||
-    url.includes("chrome.google.com/webstore") ||
-    url.includes("chromewebstore.google.com")
+    url.startsWith("view-source:") ||
+    isChromeWebStoreUrl(url)
   );
 }
 
