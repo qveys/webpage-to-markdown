@@ -3,6 +3,8 @@
 
 importScripts("/js/turndown.js");
 importScripts("/js/cleanup-markdown.js");
+importScripts("/js/html-preprocess.js");
+importScripts("/js/rewrite-crawl-links.js");
 importScripts("/js/markdown-output.js");
 importScripts("/js/safe-assets.js");
 
@@ -133,6 +135,16 @@ function convertToMarkdown(title, content) {
       }
       return ruleContent;
     },
+  });
+  // Skip tiny images (icons < 16px) — pure noise
+  service.addRule("skipTinyImages", {
+    filter: (node) => {
+      if (node.nodeName !== "IMG") return false;
+      const w = parseInt(node.getAttribute("width") || "0", 10);
+      const h = parseInt(node.getAttribute("height") || "0", 10);
+      return (w > 0 && w < 16) || (h > 0 && h < 16);
+    },
+    replacement: () => "",
   });
   // Constrain small images to their rendered size via HTML <img> tag
   service.addRule("constrainSmallImages", {
@@ -559,7 +571,21 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === "W2M_SINGLE_CONVERT") {
     (async () => {
       try {
-        const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+        let tab = null;
+        if (message.tabId != null) {
+          try {
+            tab = await chrome.tabs.get(message.tabId);
+          } catch (e) {
+            tab = null;
+          }
+        }
+        if (!tab || !tab.id || !tab.url) {
+          const [active] = await chrome.tabs.query({
+            active: true,
+            lastFocusedWindow: true,
+          });
+          tab = active;
+        }
         if (!tab || !tab.id || !tab.url) throw new Error("No active tab found");
         const url = tab.url;
         if (navigationUrlIsRestricted(url)) {
@@ -900,6 +926,8 @@ async function injectConversionLibraries(tabId) {
       "/js/turndown.js",
       "/js/turndown-plugin-gfm.js",
       "/js/cleanup-markdown.js",
+      "/js/html-preprocess.js",
+      "/js/rewrite-crawl-links.js",
     ],
   });
 }
@@ -1010,15 +1038,58 @@ function extractAndConvert(options) {
       .forEach((el) => el.remove());
 
     let html;
+    let articleTitle = "";
 
-    if (typeof Readability !== "undefined") {
+    // Full-document clone: preprocess (code/cards) then Readability
+    const docClone = document.cloneNode(true);
+    if (typeof preprocessDocument === "function") {
+      preprocessDocument(docClone, baseUrl);
+    } else if (typeof W2M !== "undefined" && W2M.preprocessDocument) {
+      W2M.preprocessDocument(docClone, baseUrl);
+    }
+    // Mirror absolute URL resolution onto the Readability clone
+    if (docClone.body) {
+      docClone.body.querySelectorAll("a[href]").forEach((a) => {
+        const href = a.getAttribute("href");
+        if (
+          href &&
+          !href.startsWith("http") &&
+          !href.startsWith("mailto:") &&
+          !href.startsWith("#")
+        ) {
+          try {
+            a.setAttribute("href", new URL(href, baseUrl).href);
+          } catch (e) { /* ignore */ }
+        }
+      });
+    }
+    if (typeof preprocessDocument === "function") {
+      preprocessDocument(bodyClone, baseUrl);
+    } else if (typeof W2M !== "undefined" && W2M.preprocessDocument) {
+      W2M.preprocessDocument(bodyClone, baseUrl);
+    }
+
+    // Prefer #content (docs sites) — Readability drops trailing card grids like "What's next"
+    const pickFn =
+      typeof pickMainContent === "function"
+        ? pickMainContent
+        : typeof W2M !== "undefined" && W2M.pickMainContent
+          ? W2M.pickMainContent
+          : null;
+    const picked = pickFn ? pickFn(docClone) : null;
+    if (picked && picked.html) {
+      html = picked.html;
+      articleTitle = picked.pageTitle || "";
+    }
+
+    if (!html && typeof Readability !== "undefined") {
       try {
-        const docClone = document.cloneNode(true);
         const article = new Readability(docClone, {
           keepClasses: false,
         }).parse();
         if (article && article.content && article.content.length > 200) {
           html = article.content;
+          articleTitle = article.title || "";
         }
       } catch (e) {
         console.warn("[W2M] Readability failed, falling back", e);
@@ -1065,10 +1136,30 @@ function extractAndConvert(options) {
       )
       .forEach((el) => el.remove());
 
-    // Remove hidden/decorative elements (tooltips, screen-reader duplicates)
-    _clean
-      .querySelectorAll("[aria-hidden=\"true\"]")
-      .forEach((el) => el.remove());
+    // Remove decorative aria-hidden (keep real links / code hosts)
+    if (typeof removeDecorativeAriaHidden === "function") {
+      removeDecorativeAriaHidden(_clean);
+    } else if (typeof W2M !== "undefined" && W2M.removeDecorativeAriaHidden) {
+      W2M.removeDecorativeAriaHidden(_clean);
+    } else {
+      _clean.querySelectorAll('[aria-hidden="true"]').forEach((el) => {
+        if (el.nodeName === "A" && el.getAttribute("href")) return;
+        if (el.querySelector && el.querySelector("pre, code")) return;
+        el.remove();
+      });
+    }
+
+    // Re-strip docs chrome + permalinks + cards; restore code lang classes
+    if (typeof W2M !== "undefined") {
+      if (W2M.stripDocsChrome) W2M.stripDocsChrome(_clean);
+      if (W2M.stripHeadingPermalinks) W2M.stripHeadingPermalinks(_clean);
+      if (W2M.flattenCards) W2M.flattenCards(_clean);
+      if (W2M.restoreCodeLanguageClasses) W2M.restoreCodeLanguageClasses(_clean);
+      if (W2M.absolutizeAnchors) W2M.absolutizeAnchors(_clean, baseUrl);
+    } else if (typeof restoreCodeLanguageClasses === "function") {
+      restoreCodeLanguageClasses(_clean);
+      if (typeof absolutizeAnchors === "function") absolutizeAnchors(_clean, baseUrl);
+    }
 
     // Convert embedded tweets to clean blockquotes (for non-Twitter pages)
     _clean
@@ -1125,7 +1216,15 @@ function extractAndConvert(options) {
     html = _clean.innerHTML;
     // ─── End HTML cleanup ─────────────────────────────────────────────
 
-    const title = document.title || "Untitled Page";
+    const resolveTitle =
+      typeof resolveMarkdownTitle === "function"
+        ? resolveMarkdownTitle
+        : typeof W2M !== "undefined" && W2M.resolveMarkdownTitle
+          ? W2M.resolveMarkdownTitle
+          : null;
+    const title = resolveTitle
+      ? resolveTitle(articleTitle, html, document.title || "Untitled Page")
+      : articleTitle || document.title || "Untitled Page";
     const opts = options || {};
     const headingStyle = opts.headingStyle === "setext" ? "setext" : "atx";
     let bullet = opts.bulletListMarker;
@@ -1139,6 +1238,13 @@ function extractAndConvert(options) {
         .replace(/>/g, "&gt;")
         .replace(/"/g, "&quot;");
     }
+
+    const detectLang =
+      typeof detectCodeLanguage === "function"
+        ? detectCodeLanguage
+        : typeof W2M !== "undefined" && W2M.detectCodeLanguage
+          ? W2M.detectCodeLanguage
+          : null;
 
     const service = new TurndownService({
       headingStyle,
@@ -1156,20 +1262,17 @@ function extractAndConvert(options) {
       replacement: (content, node) => {
         const code = node.querySelector("code");
         const rawCode = code.textContent || "";
-
-        // Detect language from multiple possible attributes
-        const lang =
-          // class="language-json" ou class="lang-json"
-          (code.className.match(/(?:language-|lang-)(\S+)/) || [])[1] ||
-          // data-lang="json"
-          code.getAttribute("data-lang") ||
-          node.getAttribute("data-lang") ||
-          // data-language="json"
-          code.getAttribute("data-language") ||
-          node.getAttribute("data-language") ||
-          // GitLab: <code data-sourcepos lang="json">
-          code.getAttribute("lang") ||
-          "";
+        const lang = detectLang
+          ? detectLang(code, node)
+          : (code.className.match(/(?:language-|lang-)(\S+)/) || [])[1] ||
+            code.getAttribute("data-lang") ||
+            node.getAttribute("data-lang") ||
+            code.getAttribute("data-language") ||
+            node.getAttribute("data-language") ||
+            code.getAttribute("language") ||
+            node.getAttribute("language") ||
+            code.getAttribute("lang") ||
+            "";
 
         return `\n\n\`\`\`${lang}\n${rawCode.replace(/\n$/, "")}\n\`\`\`\n\n`;
       },
@@ -1207,6 +1310,17 @@ function extractAndConvert(options) {
         return src ? `![${alt}](${src})` : "";
       },
     });
+    // Skip tiny images (icons < 16px) — pure noise; matches former popup rule
+    service.addRule("skipTinyImages", {
+      filter: (node) => {
+        if (node.nodeName !== "IMG") return false;
+        const rw = parseInt(node.getAttribute("data-w2m-width") || "0", 10);
+        const w = parseInt(node.getAttribute("width") || "0", 10);
+        const h = parseInt(node.getAttribute("height") || "0", 10);
+        return (rw > 0 && rw < 16) || (w > 0 && w < 16) || (h > 0 && h < 16);
+      },
+      replacement: () => "",
+    });
     // Constrain small images to their rendered size via HTML <img> tag
     service.addRule("constrainSmallImages", {
       filter: (node) => {
@@ -1225,9 +1339,19 @@ function extractAndConvert(options) {
       },
     });
 
-    const wrapHtml = `<div><h1>${escapeHtml(title)}</h1>${html}</div>`;
+    const wrapHtml =
+      typeof wrapHtmlForTurndown === "function"
+        ? wrapHtmlForTurndown(title, html, escapeHtml)
+        : typeof W2M !== "undefined" && W2M.wrapHtmlForTurndown
+          ? W2M.wrapHtmlForTurndown(title, html, escapeHtml)
+          : `<div><h1>${escapeHtml(title)}</h1>${html}</div>`;
     let markdown = service.turndown(wrapHtml);
     markdown = cleanupMarkdown(markdown);
+    if (typeof absolutizeMarkdownLinks === "function") {
+      markdown = absolutizeMarkdownLinks(markdown, baseUrl);
+    } else if (typeof W2M !== "undefined" && W2M.absolutizeMarkdownLinks) {
+      markdown = W2M.absolutizeMarkdownLinks(markdown, baseUrl);
+    }
 
     return { success: true, markdown, title };
   } catch (err) {
@@ -1283,6 +1407,15 @@ async function downloadInSession(markdown, title, folder, pageUrl) {
       maxAssetSizeMb: session.maxAssetSizeMb,
       maxSessionAssetSizeMb: session.maxSessionAssetSizeMb,
     });
+  }
+
+  // Same-host → relative .md when saving into a URL tree (crawl / session tree)
+  if (session.urlTree && pageUrl) {
+    if (typeof rewriteCrawlLinks === "function") {
+      markdown = rewriteCrawlLinks(markdown, pageUrl, urlToPath);
+    } else if (typeof W2M !== "undefined" && W2M.rewriteCrawlLinks) {
+      markdown = W2M.rewriteCrawlLinks(markdown, pageUrl, urlToPath);
+    }
   }
 
   const encoded = encodeURIComponent(markdown);

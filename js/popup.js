@@ -68,45 +68,8 @@
     });
   };
 
-  MarkdownConverter.prototype.createTurndownService = function () {
-    var service = new TurndownService({
-      headingStyle: this.settings.headingStyle,
-      hr: '---',
-      bulletListMarker: this.settings.bulletListMarker,
-      codeBlockStyle: this.settings.codeBlockStyle,
-      emDelimiter: '_'
-    });
-
-    service.keep(['iframe', 'script', 'style']);
-
-    service.addRule('figures', {
-      filter: 'figure',
-      replacement: function (content, node) {
-        var img = node.querySelector('img');
-        var caption = node.querySelector('figcaption');
-        if (img) {
-          var alt = img.getAttribute('alt') || '';
-          var src = img.getAttribute('src') || '';
-          var captionText = caption ? caption.textContent : '';
-          return '\n\n![' + alt + '](' + src + ')\n' + captionText + '\n\n';
-        }
-        return content;
-      }
-    });
-
-    // Skip tiny images (icons < 16px) -- pure noise
-    service.addRule('skipTinyImages', {
-      filter: function (node) {
-        if (node.nodeName !== 'IMG') return false;
-        var w = parseInt(node.getAttribute('width') || '0', 10);
-        var h = parseInt(node.getAttribute('height') || '0', 10);
-        return (w > 0 && w < 16) || (h > 0 && h < 16);
-      },
-      replacement: function () { return ''; }
-    });
-
-    return service;
-  };
+  // Conversion runs in the service worker (W2M_SINGLE_CONVERT → extractAndConvert).
+  // Turndown rules (skipTinyImages, constrainSmallImages, etc.) live there.
 
   // cleanupMarkdown is provided by /js/cleanup-markdown.js (loaded via <script> in popup.html)
   MarkdownConverter.prototype.cleanupMarkdown = function (markdown) {
@@ -114,156 +77,27 @@
   };
 
   MarkdownConverter.prototype.convert = function (callback) {
-    var self = this;
     chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
       var tab = tabs && tabs[0];
-      if (!tab || !tab.id) {
-        callback(new Error('No active tab found'), null);
-        return;
-      }
+      var payload = { type: 'W2M_SINGLE_CONVERT' };
+      if (tab && tab.id) payload.tabId = tab.id;
 
-      // Prevent scripting on restricted pages
-      if (
-        tab.url.indexOf('chrome://') === 0 ||
-        tab.url.indexOf('chrome-extension://') === 0 ||
-        tab.url.indexOf('edge://') === 0 ||
-        tab.url.indexOf('about:') === 0 ||
-        tab.url.indexOf('chrome.google.com/webstore') !== -1
-      ) {
-        callback(new Error('Cannot convert system pages or Web Store'), null);
-        return;
-      }
-
-      chrome.scripting.executeScript({
-        target: { tabId: tab.id },
-        func: function () {
-          try {
-            if (!document || !document.body) {
-              throw new Error('Document body not found');
-            }
-
-            var getIframeContent = function (iframe) {
-              try {
-                var iframeDoc = iframe.contentDocument || (iframe.contentWindow ? iframe.contentWindow.document : null);
-                if (!iframeDoc || !iframeDoc.body) return '';
-                var iframeClone = iframeDoc.body.cloneNode(true);
-                var unwantedIframe = iframeClone.querySelectorAll('script, style, nav, footer, aside, .ads, .comments');
-                for (var u = 0; u < unwantedIframe.length; u++) unwantedIframe[u].remove();
-                return '<div class="iframe-content">' + iframeClone.innerHTML + '</div>';
-              } catch (e) {
-                return '';
-              }
-            };
-
-            // Collect rendered dimensions of small images for post-processing
-            var smallImgSizes = {};
-            var allImgs = document.querySelectorAll('img');
-            for (var si = 0; si < allImgs.length; si++) {
-              var rect = allImgs[si].getBoundingClientRect();
-              var imgW = Math.round(rect.width);
-              var imgSrc = allImgs[si].src;
-              if (imgW > 0 && imgW < 200 && imgSrc) {
-                smallImgSizes[imgSrc] = imgW;
-              }
-            }
-
-            var bodyClone = document.body.cloneNode(true);
-
-            var iframes = document.querySelectorAll('iframe');
-            var iframeContents = [];
-            for (var fi = 0; fi < iframes.length; fi++) {
-              var fc = getIframeContent(iframes[fi]);
-              if (fc) iframeContents.push(fc);
-            }
-
-            var unwanted = bodyClone.querySelectorAll(
-              'script, style, nav, footer, aside, .ads, .comments, [role="complementary"], .cookie-banner, .popup, .overlay, .modal'
-            );
-            for (var ui = 0; ui < unwanted.length; ui++) unwanted[ui].remove();
-
-            var mainSelectors = ['main', 'article', '.content', '.post', '.entry', '[role="main"]', '#content', '.main'];
-            var mainContent = null;
-
-            for (var ms = 0; ms < mainSelectors.length; ms++) {
-              var found = bodyClone.querySelector(mainSelectors[ms]);
-              if (found && found.innerHTML.trim().length > 100) {
-                mainContent = found;
-                break;
-              }
-            }
-
-            var finalContent = mainContent ? mainContent.innerHTML : bodyClone.innerHTML;
-
-            if (iframeContents.length > 0) {
-              finalContent += '<h2>Embedded Content</h2>' + iframeContents.join('<hr>');
-            }
-
-            return {
-              title: document.title || 'Untitled Page',
-              url: document.location.href,
-              content: finalContent,
-              smallImgSizes: smallImgSizes,
-              success: true
-            };
-          } catch (error) {
-            return { success: false, error: error.message };
-          }
-        }
-      }, function (results) {
+      chrome.runtime.sendMessage(payload, function (res) {
         if (chrome.runtime.lastError) {
           callback(new Error(chrome.runtime.lastError.message), null);
           return;
         }
-        if (!results || !results[0] || !results[0].result) {
-          callback(new Error('Failed to get page content'), null);
+        if (!res || !res.ok) {
+          callback(new Error((res && res.error) || 'Extraction failed'), null);
           return;
         }
 
-        var result = results[0].result;
-        if (!result.success) {
-          callback(new Error(result.error || 'Failed to extract content'), null);
-          return;
-        }
-
-        var title = result.title;
-        var url = result.url;
-        var content = result.content;
-        var smallImgSizes = result.smallImgSizes;
-
-        function escapeHtmlText(s) {
-          return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-        }
-
-        var wrappedContent =
-          '<div class="markdown-content"><h1>' + escapeHtmlText(title) + '</h1>' + content + '</div>';
-
-        // Initialize Turndown with current settings
-        var turndownService = self.createTurndownService();
-        var markdown = turndownService.turndown(wrappedContent);
-
-        markdown = self.cleanupMarkdown(markdown);
-
-        // Constrain small images to their rendered CSS size
-        if (smallImgSizes && Object.keys(smallImgSizes).length > 0) {
-          markdown = markdown.replace(
-            /!\[([^\]]*)\]\(([^)\s]+)\)/g,
-            function (match, alt, src) {
-              var w = smallImgSizes[src];
-              if (w) {
-                return '<img src="' + src + '" alt="' + alt + '" style="max-width:' + w + 'px; height:auto;">';
-              }
-              return match;
-            }
-          );
-        }
-
-        if (self.settings.frontmatter && W2M.markdownOutput && W2M.markdownOutput.prependYamlFrontmatter) {
-          markdown = W2M.markdownOutput.prependYamlFrontmatter(markdown, title, url);
-        }
+        var markdown = res.markdown || '';
+        var title = res.title || 'Untitled Page';
+        var url = res.url || '';
 
         callback(null, { markdown: markdown, url: url, title: title });
 
-        // Persist last conversion
         chrome.storage.local.set({
           lastConversion: {
             url: url,

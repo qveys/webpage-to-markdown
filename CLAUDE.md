@@ -60,6 +60,22 @@ Notable: `sidePanel` for dashboard, `offscreen` for DOM parsing, `alarms` for cr
 - Comments and identifiers in English
 - Single `styles.css` with CSS custom properties; themes via `data-theme="light|dark"`
 
+## HTML → Markdown: generic adaptations (required)
+
+The converter must work on **arbitrary** pages and crawl corpora—not one documentation vendor.
+
+When improving extraction quality from a real page:
+
+1. **Generalize the pattern** (semantic attributes, structural roles, recurring DOM shapes). Do **not** ship hostname checks, product names, or framework-only selectors as the fix.
+2. Prefer shared pipeline hooks:
+   - `js/html-preprocess.js` — DOM normalize before Readability/Turndown
+   - `js/cleanup-markdown.js` — pure-string Markdown cleanup
+   - `js/rewrite-crawl-links.js` — same-host links → relative `.md` paths (crawl)
+3. Comments and identifiers describe the *pattern*; a site may appear only as an optional example.
+4. Tests use **generic HTML fixtures**, not production URL dumps or vendor-locked markup.
+
+Reject / rewrite proposals that only work for one site (e.g. hardcoded `data-component-part="update-tag-list"`) unless a generic equivalent is also implemented.
+
 ## Git Conventions
 
 ```

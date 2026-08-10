@@ -1,0 +1,16 @@
+---
+description: Prefer generic HTML→Markdown adaptations over site-specific hacks
+alwaysApply: true
+---
+
+# Generic HTML → Markdown adaptations
+
+This extension converts **arbitrary** webpages (and crawl corpora), not one docs vendor.
+
+When fixing missing/broken Markdown from real pages:
+
+1. **Extract the pattern**, not the brand. Prefer DOM/Markdown heuristics that recur across sites (e.g. `data-as="p"`, `[data-badge]`, adjacent short label chips, heading `|` residue, `#content` main, `.card` link cards).
+2. **Do not hardcode** hostnames, product names, framework-only class chains (e.g. Tailwind `group/badge`), or one-off `data-component-part="…"` values unless also covered by a generic fallback.
+3. **Put shared logic** in `js/html-preprocess.js` (DOM normalize before Readability/Turndown) and/or `js/cleanup-markdown.js` / `js/rewrite-crawl-links.js` (string post-process). Keep comments describing the *pattern*, with a site only as an optional example.
+4. **Fixture a generic HTML shape** in tests; avoid requiring a specific production URL or vendor markup dump.
+5. Site-specific quirks are OK only as *motivation* in a PR/commit message—not as the implementation contract.
