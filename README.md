@@ -249,12 +249,26 @@ webpage-to-markdown/
 
 ## Development
 
-For documentation quality checks:
+No bundler for the shipped extension — load unpacked from the repo root.
 
-- **Check markdown linting**: `npx markdownlint-cli2 "**/*.md"`
-- **Auto-fix markdown issues**: `npx markdownlint-cli2 --fix "**/*.md"`
+```bash
+npm install          # dev tooling only (tests + linters)
+npm test             # node:test suite
+npm run lint:all     # prettier (tooling files) + eslint + stylelint + markdownlint
+```
 
-For more details, see the [Markdownlint guide](docs/markdownlint-guide.md).
+| Script | Purpose |
+| --- | --- |
+| `npm test` | Node built-in test runner |
+| `npm run format` / `format:check` | Prettier (configs first; full tree via ignore list) |
+| `npm run lint` | ESLint 9 flat config on `js/` + `tests/` |
+| `npm run lint:css` | Stylelint on `styles.css` |
+| `npm run lint:md` / `lint:md:fix` | markdownlint-cli2 |
+| `npm run lint:all` | All of the above checks |
+
+CI runs the same linters via `.github/workflows/lint.yml` (self-hosted).
+
+For Markdownlint details, see the [Markdownlint guide](docs/markdownlint-guide.md).
 
 ---
 

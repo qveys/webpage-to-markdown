@@ -1,0 +1,36 @@
+{
+  "extends": "stylelint-config-standard",
+  "rules": {
+    "selector-class-pattern": "^[a-z0-9]+(-[a-z0-9]+)*(__[a-z0-9]+(-[a-z0-9]+)*)?(--[a-z0-9]+(-[a-z0-9]+)*)?$",
+    "custom-property-pattern": null,
+    "color-hex-length": null,
+    "alpha-value-notation": null,
+    "color-function-notation": null,
+    "color-function-alias-notation": null,
+    "media-feature-range-notation": null,
+    "declaration-block-no-redundant-longhand-properties": null,
+    "declaration-empty-line-before": null,
+    "rule-empty-line-before": null,
+    "declaration-property-value-keyword-no-deprecated": null,
+    "property-no-deprecated": null,
+    "value-keyword-case": [
+      "lower",
+      {
+        "camelCaseSvgKeywords": true,
+        "ignoreKeywords": [
+          "BlinkMacSystemFont",
+          "Segoe UI",
+          "Roboto",
+          "Helvetica Neue",
+          "Arial",
+          "SFMono-Regular",
+          "Menlo",
+          "Monaco",
+          "Consolas",
+          "Liberation Mono",
+          "Courier New"
+        ]
+      }
+    ]
+  }
+}

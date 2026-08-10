@@ -1,0 +1,30 @@
+# Vendored libraries
+js/Readability.js
+js/turndown.js
+js/turndown-plugin-gfm.js
+
+# Generated / deps
+package-lock.json
+node_modules/
+
+# Local agent memory
+.remember/
+.paperclip/
+.claude/
+.claude-flow/
+.auto-claude/
+
+# Large static pages (manual formatting)
+beta/
+privacy/
+support/
+
+# Existing codebase not reformatted in this PR (use `npm run format` when ready)
+js/
+tests/
+*.html
+styles.css
+manifest.json
+MIGRATION.md
+docs/
+*.md
