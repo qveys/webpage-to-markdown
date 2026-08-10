@@ -111,7 +111,10 @@ function extractPageContent() {
 
 // ─── Conversion HTML → Markdown ───────────────────────────────────────────────
 
-function convertToMarkdown(title, content) {
+function convertToMarkdown(title, content, options) {
+  const opts = options || {};
+  const includeImages = opts.includeImages !== false;
+
   const service = new TurndownService({
     headingStyle: "atx",
     hr: "---",
@@ -125,6 +128,10 @@ function convertToMarkdown(title, content) {
   service.addRule("figures", {
     filter: "figure",
     replacement: (ruleContent, node) => {
+      if (!includeImages) {
+        const caption = node.querySelector("figcaption");
+        return caption ? caption.textContent : "";
+      }
       const img = node.querySelector("img");
       const caption = node.querySelector("figcaption");
       if (img) {
@@ -136,6 +143,13 @@ function convertToMarkdown(title, content) {
       return ruleContent;
     },
   });
+
+  if (!includeImages) {
+    service.addRule("stripImages", {
+      filter: "img",
+      replacement: () => "",
+    });
+  }
   // Skip tiny images (icons < 16px) — pure noise
   service.addRule("skipTinyImages", {
     filter: (node) => {
@@ -146,6 +160,7 @@ function convertToMarkdown(title, content) {
     },
     replacement: () => "",
   });
+
   // Constrain small images to their rendered size via HTML <img> tag
   service.addRule("constrainSmallImages", {
     filter: (node) => {
@@ -943,6 +958,7 @@ async function extractMarkdownFromTab(tabId, pageUrl) {
     headingStyle: m.headingStyle,
     bulletListMarker: m.bulletListMarker,
     codeBlockStyle: m.codeBlockStyle,
+    includeImages: m.includeImages,
   };
   const results = await chrome.scripting.executeScript({
     target: { tabId },
@@ -1230,6 +1246,7 @@ function extractAndConvert(options) {
     let bullet = opts.bulletListMarker;
     if (bullet !== "-" && bullet !== "*" && bullet !== "+") bullet = "-";
     const codeBlockStyle = opts.codeBlockStyle === "indented" ? "indented" : "fenced";
+    const includeImages = opts.includeImages !== false;
 
     function escapeHtml(s) {
       return String(s)
@@ -1280,6 +1297,10 @@ function extractAndConvert(options) {
     service.addRule("figures", {
       filter: "figure",
       replacement: (content, node) => {
+        if (!includeImages) {
+          const cap = node.querySelector("figcaption");
+          return cap ? cap.textContent : "";
+        }
         const img = node.querySelector("img");
         if (img) {
           const alt = img.getAttribute("alt") || "";
@@ -1290,6 +1311,12 @@ function extractAndConvert(options) {
         return content;
       },
     });
+    if (!includeImages) {
+      service.addRule("stripImages", {
+        filter: "img",
+        replacement: () => "",
+      });
+    }
     service.addRule("details", {
       filter: "details",
       replacement: (content, node) => {

@@ -188,7 +188,10 @@ async function parseAndConvert(pageUrl, html) {
         ? W2M.resolveMarkdownTitle(articleTitle, content, fallbackTitle)
         : articleTitle || fallbackTitle;
 
-    const markdown = convertToMarkdown(title, content, pageUrl);
+    const { markdownSettings } = await chrome.storage.local.get("markdownSettings");
+    const includeImages = !markdownSettings || markdownSettings.includeImages !== false;
+    const markdown = convertToMarkdown(title, content, pageUrl, { includeImages });
+
 
     return { url: pageUrl, links, markdown, title };
   } catch (err) {
@@ -286,7 +289,10 @@ function extractLinks(doc, pageUrl) {
 
 // ─── Convert HTML to Markdown via TurndownService ────────────────────────────
 
-function convertToMarkdown(title, html, pageUrl) {
+function convertToMarkdown(title, html, pageUrl, options) {
+  const opts = options || {};
+  const includeImages = opts.includeImages !== false;
+
   const service = new TurndownService({
     headingStyle: "atx",
     hr: "---",
@@ -330,6 +336,10 @@ function convertToMarkdown(title, html, pageUrl) {
   service.addRule("figures", {
     filter: "figure",
     replacement: (content, node) => {
+      if (!includeImages) {
+        const cap = node.querySelector("figcaption");
+        return cap ? cap.textContent : "";
+      }
       const img = node.querySelector("img");
       if (img) {
         const alt = img.getAttribute("alt") || "";
@@ -340,6 +350,13 @@ function convertToMarkdown(title, html, pageUrl) {
       return content;
     },
   });
+
+  if (!includeImages) {
+    service.addRule("stripImages", {
+      filter: "img",
+      replacement: () => "",
+    });
+  }
 
   // Skip tiny images (icons < 16px) — pure noise
   service.addRule("skipTinyImages", {
@@ -352,6 +369,7 @@ function convertToMarkdown(title, html, pageUrl) {
     },
     replacement: () => "",
   });
+
   // Constrain small images to their rendered size via HTML <img> tag
   service.addRule("constrainSmallImages", {
     filter: (node) => {

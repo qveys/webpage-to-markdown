@@ -69,7 +69,8 @@
   };
 
   // Conversion runs in the service worker (W2M_SINGLE_CONVERT → extractAndConvert).
-  // Turndown rules (skipTinyImages, constrainSmallImages, etc.) live there.
+  // Turndown rules (includeImages strip, skipTinyImages, constrainSmallImages, etc.) live there.
+
 
   // cleanupMarkdown is provided by /js/cleanup-markdown.js (loaded via <script> in popup.html)
   MarkdownConverter.prototype.cleanupMarkdown = function (markdown) {
@@ -163,6 +164,20 @@
         actions.appendChild(el('button', { className: 'btn btn-primary btn-full', id: 'btn-convert', textContent: t('home.cta'), onClick: function () { app.handleConvert(); } }));
         actions.appendChild(el('button', { className: 'btn btn-secondary btn-full', textContent: t('home.crawl'), onClick: function () { state.navigate(STATES.PRECRAWL, { url: app.currentUrl }); } }));
         container.appendChild(actions);
+
+        var imgCb = el('input', { type: 'checkbox', id: 'setting-images', checked: app.converter.settings.includeImages !== false ? 'checked' : '' });
+        var imgLabel = el('label', { className: 'inline-option', title: 'Include images in the Markdown output' });
+        imgLabel.appendChild(imgCb);
+        imgLabel.appendChild(el('span', { textContent: 'Images' }));
+        imgCb.addEventListener('change', function () {
+          app.converter.settings.includeImages = imgCb.checked;
+          chrome.storage.local.get('markdownSettings', function (data) {
+            var s = data.markdownSettings || {};
+            s.includeImages = imgCb.checked;
+            chrome.storage.local.set({ markdownSettings: s });
+          });
+        });
+        container.appendChild(imgLabel);
         if (data && data.lastConversion) {
           var hist = el('div', { className: 'view-home__history text-muted' }, t('home.history') + ' ' + data.lastConversion.url + ' — ' + formatTimeAgo(data.lastConversion.timestamp));
           container.appendChild(hist);
