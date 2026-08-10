@@ -6,6 +6,10 @@
   color: "1d76db"
   description: "Session-based background capture while browsing."
 
+- name: "🧩 Area: CI"
+  color: "1d76db"
+  description: "Workflows, actions, or continuous integration configuration."
+
 - name: "🧩 Area: Conversion"
   color: "1d76db"
   description: "HTML extraction, Markdown conversion, cleanup, or asset rewriting."
@@ -14,17 +18,41 @@
   color: "1d76db"
   description: "Multi-page crawl, discovery, queueing, or anti-bot handling."
 
+- name: "🧩 Area: Docs"
+  color: "1d76db"
+  description: "README, LICENSE, CHANGELOG, and other repo-level docs."
+
 - name: "🧩 Area: Platform"
   color: "1d76db"
   description: "Manifest, service worker lifecycle, permissions, downloads, or offscreen APIs."
+
+- name: "🧩 Area: Tests"
+  color: "1d76db"
+  description: "Test suites, fixtures, or test tooling."
 
 - name: "🧩 Area: UI"
   color: "1d76db"
   description: "Popup, dashboard, settings, theme, or shared styles."
 
+- name: "🕰️ Automation: Stale issue"
+  color: "9e9e9e"
+  description: "Marked stale by the stale workflow."
+
+- name: "🕰️ Automation: Stale pull request"
+  color: "9e9e9e"
+  description: "Marked stale by the stale workflow."
+
 - name: "🌐 Browser: Chrome"
   color: "4285f4"
   description: "Specific to Google Chrome or Chrome Extension behavior."
+
+- name: "🌐 Browser: Edge"
+  color: "3b82f6"
+  description: "Specific to Microsoft Edge."
+
+- name: "🌐 Browser: Firefox"
+  color: "ff9800"
+  description: "Specific to Mozilla Firefox."
 
 - name: "🌍 Scope: Site-Specific"
   color: "7cb342"
@@ -78,6 +106,14 @@
   color: "fff176"
   description: "Normal priority."
 
+- name: "🤖 Source: Copilot"
+  color: "8957e5"
+  description: "Pull request opened by GitHub Copilot."
+
+- name: "🤖 Source: Dependabot"
+  color: "0366d6"
+  description: "Pull request opened by Dependabot."
+
 - name: "🚦 Status: Blocked"
   color: "e53935"
   description: "Blocked by a dependency, browser limitation, or external constraint."
@@ -125,6 +161,10 @@
 - name: "🧹 Type: Chore"
   color: "cfd8dc"
   description: "Routine maintenance with no product behavior change."
+
+- name: "📦 Type: Dependency"
+  color: "0366d6"
+  description: "Dependency bumps and lockfile updates."
 
 - name: "📚 Type: Documentation"
   color: "0288d1"

@@ -231,9 +231,9 @@ var TurndownService = (function () {
   
       replacement: function (content, node) {
         var href = node.getAttribute('href');
-        if (href) href = href.replace(/([()])/g, '\\$1');
+        if (href) href = href.replace(/\\/g, '\\\\').replace(/([()])/g, '\\$1');
         var title = cleanAttribute(node.getAttribute('title'));
-        if (title) title = ' "' + title.replace(/"/g, '\\"') + '"';
+        if (title) title = ' "' + title.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"';
         return '[' + content + '](' + href + title + ')'
       }
     };

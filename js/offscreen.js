@@ -37,17 +37,33 @@ async function parseAndConvert(pageUrl, html) {
     resolveUrls(doc, pageUrl);
     const links = extractLinks(doc, pageUrl);
 
-    const title = doc.title || "Untitled Page";
+    const fallbackTitle = doc.title || "Untitled Page";
+    let articleTitle = "";
+
+    // Flatten docs widgets (code blocks, cards) before extraction
+    if (typeof W2M !== "undefined" && W2M.preprocessDocument) {
+      W2M.preprocessDocument(doc, pageUrl);
+    }
 
     let content = null;
 
-    // Try Readability first
-    if (typeof Readability !== "undefined") {
+    // Prefer #content (docs) — Readability often drops trailing "What's next" cards
+    if (typeof W2M !== "undefined" && W2M.pickMainContent) {
+      const picked = W2M.pickMainContent(doc);
+      if (picked && picked.html) {
+        content = picked.html;
+        articleTitle = picked.pageTitle || "";
+      }
+    }
+
+    // Try Readability if no docs main content
+    if (!content && typeof Readability !== "undefined") {
       try {
         const docClone = doc.cloneNode(true);
         const article = new Readability(docClone).parse();
         if (article && article.content && article.content.length > 200) {
           content = article.content;
+          articleTitle = article.title || "";
         }
       } catch (e) {
         console.warn("[offscreen] Readability failed, falling back:", e);
@@ -100,10 +116,24 @@ async function parseAndConvert(pageUrl, html) {
       )
       .forEach((el) => el.remove());
 
-    // Remove hidden/decorative elements
-    _clean
-      .querySelectorAll('[aria-hidden="true"]')
-      .forEach((el) => el.remove());
+    // Remove decorative aria-hidden (keep real links / code hosts)
+    if (typeof W2M !== "undefined" && W2M.removeDecorativeAriaHidden) {
+      W2M.removeDecorativeAriaHidden(_clean);
+    } else {
+      _clean.querySelectorAll('[aria-hidden="true"]').forEach((el) => {
+        if (el.nodeName === "A" && el.getAttribute("href")) return;
+        if (el.querySelector && el.querySelector("pre, code")) return;
+        el.remove();
+      });
+    }
+
+    if (typeof W2M !== "undefined") {
+      if (W2M.stripDocsChrome) W2M.stripDocsChrome(_clean);
+      if (W2M.stripHeadingPermalinks) W2M.stripHeadingPermalinks(_clean);
+      if (W2M.flattenCards) W2M.flattenCards(_clean);
+      if (W2M.restoreCodeLanguageClasses) W2M.restoreCodeLanguageClasses(_clean);
+      if (W2M.absolutizeAnchors) W2M.absolutizeAnchors(_clean, pageUrl);
+    }
 
     // Convert embedded tweets to clean blockquotes
     _clean
@@ -153,9 +183,15 @@ async function parseAndConvert(pageUrl, html) {
 
     content = _clean.innerHTML;
 
+    const title =
+      typeof W2M !== "undefined" && W2M.resolveMarkdownTitle
+        ? W2M.resolveMarkdownTitle(articleTitle, content, fallbackTitle)
+        : articleTitle || fallbackTitle;
+
     const { markdownSettings } = await chrome.storage.local.get("markdownSettings");
     const includeImages = !markdownSettings || markdownSettings.includeImages !== false;
-    const markdown = convertToMarkdown(title, content, { includeImages });
+    const markdown = convertToMarkdown(title, content, pageUrl, { includeImages });
+
 
     return { url: pageUrl, links, markdown, title };
   } catch (err) {
@@ -193,15 +229,19 @@ function resolveUrls(doc, pageUrl) {
   // Resolve relative hrefs on anchors
   doc.querySelectorAll("a[href]").forEach((a) => {
     const href = a.getAttribute("href");
+    // URI schemes are case-insensitive; trim + lowercase before allow/deny checks.
+    const normalizedHref = href ? href.trim().toLowerCase() : "";
     if (
       href &&
-      !href.startsWith("http") &&
-      !href.startsWith("mailto:") &&
-      !href.startsWith("#") &&
-      !href.startsWith("javascript:")
+      !normalizedHref.startsWith("http") &&
+      !normalizedHref.startsWith("mailto:") &&
+      !normalizedHref.startsWith("#") &&
+      !normalizedHref.startsWith("javascript:") &&
+      !normalizedHref.startsWith("data:") &&
+      !normalizedHref.startsWith("vbscript:")
     ) {
       try {
-        a.setAttribute("href", new URL(href, pageUrl).href);
+        a.setAttribute("href", new URL(href.trim(), pageUrl).href);
       } catch (e) {
         // Ignore malformed URLs
       }
@@ -217,16 +257,20 @@ function extractLinks(doc, pageUrl) {
   doc.querySelectorAll("a[href]").forEach((a) => {
     const href = a.getAttribute("href");
     if (!href) return;
+    // URI schemes are case-insensitive; trim + lowercase before allow/deny checks.
+    const normalizedHref = href.trim().toLowerCase();
     if (
-      href.startsWith("mailto:") ||
-      href.startsWith("javascript:") ||
-      href.startsWith("#")
+      normalizedHref.startsWith("mailto:") ||
+      normalizedHref.startsWith("javascript:") ||
+      normalizedHref.startsWith("data:") ||
+      normalizedHref.startsWith("vbscript:") ||
+      normalizedHref.startsWith("#")
     ) {
       return;
     }
 
     try {
-      const resolved = new URL(href, pageUrl);
+      const resolved = new URL(href.trim(), pageUrl);
       // Remove fragment
       resolved.hash = "";
       // Remove trailing slash (only if there's a non-empty pathname beyond root)
@@ -245,7 +289,7 @@ function extractLinks(doc, pageUrl) {
 
 // ─── Convert HTML to Markdown via TurndownService ────────────────────────────
 
-function convertToMarkdown(title, html, options) {
+function convertToMarkdown(title, html, pageUrl, options) {
   const opts = options || {};
   const includeImages = opts.includeImages !== false;
 
@@ -271,14 +315,18 @@ function convertToMarkdown(title, html, options) {
     replacement: (content, node) => {
       const code = node.querySelector("code");
       const rawCode = code.textContent || "";
-
       const lang =
-        (code.className.match(/(?:language-|lang-)(\S+)/) || [])[1] ||
-        code.getAttribute("data-lang") ||
-        node.getAttribute("data-lang") ||
-        code.getAttribute("data-language") ||
-        node.getAttribute("data-language") ||
-        "";
+        typeof W2M !== "undefined" && W2M.detectCodeLanguage
+          ? W2M.detectCodeLanguage(code, node)
+          : (code.className.match(/(?:language-|lang-)(\S+)/) || [])[1] ||
+            code.getAttribute("data-lang") ||
+            node.getAttribute("data-lang") ||
+            code.getAttribute("data-language") ||
+            node.getAttribute("data-language") ||
+            code.getAttribute("language") ||
+            node.getAttribute("language") ||
+            code.getAttribute("lang") ||
+            "";
 
       return `\n\n\`\`\`${lang}\n${rawCode.replace(/\n$/, "")}\n\`\`\`\n\n`;
     },
@@ -310,6 +358,18 @@ function convertToMarkdown(title, html, options) {
     });
   }
 
+  // Skip tiny images (icons < 16px) — pure noise
+  service.addRule("skipTinyImages", {
+    filter: (node) => {
+      if (node.nodeName !== "IMG") return false;
+      const rw = parseInt(node.getAttribute("data-w2m-width") || "0", 10);
+      const w = parseInt(node.getAttribute("width") || "0", 10);
+      const h = parseInt(node.getAttribute("height") || "0", 10);
+      return (rw > 0 && rw < 16) || (w > 0 && w < 16) || (h > 0 && h < 16);
+    },
+    replacement: () => "",
+  });
+
   // Constrain small images to their rendered size via HTML <img> tag
   service.addRule("constrainSmallImages", {
     filter: (node) => {
@@ -328,9 +388,15 @@ function convertToMarkdown(title, html, options) {
     },
   });
 
-  let markdown = service.turndown(`<div><h1>${title}</h1>${html}</div>`);
+  let markdown = service.turndown(
+    typeof W2M !== "undefined" && W2M.wrapHtmlForTurndown
+      ? W2M.wrapHtmlForTurndown(title, html)
+      : `<div><h1>${title}</h1>${html}</div>`,
+  );
   markdown = cleanupMarkdown(markdown);
-
+  if (pageUrl && typeof W2M !== "undefined" && W2M.absolutizeMarkdownLinks) {
+    markdown = W2M.absolutizeMarkdownLinks(markdown, pageUrl);
+  }
   return markdown;
 }
 

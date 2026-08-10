@@ -1,9 +1,11 @@
 const vm = require('vm');
+const { describe, test, before } = require('node:test');
+const assert = require('node:assert/strict');
 const { loadModule } = require('./setup/load-module');
 
 let t, formatDuration, formatSize;
 
-beforeAll(() => {
+before(() => {
   vm.runInThisContext('var window = globalThis; window.W2M = window.W2M || {};');
   // i18n.js dispatches a CustomEvent on setLocale — stub it out
   vm.runInThisContext('window.dispatchEvent = function() {};');
@@ -16,52 +18,66 @@ beforeAll(() => {
 
 describe('t() translation lookup', () => {
   test('returns known translation for app.title', () => {
-    expect(t('app.title')).toBe('Webpage to Markdown');
+    assert.equal(t('app.title'), 'Webpage to Markdown');
   });
 
   test('returns the key itself for a nonexistent key', () => {
-    expect(t('nonexistent.key')).toBe('nonexistent.key');
+    assert.equal(t('nonexistent.key'), 'nonexistent.key');
   });
 
   test('interpolates parameters', () => {
-    expect(t('result.meta', { size: '1 Ko', words: 42 })).toBe('Taille : 1 Ko · 42 mots');
+    assert.equal(t('result.meta', { size: '1 Ko', words: 42 }), 'Taille : 1 Ko · 42 mots');
+  });
+
+  test('includes labels for every interface theme', () => {
+    assert.equal(t('settings.theme.light'), 'Clair');
+    assert.equal(t('settings.theme.dark'), 'Sombre');
+    assert.equal(t('settings.theme.midnightBlue'), 'Bleu nuit');
+    assert.equal(t('settings.theme.synthwave'), 'Synthwave');
+    assert.equal(t('settings.theme.solarizedDark'), 'Solarized sombre');
+    assert.equal(t('settings.theme.catppuccin'), 'Catppuccin');
+    assert.equal(t('settings.theme.dracula'), 'Dracula');
+    assert.equal(t('settings.theme.nord'), 'Nord');
+    assert.equal(t('settings.theme.vercel'), 'Vercel');
+    assert.equal(t('settings.theme.retroTerminal'), 'Terminal rétro');
+    assert.equal(t('settings.theme.paper'), 'Papier');
   });
 });
 
 describe('formatDuration()', () => {
   test('seconds only', () => {
-    expect(formatDuration(5000)).toBe('5s');
+    assert.equal(formatDuration(5000), '5s');
   });
 
   test('minutes and seconds', () => {
-    expect(formatDuration(65000)).toBe('1 min 5 s');
+    assert.equal(formatDuration(65000), '1 min 5 s');
   });
 
   test('hours and minutes', () => {
-    expect(formatDuration(3660000)).toBe('1h 1min');
+    assert.equal(formatDuration(3660000), '1h 1min');
   });
 
   test('exact minutes (no leftover seconds)', () => {
-    expect(formatDuration(120000)).toBe('2 min');
+    assert.equal(formatDuration(120000), '2 min');
   });
 
   test('zero ms', () => {
-    expect(formatDuration(0)).toBe('0s');
+    assert.equal(formatDuration(0), '0s');
   });
 });
 
 describe('formatSize()', () => {
   test('bytes (below 1024)', () => {
-    expect(formatSize(500)).toMatch(/500/);
+    assert.match(formatSize(500), /500/);
     // Default locale is 'fr', so suffix is ' o'
-    expect(formatSize(500)).toBe('500 o');
+    assert.equal(formatSize(500), '500 o');
   });
 
   test('kilobytes', () => {
-    expect(formatSize(2048)).toBe('2.0 Ko');
+    assert.equal(formatSize(2048), '2.0 Ko');
   });
 
   test('megabytes', () => {
-    expect(formatSize(1572864)).toBe('1.5 Mo');
+    assert.equal(formatSize(1572864), '1.5 Mo');
   });
 });

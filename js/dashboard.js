@@ -10,6 +10,27 @@
   var DEFAULT_CAPTURE_SETTINGS = W2M.DEFAULT_CAPTURE_SETTINGS;
   var DEFAULT_CRAWL_SETTINGS = W2M.DEFAULT_CRAWL_SETTINGS;
   var defaultSessionFolder = W2M.defaultSettings.defaultSessionFolder;
+  var requestOriginPermission = W2M.defaultSettings.requestOriginPermission;
+
+  // Without the "tabs" permission, chrome.tabs.query only exposes tab.url once
+  // the origin is granted (or activeTab applies). Fall back to the service
+  // worker, which tracks each tab's URL via webNavigation events.
+  function getActiveTabUrl(callback) {
+    chrome.tabs.query({ active: true, lastFocusedWindow: true }, function (tabs) {
+      var tab = tabs && tabs[0];
+      if (tab && tab.url) {
+        callback(tab.url);
+        return;
+      }
+      chrome.runtime.sendMessage({ type: 'W2M_GET_ACTIVE_URL' }, function (res) {
+        if (chrome.runtime.lastError || !res || !res.ok) {
+          callback('');
+          return;
+        }
+        callback(res.url || '');
+      });
+    });
+  }
 
   function createSvgIcon(paths, width, height, fill, stroke) {
     var svg = document.createElementNS(SVG_NS, 'svg');
@@ -62,9 +83,10 @@
   // SINGLE PAGE PANEL
   // =============================================
 
-  function SinglePagePanel(container, showToast) {
+  function SinglePagePanel(container, showToast, getActiveUrl) {
     this.$container = container;
     this._showToast = showToast;
+    this._getActiveUrl = getActiveUrl;
     this._state = 'idle'; // idle | converting | success | error
     this._result = null;  // { markdown, title, url }
     this._errorMsg = '';
@@ -136,6 +158,21 @@
       var cb = el('input', { type: 'checkbox', className: 'form-checkbox' });
       cb.checked = !!currentVal;
       cb.addEventListener('change', function () {
+        if (storageKey === 'autoConvert' && cb.checked) {
+          // Call requestOriginPermission() synchronously with the URL cached
+          // by the Dashboard — an async getActiveTabUrl() hop here would lose
+          // the user gesture and make Chrome reject the permission prompt.
+          var url = self._getActiveUrl ? self._getActiveUrl() : '';
+          requestOriginPermission(url, function (granted) {
+            if (!granted) {
+              cb.checked = false;
+              self._showToast(t('error.permission'));
+              return;
+            }
+            self._saveSettings({ autoConvert: true });
+          });
+          return;
+        }
         var patch = {};
         patch[storageKey] = cb.checked;
         self._saveSettings(patch);
@@ -265,6 +302,8 @@
     this._debugFilterTimer = null;
     this._lastBlockedKey = '';
     this._reconnectAttempts = 0;
+    this._activeUrl = '';
+    this._activeUrlToken = 0;
 
     this._initLocale();
   }
@@ -281,7 +320,46 @@
       self._loadSession();
       self._checkShowSettings();
       self._initDebugMode();
+      self._refreshActiveUrl();
+      self._watchActiveTab();
     });
+  };
+
+  // Cache the active tab URL so permission prompts triggered later by a user
+  // gesture (checkbox toggle, crawl button) can call
+  // chrome.permissions.request() synchronously — an async chrome.tabs.query()
+  // hop in between would drop the transient user-activation state and make
+  // Chrome reject the request with "must be called during a user gesture".
+  //
+  // Quick tab switches leave several lookups in flight, and getActiveTabUrl()
+  // may fall back to the service worker, so replies can arrive out of order.
+  // Only the newest request is allowed to write, otherwise a slow older reply
+  // would restore the very stale URL this cache exists to avoid.
+  Dashboard.prototype._refreshActiveUrl = function () {
+    var self = this;
+    var token = ++this._activeUrlToken;
+    getActiveTabUrl(function (url) {
+      if (token !== self._activeUrlToken) return;
+      self._activeUrl = url;
+    });
+  };
+
+  // The side panel outlives tab switches, so the cached URL has to follow the
+  // active tab. Without this, switching tabs after opening the panel leaves
+  // _activeUrl pointing at the previous tab and silently crawls it.
+  Dashboard.prototype._watchActiveTab = function () {
+    var self = this;
+    if (!chrome.tabs) return;
+    chrome.tabs.onActivated.addListener(function () {
+      self._refreshActiveUrl();
+    });
+    chrome.tabs.onUpdated.addListener(function (tabId, changeInfo, tab) {
+      if (changeInfo.url && tab && tab.active) self._refreshActiveUrl();
+    });
+  };
+
+  Dashboard.prototype._getActiveUrl = function () {
+    return this._activeUrl;
   };
 
   Dashboard.prototype._cacheElements = function () {
@@ -334,28 +412,15 @@
 
   Dashboard.prototype._initTheme = function () {
     var self = this;
-    chrome.storage.local.get('theme', function (r) {
-      var theme = r.theme || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-      document.documentElement.setAttribute('data-theme', theme);
-      self._updateThemeIcon(theme);
-    });
 
     if (this.$themeBtn) {
       this.$themeBtn.addEventListener('click', function () {
-        var cur = document.documentElement.getAttribute('data-theme');
-        var next = cur === 'dark' ? 'light' : 'dark';
-        document.documentElement.setAttribute('data-theme', next);
-        chrome.storage.local.set({ theme: next });
-        self._updateThemeIcon(next);
+        W2M.theme.toggleTheme();
       });
     }
 
-    chrome.storage.onChanged.addListener(function (changes, area) {
-      if (area === 'local' && changes.theme) {
-        var theme = changes.theme.newValue;
-        document.documentElement.setAttribute('data-theme', theme);
-        self._updateThemeIcon(theme);
-      }
+    W2M.theme.subscribe(function (theme) {
+      self._updateThemeIcon(theme);
     });
   };
 
@@ -366,7 +431,7 @@
     var parent = iconHost.parentNode;
     while (parent.firstChild) parent.removeChild(parent.firstChild);
 
-    var svg = W2M.buildThemeIcon(theme === 'dark');
+    var svg = W2M.buildThemeIcon(W2M.theme.isDarkTheme(theme));
     svg.id = 'dash-theme-icon';
     parent.appendChild(svg);
   };
@@ -841,7 +906,7 @@
 
     // Lazy-build the single-page panel the first time the mode is selected
     if (isSingle && this.$singleView && !this._singlePanel) {
-      this._singlePanel = new SinglePagePanel(this.$singleView, this._showToast.bind(this));
+      this._singlePanel = new SinglePagePanel(this.$singleView, this._showToast.bind(this), this._getActiveUrl.bind(this));
       this._singlePanel.init();
     }
   };
@@ -861,15 +926,23 @@
 
   Dashboard.prototype._startCrawlFromActiveTab = function () {
     var self = this;
-    chrome.tabs.query({ active: true, lastFocusedWindow: true }, function (tabs) {
-      var tab = tabs && tabs[0];
-      var url = tab && tab.url ? tab.url : '';
-      if (!url || !/^https?:\/\//.test(url)) {
-        self._showToast(t('error.unavailable.message'));
+    var url = this._activeUrl;
+    if (!url || !/^https?:\/\//.test(url)) {
+      self._showToast(t('error.unavailable.message'));
+      return;
+    }
+
+    var folder = defaultSessionFolder(url);
+
+    // requestOriginPermission() must run synchronously within this click
+    // handler's call stack — no async hop before it — or Chrome rejects the
+    // prompt for lacking a user gesture. The active URL is refreshed ahead
+    // of time via _refreshActiveUrl() for exactly this reason.
+    requestOriginPermission(url, function (granted) {
+      if (!granted) {
+        self._showToast(t('error.permission'));
         return;
       }
-
-      var folder = defaultSessionFolder(url);
 
       chrome.storage.local.get(['captureSettings', 'crawlSettings'], function (data) {
         var cap = Object.assign({}, DEFAULT_CAPTURE_SETTINGS, data.captureSettings || {});
@@ -882,6 +955,8 @@
           delay: cap.delay,
           urlTree: !!cap.urlTree,
           saveAssets: !!cap.saveAssets,
+          maxAssetSizeMb: cap.maxAssetSizeMb,
+          maxSessionAssetSizeMb: cap.maxSessionAssetSizeMb,
           concurrency: Number(cr.concurrency) || DEFAULT_CRAWL_SETTINGS.concurrency,
           maxBlocks: Number.isFinite(Number(cr.maxBlocks)) ? Number(cr.maxBlocks) : DEFAULT_CRAWL_SETTINGS.maxBlocks,
           depth: Number.isFinite(Number(cr.depth)) ? Number(cr.depth) : DEFAULT_CRAWL_SETTINGS.depth
@@ -1036,7 +1111,7 @@
       }
       if (msg && msg.type === 'W2M_SINGLE_RESULT') {
         if (!self._singlePanel) {
-          self._singlePanel = new SinglePagePanel(self.$singleView, self._showToast.bind(self));
+          self._singlePanel = new SinglePagePanel(self.$singleView, self._showToast.bind(self), self._getActiveUrl.bind(self));
           self._singlePanel.init();
         }
         if (msg.ok) {
@@ -1273,13 +1348,49 @@
     }
 
     if (tab === 'logs') {
-      var logs = snap.logs || [];
+      var logs = (snap.logs || []).slice().reverse();
       var typeF = this._debugEls.logSelect.value;
       if (typeF) logs = logs.filter(function (l) { return l.type === typeF; });
       if (filter) logs = logs.filter(function (l) { return (String(l.message || '')).toLowerCase().indexOf(filter) !== -1; });
-      logs.forEach(function (l) {
-        var line = '[' + (l.type || '') + '] ' + (l.message || '');
-        c.appendChild(el('div', { className: 'dash-debug__logline monospace', textContent: line, title: line }));
+      var logTypes = {
+        info: { emoji: '\u2139\uFE0F', labelKey: 'debug.log.info' },
+        capture: { emoji: '\u2705', labelKey: 'debug.log.capture' },
+        asset: { emoji: '\uD83D\uDDBC\uFE0F', labelKey: 'debug.log.asset' },
+        skip: { emoji: '\u23ED\uFE0F', labelKey: 'debug.log.skip' },
+        blocked: { emoji: '\uD83D\uDEE1\uFE0F', labelKey: 'debug.log.blocked' },
+        warn: { emoji: '\u26A0\uFE0F', labelKey: 'debug.log.warn' },
+        error: { emoji: '\u274C', labelKey: 'debug.log.error' }
+      };
+      logs.forEach(function (l, index) {
+        var rawType = String(l.type || 'info').toLowerCase();
+        var safeType = Object.prototype.hasOwnProperty.call(logTypes, rawType) ? rawType : 'info';
+        var meta = logTypes[safeType];
+        var message = String(l.message || '');
+        var logDate = new Date(Number(l.timestamp));
+        var time = Number.isNaN(logDate.getTime()) ? '--:--:--' : logDate.toTimeString().slice(0, 8);
+        var line = time + ' [' + rawType + '] ' + message;
+        var popoverId = 'dash-log-popover-' + index;
+        c.appendChild(el('button', {
+          type: 'button',
+          className: 'dash-debug__logline dash-debug__logline--' + safeType + ' monospace',
+          title: line,
+          'aria-label': line,
+          popovertarget: popoverId
+        },
+        el('span', { className: 'dash-debug__logtime', textContent: time }),
+        el('span', { className: 'dash-debug__logicon', textContent: meta.emoji, 'aria-hidden': 'true' }),
+        el('span', { className: 'dash-debug__loglabel', textContent: t(meta.labelKey) }),
+        el('span', { className: 'dash-debug__logmessage', textContent: message })));
+        var popover = el('div', {
+          id: popoverId,
+          className: 'dash-debug__logpopover monospace',
+          popover: 'auto'
+        },
+        el('span', { className: 'dash-debug__logtime', textContent: time }),
+        el('span', { className: 'dash-debug__logicon', textContent: meta.emoji, 'aria-hidden': 'true' }),
+        el('span', { className: 'dash-debug__loglabel', textContent: t(meta.labelKey) }),
+        el('span', { className: 'dash-debug__logpopover-message', textContent: message }));
+        c.appendChild(popover);
       });
       truncNote('logs', snap.logs.length, snap.totalLogs);
       return;

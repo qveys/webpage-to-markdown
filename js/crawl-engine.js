@@ -38,6 +38,7 @@ class CrawlEngine {
     this.ports = new Set();
     this.logBuffer = [];
     this.downloadedAssets = new Map();
+    this.assetBudget = { used: 0 };
     this._broadcastTimer = null;
     this._abortController = null;
     /** @type {(() => Promise<void>) | null} */
@@ -57,6 +58,14 @@ class CrawlEngine {
       await this._onSessionEnded();
     } catch (e) {
       console.warn("[CrawlEngine] onSessionEnded:", e);
+    }
+  }
+
+  async _setDownloadUiEnabled(enabled) {
+    try {
+      await chrome.downloads.setUiOptions({ enabled });
+    } catch (e) {
+      console.warn("[CrawlEngine] setUiOptions:", e.message);
     }
   }
 
@@ -139,6 +148,7 @@ class CrawlEngine {
     this.seenUrls = new Set();
     this.blockedUrls = [];
     this.downloadedAssets = new Map();
+    this.assetBudget = { used: 0 };
     this.consecutiveBlocks = 0;
     this.stats = {
       captured: 0,
@@ -149,11 +159,12 @@ class CrawlEngine {
 
     this.enqueue(startUrl, 0);
     chrome.alarms.create("crawl-keepalive", { periodInMinutes: 0.4 });
-    // Hide Chrome download UI during crawl
-    try { chrome.downloads.setUiOptions({ enabled: false }); } catch (e) { console.warn('[W2M] setUiOptions:', e.message); }
+    await this._setDownloadUiEnabled(false);
     this._abortController = new AbortController();
     this.status = "running";
     this.log("info", `Crawl started: ${startUrl}`);
+    // Replace the previous completed snapshot before workers begin.
+    await this.saveState();
     this.broadcastStatus(true);
     this.spawnWorkers();
   }
@@ -194,8 +205,7 @@ class CrawlEngine {
     this.discoveryQueue = [];
     this.stats.queued = 0;
     chrome.alarms.clear("crawl-keepalive");
-    // Re-enable Chrome download UI
-    try { chrome.downloads.setUiOptions({ enabled: true }); } catch (e) { console.warn('[W2M] setUiOptions:', e.message); }
+    await this._setDownloadUiEnabled(true);
     clearTimeout(this._broadcastTimer);
     this._broadcastTimer = null;
     this.log("info", "Crawl stopped");
@@ -211,6 +221,7 @@ class CrawlEngine {
     this.seenUrls = new Set();
     this.blockedUrls = [];
     this.downloadedAssets = new Map();
+    this.assetBudget = { used: 0 };
     this.lastPage = null;
     this.logBuffer = [];
     this.stats = { captured: 0, queued: 0, blocked: 0, startTime: null };
@@ -256,6 +267,7 @@ class CrawlEngine {
           this.log("info", "Crawl complete");
           this.status = "stopped";
           chrome.alarms.clear("crawl-keepalive");
+          await this._setDownloadUiEnabled(true);
           await this.saveState();
           this.broadcastStatus(true);
           await this._invokeSessionEnded();
@@ -441,6 +453,9 @@ class CrawlEngine {
         pageUrl,
         pageLabel,
         downloadedAssets: this.downloadedAssets,
+        assetBudget: this.assetBudget,
+        maxAssetSizeMb: session.maxAssetSizeMb,
+        maxSessionAssetSizeMb: session.maxSessionAssetSizeMb,
         onAssetSaved: (info) => {
           this.log("asset", info.localName, {
             fileName: info.localName,
@@ -449,14 +464,25 @@ class CrawlEngine {
             pageLabel: info.pageLabel || pageLabel,
           });
         },
+        onAssetSkipped: (info) => {
+          this.log("skip", `Image skipped: ${info.reason}`, {
+            assetUrl: info.imgUrl,
+            pageUrl: info.pageUrl || pageUrl,
+          });
+        },
       });
+    }
+
+    if (typeof rewriteCrawlLinks === "function") {
+      finalMarkdown = rewriteCrawlLinks(finalMarkdown, pageUrl, urlToPath);
+    } else if (typeof W2M !== "undefined" && W2M.rewriteCrawlLinks) {
+      finalMarkdown = W2M.rewriteCrawlLinks(finalMarkdown, pageUrl, urlToPath);
     }
 
     const encoded = encodeURIComponent(finalMarkdown);
     await w2mDownload({
       url: `data:text/markdown;charset=utf-8,${encoded}`,
       filename: `${folder}/${mdPath}`,
-      saveAs: false,
       conflictAction: "overwrite",
     });
   }
@@ -628,6 +654,7 @@ class CrawlEngine {
           blockedUrls: this.blockedUrls,
           config: this.config,
           scope: this.scope,
+          assetBytesUsed: this.assetBudget.used,
         },
       });
       await chrome.storage.session.set({
@@ -656,6 +683,7 @@ class CrawlEngine {
     this.blockedUrls = crawlState.blockedUrls || [];
     this.config = crawlState.config || this.config;
     this.scope = crawlState.scope || null;
+    this.assetBudget = { used: Number(crawlState.assetBytesUsed) || 0 };
     this.discoveryQueue = crawlQueue || [];
     this.stats.queued = this.discoveryQueue.length;
     // Rebuild seenUrls from captured + queued + blocked URLs
@@ -666,8 +694,13 @@ class CrawlEngine {
     this.log("info", "State restored");
 
     if (this.status === "running") {
+      await this._setDownloadUiEnabled(false);
       this.spawnWorkers();
     }
+
+    // A connected dashboard may have received the constructor's empty state
+    // before storage finished loading. Always publish the restored snapshot.
+    this.broadcastStatus(true);
 
     return true;
   }
