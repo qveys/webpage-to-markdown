@@ -1,3 +1,5 @@
+const { describe, test } = require('node:test');
+const assert = require('node:assert/strict');
 const {
   defaults,
   mergeSettings,
@@ -5,15 +7,15 @@ const {
 
 describe('includeImages — defaults', () => {
   test('includeImages defaults to true', () => {
-    expect(defaults.includeImages).toBe(true);
+    assert.equal(defaults.includeImages, true);
   });
 
   test('mergeSettings preserves includeImages when not overridden', () => {
-    expect(mergeSettings({}).includeImages).toBe(true);
+    assert.equal(mergeSettings({}).includeImages, true);
   });
 
   test('mergeSettings respects includeImages: false', () => {
-    expect(mergeSettings({ includeImages: false }).includeImages).toBe(false);
+    assert.equal(mergeSettings({ includeImages: false }).includeImages, false);
   });
 });
 
@@ -64,25 +66,25 @@ describe('includeImages — turndown rules (mock)', () => {
   test('does not add stripImages rule by default', () => {
     buildRules({});
     var names = rules.map(function (r) { return r.name; });
-    expect(names).not.toContain('stripImages');
+    assert.equal(names.includes('stripImages'), false);
   });
 
   test('does not add stripImages rule when includeImages is true', () => {
     buildRules({ includeImages: true });
     var names = rules.map(function (r) { return r.name; });
-    expect(names).not.toContain('stripImages');
+    assert.equal(names.includes('stripImages'), false);
   });
 
   test('adds stripImages rule when includeImages is false', () => {
     buildRules({ includeImages: false });
     var names = rules.map(function (r) { return r.name; });
-    expect(names).toContain('stripImages');
+    assert.equal(names.includes('stripImages'), true);
   });
 
   test('stripImages replacement returns empty string', () => {
     buildRules({ includeImages: false });
     var strip = rules.find(function (r) { return r.name === 'stripImages'; });
-    expect(strip.replacement()).toBe('');
+    assert.equal(strip.replacement(), '');
   });
 
   test('figures rule returns caption only when images excluded', () => {
@@ -94,7 +96,7 @@ describe('includeImages — turndown rules (mock)', () => {
         return null;
       },
     };
-    expect(fig.replacement('', node)).toBe('My caption');
+    assert.equal(fig.replacement('', node), 'My caption');
   });
 
   test('figures rule returns empty string when no caption and images excluded', () => {
@@ -103,7 +105,7 @@ describe('includeImages — turndown rules (mock)', () => {
     var node = {
       querySelector: function () { return null; },
     };
-    expect(fig.replacement('', node)).toBe('');
+    assert.equal(fig.replacement('', node), '');
   });
 
   test('figures rule produces markdown image when images included', () => {
@@ -117,7 +119,7 @@ describe('includeImages — turndown rules (mock)', () => {
       },
     };
     var result = fig.replacement('', node);
-    expect(result).toContain('![photo](img.jpg)');
-    expect(result).toContain('A photo');
+    assert.ok(result.includes('![photo](img.jpg)'));
+    assert.ok(result.includes('A photo'));
   });
 });
