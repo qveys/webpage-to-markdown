@@ -22,7 +22,7 @@ jobs:
         with:
           node-version: 20
           cache: npm
-      - run: npm ci
+      - run: npm ci --ignore-scripts
       - name: Audit (high+ severity blocks)
         # Dev-only chain (jest > glob > minimatch > brace-expansion) is unfixable
         # upstream today (only brace-expansion 5.0.8 is patched); this repo has
