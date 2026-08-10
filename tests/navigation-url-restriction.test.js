@@ -1,10 +1,12 @@
 const fs = require('fs');
 const vm = require('vm');
 const path = require('path');
+const { describe, test, before } = require('node:test');
+const assert = require('node:assert/strict');
 
 let navigationUrlIsRestricted;
 
-beforeAll(() => {
+before(() => {
   const bgCode = fs.readFileSync(
     path.resolve(__dirname, '../js/background.js'),
     'utf8',
@@ -23,34 +25,44 @@ beforeAll(() => {
 
 describe('navigationUrlIsRestricted', () => {
   test('restricts Chrome Web Store URLs by parsed hostname and path', () => {
-    expect(navigationUrlIsRestricted('https://chrome.google.com/webstore/detail/test')).toBe(true);
-    expect(navigationUrlIsRestricted('https://chromewebstore.google.com/detail/test')).toBe(true);
+    assert.equal(
+      navigationUrlIsRestricted('https://chrome.google.com/webstore/detail/test'),
+      true,
+    );
+    assert.equal(
+      navigationUrlIsRestricted('https://chromewebstore.google.com/detail/test'),
+      true,
+    );
   });
 
   test('does not restrict attacker-controlled URLs that only contain store substrings', () => {
-    expect(
+    assert.equal(
       navigationUrlIsRestricted('https://evil.example/path/chrome.google.com/webstore/detail/test'),
-    ).toBe(false);
-    expect(
+      false,
+    );
+    assert.equal(
       navigationUrlIsRestricted('https://evil.example/?next=https://chromewebstore.google.com/detail/test'),
-    ).toBe(false);
+      false,
+    );
   });
 
   test('still restricts browser-internal pages', () => {
-    expect(navigationUrlIsRestricted('chrome://extensions')).toBe(true);
-    expect(navigationUrlIsRestricted('chrome-extension://abc123/page.html')).toBe(true);
-    expect(navigationUrlIsRestricted('edge://settings')).toBe(true);
-    expect(navigationUrlIsRestricted('about:blank')).toBe(true);
+    assert.equal(navigationUrlIsRestricted('chrome://extensions'), true);
+    assert.equal(navigationUrlIsRestricted('chrome-extension://abc123/page.html'), true);
+    assert.equal(navigationUrlIsRestricted('edge://settings'), true);
+    assert.equal(navigationUrlIsRestricted('about:blank'), true);
   });
 
   test('restricts view-source URLs (not scriptable; cannot bypass store checks)', () => {
-    expect(
+    assert.equal(
       navigationUrlIsRestricted('view-source:https://chromewebstore.google.com/detail/test'),
-    ).toBe(true);
-    expect(
+      true,
+    );
+    assert.equal(
       navigationUrlIsRestricted('view-source:https://chrome.google.com/webstore/detail/test'),
-    ).toBe(true);
-    expect(navigationUrlIsRestricted('view-source:chrome://extensions')).toBe(true);
-    expect(navigationUrlIsRestricted('view-source:https://example.com/')).toBe(true);
+      true,
+    );
+    assert.equal(navigationUrlIsRestricted('view-source:chrome://extensions'), true);
+    assert.equal(navigationUrlIsRestricted('view-source:https://example.com/'), true);
   });
 });
