@@ -386,7 +386,7 @@ before(() => {
 });
 
 describe('detectCodeLanguage', () => {
-  test('reads bare language attribute (Mintlify/Shiki)', () => {
+  test('reads bare language attribute on code/pre', () => {
     const code = {
       className: '',
       getAttribute(name) {
@@ -395,7 +395,7 @@ describe('detectCodeLanguage', () => {
       },
     };
     const pre = {
-      className: 'shiki',
+      className: 'highlight',
       getAttribute(name) {
         if (name === 'language') return 'shellscript';
         return '';
@@ -419,9 +419,9 @@ describe('preprocessDocument', () => {
   test('promotes aria-hidden card links with useful text', () => {
     const { document, body } = createMiniDom(`
       <div class="card" role="link">
-        <a href="https://docs.coderabbit.ai/api/workspace-api-tokens" aria-hidden="true">
-          Workspace API tokens
-          <span>Create a workspace-scoped token.</span>
+        <a href="https://docs.example.test/api/tokens" aria-hidden="true">
+          API tokens
+          <span>Create a scoped token.</span>
         </a>
       </div>
     `);
@@ -441,19 +441,19 @@ describe('preprocessDocument', () => {
     body.childNodes.forEach(walk);
     assert.equal(anchors.length, 1);
     assert.equal(anchors[0].getAttribute('aria-hidden'), null);
-    assert.match(anchors[0].getAttribute('href'), /workspace-api-tokens/);
+    assert.match(anchors[0].getAttribute('href'), /api\/tokens/);
   });
 
-  test('flattens shiki scroll-area code block to plain pre>code', () => {
-    const curl =
-      'curl "https://api.coderabbit.ai/v1/users" \\\n  -H "x-coderabbitai-api-key: $CODERABBIT_API_KEY"';
+  test('flattens nested code-block widget to plain pre>code with bare language attr', () => {
+    const sample =
+      'echo "hello" \\\n  --flag value';
     const { document, body } = createMiniDom(`
       <div class="code-block mt-5 not-prose" language="shellscript">
         <button aria-label="Copy">Copy</button>
         <div role="presentation" data-component-part="code-block-root"
              class="overflow-y-hidden scroll-area">
-          <pre class="shiki" language="shellscript"><code language="shellscript"><span>curl "https://api.coderabbit.ai/v1/users" \\</span>
-<span>  -H "x-coderabbitai-api-key: $CODERABBIT_API_KEY"</span>
+          <pre class="highlight" language="shellscript"><code language="shellscript"><span>echo "hello" \\</span>
+<span>  --flag value</span>
 </code></pre>
         </div>
       </div>
@@ -473,8 +473,8 @@ describe('preprocessDocument', () => {
     const code = pres[0].childNodes.find((c) => c.tagName === 'CODE');
     assert.ok(code);
     assert.equal(code.className, 'language-shellscript');
-    assert.match(code.textContent, /curl/);
-    assert.match(code.textContent, /CODERABBIT_API_KEY/);
+    assert.match(code.textContent, /echo/);
+    assert.match(code.textContent, /--flag value/);
     // Lang marker comment for Readability survival
     const comment = code.childNodes.find(
       (c) => c.nodeType === 8 && String(c.nodeValue || '').startsWith('w2m:'),
@@ -588,11 +588,11 @@ describe('resolveMarkdownTitle', () => {
     globalThis.document = document;
     assert.equal(
       W2M.resolveMarkdownTitle(
-        'CodeRabbit Documentation - marketing',
-        '<h1>CodeRabbit API</h1>',
+        'Example Docs Documentation - marketing',
+        '<h1>Product API</h1>',
         'Doc Title',
       ),
-      'CodeRabbit API',
+      'Product API',
     );
   });
 
@@ -611,20 +611,20 @@ describe('resolveMarkdownTitle', () => {
 });
 
 describe('flattenCards', () => {
-  test('converts Mintlify card to plain paragraph link', () => {
+  test('converts card widget to plain paragraph link', () => {
     const { document, body } = createMiniDom(`
       <div class="card" role="link">
-        <a href="/api/workspace-api-tokens" aria-hidden="true">
-          <h2 data-component-part="card-title">Workspace API tokens</h2>
-          <div data-component-part="card-content">Create a workspace-scoped token.</div>
+        <a href="/api/tokens" aria-hidden="true">
+          <h2 data-component-part="card-title">API tokens</h2>
+          <div data-component-part="card-content">Create a scoped token.</div>
         </a>
       </div>
     `);
     globalThis.document = document;
     W2M.preprocessDocument(document);
     const html = body.innerHTML;
-    assert.match(html, /<a href="\/api\/workspace-api-tokens">Workspace API tokens<\/a>/);
-    assert.match(html, /Create a workspace-scoped token/);
+    assert.match(html, /<a href="\/api\/tokens">API tokens<\/a>/);
+    assert.match(html, /Create a scoped token/);
     assert.doesNotMatch(html, /\bcard\b/);
   });
 });
@@ -633,10 +633,10 @@ describe('pickMainContent', () => {
   test('prefers #content and reads data-page-title', () => {
     // Length must meet pickMainContent's minimum (~200 chars of innerHTML).
     const pad =
-      'The CodeRabbit API provides programmatic access to review data and administrative operations. ';
+      'The product API provides programmatic access to review data and administrative operations. ';
     const { document } = createMiniDom(`
       <h1 id="page-title">Outside</h1>
-      <div id="content" data-page-title="CodeRabbit API">
+      <div id="content" data-page-title="Product API">
         <p>${pad}${pad}</p>
         <h2>Explore the API</h2>
         <div class="card"><a href="/a">A</a></div>
@@ -646,8 +646,21 @@ describe('pickMainContent', () => {
     `);
     const picked = W2M.pickMainContent(document);
     assert.ok(picked);
-    assert.equal(picked.pageTitle, 'CodeRabbit API');
+    assert.equal(picked.pageTitle, 'Product API');
     assert.match(picked.html, /What's next/);
     assert.match(picked.html, /Explore the API/);
+  });
+
+  test('does not outrank Readability for generic main-only pages', () => {
+    const pad =
+      'Generic article body with enough characters to pass a length gate for main content extraction. ';
+    const { document } = createMiniDom(`
+      <nav>Site nav</nav>
+      <main>
+        <p>${pad}${pad}</p>
+      </main>
+    `);
+    const picked = W2M.pickMainContent(document);
+    assert.equal(picked, null);
   });
 });

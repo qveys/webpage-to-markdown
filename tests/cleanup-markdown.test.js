@@ -88,28 +88,29 @@ describe('cleanupMarkdown', () => {
 
   test('dedupes site-title then page H1', () => {
     const input =
-      '# CodeRabbit Documentation - AI reviews\n\n# CodeRabbit API\n\nBody.';
+      '# Example Docs Documentation - product overview\n\n# Product API\n\nBody.';
     const result = cleanupMarkdown(input);
-    assert.equal(result.startsWith('# CodeRabbit API'), true);
+    assert.equal(result.startsWith('# Product API'), true);
     assert.equal(result.includes('Documentation'), false);
   });
 
   test('dedupes site-title H1 with breadcrumb before page H1', () => {
     const input =
-      '# CodeRabbit Documentation - AI code reviews on pull requests, IDE, and CLI\n\n' +
-      '[CodeRabbit API](/api/index)\n\n# CodeRabbit API\n\nBody text here.';
+      '# Example Docs Documentation - product overview for teams and CLI\n\n' +
+      '[Product API](/api/index)\n\n# Product API\n\nBody text here.';
     const result = cleanupMarkdown(input);
-    assert.equal(result.startsWith('# CodeRabbit API\n'), true);
+    assert.equal(result.startsWith('# Product API\n'), true);
     assert.equal(result.includes('Documentation'), false);
-    assert.equal(result.includes('[CodeRabbit API](/api/index)'), false);
+    assert.equal(result.includes('[Product API](/api/index)'), false);
   });
 
-  test('strips Enterprise Plan badge glued to paragraph', () => {
+  test('preserves plan names that start a real sentence', () => {
+    // Badge chips are stripped in the DOM layer; string cleanup must not
+    // delete commercial plan names from legitimate prose.
     const input =
-      'Enterprise Plan The CodeRabbit API provides programmatic access.';
+      'Free Plan Users can request two reviews per day.';
     const result = cleanupMarkdown(input);
-    assert.equal(result.includes('Enterprise Plan'), false);
-    assert.match(result, /^The CodeRabbit API/);
+    assert.match(result, /Free Plan Users can request two reviews/);
   });
 
   test('strips trailing pipe residue on headings and lone pipe lines', () => {
