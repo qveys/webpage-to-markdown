@@ -1070,6 +1070,7 @@
 
   Dashboard.prototype._toggleSettings = function () {
     this.settingsVisible = !this.settingsVisible;
+    if (this.$settingsBtn) this.$settingsBtn.setAttribute('aria-expanded', String(this.settingsVisible));
 
     if (this.settingsVisible) {
       if (this.$monitor) this.$monitor.classList.add('hidden');
@@ -1459,11 +1460,22 @@
     URL.revokeObjectURL(url);
   };
 
-  Dashboard.prototype._showToast = function (message) {
+  Dashboard.prototype._showToast = function (message, type) {
+    type = type || 'info';
     var container = document.getElementById('toast-container');
     if (!container) return;
-    var toast = el('div', { className: 'toast toast--info', textContent: message });
+    var toast = el('div', { className: 'toast toast--' + type, textContent: message });
+
+    if (type === 'error') {
+      toast.setAttribute('role', 'alert');
+      toast.setAttribute('aria-live', 'assertive');
+    }
+
     container.appendChild(toast);
+
+    var announce = document.getElementById('a11y-announce');
+    if (announce) announce.textContent = message;
+
     requestAnimationFrame(function () { toast.classList.add('toast--visible'); });
     setTimeout(function () {
       toast.classList.remove('toast--visible');

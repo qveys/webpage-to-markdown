@@ -1053,9 +1053,17 @@
     type = type || 'info';
     var container = document.getElementById('toast-container');
     var toast = el('div', { className: 'toast toast--' + type, textContent: message });
+
+    if (type === 'error') {
+      toast.setAttribute('role', 'alert');
+      toast.setAttribute('aria-live', 'assertive');
+    }
+
     container.appendChild(toast);
 
-    // Trigger enter animation
+    var announce = document.getElementById('a11y-announce');
+    if (announce) announce.textContent = message;
+
     requestAnimationFrame(function () {
       toast.classList.add('toast--visible');
     });
