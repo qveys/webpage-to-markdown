@@ -475,9 +475,13 @@ Readability.prototype = {
     this._forEachNode(links, function (link) {
       var href = link.getAttribute("href");
       if (href) {
-        // Remove links with javascript: URIs, since
-        // they won't work after scripts have been removed from the page.
-        if (href.indexOf("javascript:") === 0) {
+        // URI schemes are case-insensitive; trim + lowercase so mixed-case
+        // or whitespace-padded values cannot bypass the dangerous-scheme guard.
+        var normalizedHref = href.trim().toLowerCase();
+        // Remove links with javascript:, data:, or vbscript: URIs, since
+        // they won't work after scripts have been removed from the page,
+        // and can be used for code injection.
+        if (normalizedHref.indexOf("javascript:") === 0 || normalizedHref.indexOf("data:") === 0 || normalizedHref.indexOf("vbscript:") === 0) {
           // if the link only contains simple text content, it can be converted to a text node
           if (
             link.childNodes.length === 1 &&
