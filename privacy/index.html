@@ -1,153 +1,530 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="fr">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Politique de confidentialité — MarkdownVault</title>
-  <meta name="description" content="Privacy Policy for MarkdownVault iOS — local-first encrypted vault.">
-  <style>
-    :root {
-      --bg: #f7f4ef;
-      --ink: #1a1a1a;
-      --muted: #5a5a5a;
-      --accent: #0f5c4c;
-      --rule: #d9d2c5;
-    }
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
-      background:
-        radial-gradient(1200px 600px at 10% -10%, #e8f2ef 0%, transparent 55%),
-        linear-gradient(180deg, #fbf9f5 0%, var(--bg) 40%, #efe9df 100%);
-      color: var(--ink);
-      line-height: 1.65;
-    }
-    main {
-      max-width: 42rem;
-      margin: 0 auto;
-      padding: 2.5rem 1.25rem 4rem;
-    }
-    h1 { font-size: 1.85rem; line-height: 1.25; margin: 0 0 1rem; color: var(--accent); }
-    h2 { font-size: 1.25rem; margin: 2rem 0 0.75rem; }
-    p { margin: 0.75rem 0; }
-    hr { border: 0; border-top: 1px solid var(--rule); margin: 1.5rem 0; }
-    table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.95rem; }
-    th, td { border: 1px solid var(--rule); padding: 0.5rem 0.6rem; text-align: left; vertical-align: top; }
-    th { background: rgba(15,92,76,0.08); }
-    code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.9em; }
-    ul { padding-left: 1.2rem; }
-    .meta { color: var(--muted); font-size: 0.95rem; }
-    footer { margin-top: 3rem; color: var(--muted); font-size: 0.85rem; }
-  </style>
-</head>
-<body>
-  <main>
-<h1>Politique de confidentialité — MarkdownVault</h1>
-<p><strong>Dernière mise à jour :</strong> 18 juillet 2026 <strong>Application :</strong> MarkdownVault (iOS / iPadOS) <strong>Responsable du traitement :</strong> Quentin Veys (développeur individuel) <strong>URL publique :</strong> <code>https://qveys.github.io/webpage-to-markdown/privacy/</code></p>
-<hr>
-<h2>Résumé</h2>
-<p>MarkdownVault est une application <strong>locale</strong> : vos documents capturés restent <strong>chiffrés sur votre appareil</strong>. Nous ne vendons pas vos données. Nous n’exploitons pas de comptes utilisateur ni de serveur MarkdownVault en version 1.0.</p>
-<p>La seule donnée pouvant nous parvenir est un <strong>rapport de plantage</strong> transmis par <strong>Apple</strong>, si vous avez activé le partage de diagnostics sur votre appareil.</p>
-<hr>
-<h2>1. Qui sommes-nous ?</h2>
-<p>MarkdownVault est publié par <strong>Quentin Veys</strong>, en qualité de développeur individuel titulaire du compte Apple Developer. Pour toute question relative à cette politique, contactez : <strong>quentinveys@gmail.com</strong>.</p>
-<hr>
-<h2>2. Principes produit (v1.0)</h2>
-<table>
-<thead><tr><th>Principe</th><th>Engagement</th></tr></thead><tbody>
-<tr><td><strong>Local-first</strong></td><td>Vos notes Markdown, métadonnées et clés de chiffrement restent sur votre iPhone ou iPad.</td></tr>
-<tr><td><strong>Pas de compte</strong></td><td>Aucune inscription, identifiant utilisateur ni profil côté développeur.</td></tr>
-<tr><td><strong>Pas de backend MarkdownVault</strong></td><td>L’application ne synchronise pas votre coffre vers nos serveurs.</td></tr>
-<tr><td><strong>Pas de publicité ni d’analytics tiers</strong></td><td>Aucun SDK publicitaire, attribution ou analytics tiers en v1.0.</td></tr>
-<tr><td><strong>Pas de vente de données</strong></td><td>Nous ne vendons, ne louons ni n’échangeons vos informations personnelles.</td></tr>
-</tbody></table>
-<hr>
-<h2>3. Données traitées sur votre appareil</h2>
-<p>Les éléments suivants sont stockés <strong>localement</strong> et ne sont <strong>pas accessibles</strong> au développeur :</p>
-<ul>
-<li><strong>Contenu du coffre</strong> : pages web converties en Markdown, titres, URL source, dates de capture.</li>
-<li><strong>Clés de chiffrement</strong> : conservées dans le <strong>Trousseau iOS (Keychain)</strong>, liées à l’appareil.</li>
-<li><strong>Recherche</strong> : index de titres consulté uniquement en local.</li>
-<li><strong>Préférences d’application</strong> : réglages de verrouillage, options de capture, etc.</li>
-</ul>
-<p>Ces données ne constituent pas une « collecte » au sens de la politique App Store tant qu’elles ne quittent pas votre appareil sous notre contrôle.</p>
-<hr>
-<h2>4. Biométrie (Face ID / Touch ID)</h2>
-<p>MarkdownVault peut utiliser <strong>Face ID</strong> ou <strong>Touch ID</strong> pour déverrouiller votre coffre local.</p>
-<ul>
-<li>Les données biométriques sont gérées par <strong>iOS</strong> (Secure Enclave) ; l’application ne reçoit qu’un résultat succès/échec.</li>
-<li><strong>Aucune donnée biométrique n’est transmise</strong> à MarkdownVault ni à des tiers.</li>
-<li>Un <strong>code de repli</strong> défini par vous reste disponible si la biométrie est indisponible ou refusée.</li>
-</ul>
-<hr>
-<h2>5. Réseau et capture web</h2>
-<p>Lorsque <strong>vous</strong> demandez la capture d’une page web :</p>
-<ul>
-<li>L’application contacte <strong>uniquement les serveurs du site que vous avez indiqué</strong> (HTTPS par défaut).</li>
-<li>Nous ne recevons pas le contenu capturé : il est converti et enregistré <strong>sur votre appareil</strong>.</li>
-<li>Nous ne consultons pas <code>robots.txt</code> ; l’archivage est <strong>initié par vous</strong> à des fins personnelles locales.</li>
-<li>Aucun cookie persistant cross-sites n’est conservé au-delà du besoin technique de la capture.</li>
-</ul>
-<hr>
-<h2>6. Export et partage</h2>
-<p>Si vous utilisez la fonction <strong>Partager / Exporter</strong> :</p>
-<ul>
-<li>Vous choisissez la destination (fichiers, autre application, etc.).</li>
-<li>L’export sort du périmètre chiffré du coffre ; vous en assumez le contrôle.</li>
-<li>Le développeur <strong>ne reçoit pas</strong> le fichier exporté.</li>
-</ul>
-<hr>
-<h2>7. Données que nous pouvons recevoir (diagnostics Apple)</h2>
-<p>Conformément aux principes produit définis pour la version 1.0 :</p>
-<table>
-<thead><tr><th>Type</th><th>Source</th><th>Finalité</th><th>Lié à vous ?</th><th>Tracking ?</th></tr></thead><tbody>
-<tr><td><strong>Rapports de plantage (Crash Data)</strong></td><td>Xcode Organizer / App Store Connect, via les mécanismes <strong>natifs Apple</strong></td><td>Corriger les bugs et améliorer la stabilité</td><td><strong>Non</strong></td><td><strong>Non</strong></td></tr>
-</tbody></table>
-<ul>
-<li>Ce partage dépend du <strong>réglage Diagnostics &amp; améliorations</strong> de votre appareil iOS (opt-in utilisateur).</li>
-<li>Nous n’utilisons <strong>aucun SDK tiers</strong> de crash reporting en v1.0.</li>
-<li>Nous n’utilisons pas ces données à des fins publicitaires ni de profilage cross-apps.</li>
-</ul>
-<p><strong>Tous les autres types de données</strong> du questionnaire App Store (identifiants, contenu utilisateur, historique de navigation, localisation, achats, etc.) sont <strong>non collectés</strong> par le développeur en v1.0.</p>
-<hr>
-<h2>8. Services tiers</h2>
-<p>En v1.0, MarkdownVault <strong>n’intègre pas</strong> de SDK analytics, publicité, attribution ou synchronisation cloud tiers.</p>
-<p>Les sites web que vous capturez ne sont pas des « partenaires » MarkdownVault : ce sont des destinations <strong>choisies par vous</strong>.</p>
-<hr>
-<h2>9. Conservation et suppression</h2>
-<ul>
-<li>Vos documents restent sur l’appareil jusqu’à <strong>suppression par vous</strong> dans l’application ou <strong>désinstallation</strong> de l’app.</li>
-<li>La suppression d’un document retire le fichier chiffré et son entrée d’index de façon <strong>irréversible</strong> (après confirmation dans l’app).</li>
-<li>Les rapports de plantage éventuels sont conservés selon les politiques <strong>d’Apple</strong> ; contactez-nous pour toute demande liée à ces données.</li>
-</ul>
-<hr>
-<h2>10. Mineurs</h2>
-<p>MarkdownVault ne s’adresse pas spécifiquement aux enfants de moins de 13 ans. Nous ne collectons pas sciemment d’informations personnelles d’enfants.</p>
-<hr>
-<h2>11. Vos droits</h2>
-<p>MarkdownVault v1.0 ne crée pas de compte développeur associé à votre identité. Pour les données stockées localement, vous gardez le contrôle via l’application (consultation, export, suppression).</p>
-<p>Pour toute question ou demande relative à cette politique : <strong>quentinveys@gmail.com</strong>.</p>
-<p>Si vous êtes dans l’Espace économique européen, vous pouvez exercer vos droits (accès, rectification, effacement, opposition) dans la mesure applicable. Étant donné le modèle local-first, la plupart des actions se font <strong>directement sur votre appareil</strong>.</p>
-<hr>
-<h2>12. Modifications</h2>
-<p>Nous mettrons à jour cette politique si le produit évolue (ex. synchronisation cloud, comptes, analytics). La date « Dernière mise à jour » sera révisée ; une version matériellement différente pourra être signalée dans l’application ou sur cette page avant soumission App Store.</p>
-<hr>
-<h2 id="english-summary">13. English summary</h2>
-<section lang="en" aria-labelledby="english-summary">
-<p><strong>MarkdownVault</strong> is a <strong>local-first</strong> iOS app. Your captured Markdown vault stays <strong>encrypted on your device</strong>. We do not sell your data. There is <strong>no MarkdownVault account or backend</strong> in v1.0, and <strong>no third-party analytics or advertising SDKs</strong>.</p>
-<p><strong>Network use</strong> occurs only when <strong>you</strong> request capture of a URL; requests go to <strong>that website</strong>, not to MarkdownVault servers. <strong>Face ID / Touch ID</strong> unlocks your local vault; biometric data never leaves your device or is sent to us.</p>
-<p><strong>Export/share</strong> is <strong>user-initiated</strong>; we do not receive exported files.</p>
-<p>The <strong>only data</strong> we may receive is <strong>Crash Data</strong> through <strong>Apple’s native</strong> Xcode Organizer / App Store Connect crash reporting, if you have opted in to share diagnostics on your device. It is <strong>not linked to your identity</strong> and <strong>not used for tracking</strong>. All other App Store privacy categories are <strong>not collected</strong> by the developer in v1.0.</p>
-<p><strong>Data controller:</strong> Quentin Veys (individual developer). <strong>Contact:</strong> quentinveys@gmail.com. <strong>Last updated:</strong> July 18, 2026.</p>
-</section>
-<hr>
-<p>*Ce document ne constitue pas un avis juridique.*</p>
-    <footer>
-      <p>MarkdownVault · Privacy Policy ·
-        <a href="https://qveys.github.io/webpage-to-markdown/privacy/">https://qveys.github.io/webpage-to-markdown/privacy/</a>
-      </p>
-    </footer>
-  </main>
-</body>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Privacy Policy for MarkdownVault iOS — local-first encrypted vault."
+    />
+    <title>Politique de confidentialité — MarkdownVault</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        line-height: 1.6;
+      }
+
+      body {
+        margin: 0;
+        background: #f5f7fb;
+        color: #182033;
+      }
+
+      main {
+        width: min(760px, calc(100% - 32px));
+        margin: 40px auto;
+        padding: 32px;
+        box-sizing: border-box;
+        background: #ffffff;
+        border: 1px solid #dce2ee;
+        border-radius: 16px;
+        box-shadow: 0 12px 36px rgb(20 31 55 / 8%);
+      }
+
+      h1,
+      h2,
+      h3 {
+        line-height: 1.25;
+      }
+
+      h1 {
+        margin-top: 0;
+      }
+
+      h2 {
+        margin-top: 40px;
+        padding-top: 24px;
+        border-top: 1px solid #dce2ee;
+      }
+
+      h3 {
+        margin-top: 28px;
+        margin-bottom: 6px;
+      }
+
+      p {
+        margin-top: 6px;
+      }
+
+      a {
+        color: #3157c8;
+      }
+
+      .meta,
+      footer {
+        color: #59657a;
+        font-size: 0.95rem;
+      }
+
+      .summary {
+        padding: 20px;
+        background: #eef3ff;
+        border-radius: 12px;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 1rem 0;
+        font-size: 0.95rem;
+      }
+
+      th,
+      td {
+        border: 1px solid #dce2ee;
+        padding: 0.5rem 0.6rem;
+        text-align: left;
+        vertical-align: top;
+      }
+
+      th {
+        background: #eef3ff;
+      }
+
+      code {
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 0.9em;
+      }
+
+      ul {
+        padding-left: 1.2rem;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        body {
+          background: #111624;
+          color: #eef2fb;
+        }
+
+        main {
+          background: #191f2f;
+          border-color: #333d54;
+          box-shadow: none;
+        }
+
+        h2 {
+          border-color: #333d54;
+        }
+
+        a {
+          color: #9eb8ff;
+        }
+
+        .meta,
+        footer {
+          color: #b4bfd3;
+        }
+
+        .summary {
+          background: #222d49;
+        }
+
+        th {
+          background: #222d49;
+        }
+
+        th,
+        td {
+          border-color: #333d54;
+        }
+      }
+
+      @media (max-width: 560px) {
+        main {
+          width: 100%;
+          margin: 0;
+          padding: 24px 20px;
+          border: 0;
+          border-radius: 0;
+        }
+
+        table {
+          display: block;
+          overflow-x: auto;
+          -webkit-overflow-scrolling: touch;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>Politique de confidentialité — MarkdownVault</h1>
+        <p class="meta">
+          iOS / iPadOS · Dernière mise à jour : 18 juillet 2026<br />
+          Responsable du traitement : Quentin Veys (développeur individuel)<br />
+          URL publique :
+          <code
+            >https://qveys.github.io/webpage-to-markdown/privacy/</code
+          >
+        </p>
+      </header>
+
+      <section class="summary" aria-labelledby="resume">
+        <h2 id="resume" style="margin-top: 0; padding-top: 0; border-top: 0">
+          Résumé
+        </h2>
+        <p>
+          MarkdownVault est une application <strong>locale</strong> : vos
+          documents capturés restent <strong>chiffrés sur votre appareil</strong>.
+          Nous ne vendons pas vos données. Nous n'exploitons pas de comptes
+          utilisateur ni de serveur MarkdownVault en version 1.0.
+        </p>
+        <p>
+          La seule donnée pouvant nous parvenir est un
+          <strong>rapport de plantage</strong> transmis par
+          <strong>Apple</strong>, si vous avez activé le partage de diagnostics
+          sur votre appareil.
+        </p>
+      </section>
+
+      <section aria-labelledby="qui-sommes-nous">
+        <h2 id="qui-sommes-nous">1. Qui sommes-nous ?</h2>
+        <p>
+          MarkdownVault est publié par <strong>Quentin Veys</strong>, en qualité
+          de développeur individuel titulaire du compte Apple Developer. Pour
+          toute question relative à cette politique, contactez :
+          <a href="mailto:quentinveys@gmail.com">quentinveys@gmail.com</a>.
+        </p>
+      </section>
+
+      <section aria-labelledby="principes-produit">
+        <h2 id="principes-produit">2. Principes produit (v1.0)</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Principe</th>
+              <th>Engagement</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Local-first</strong></td>
+              <td>
+                Vos notes Markdown, métadonnées et clés de chiffrement restent
+                sur votre iPhone ou iPad.
+              </td>
+            </tr>
+            <tr>
+              <td><strong>Pas de compte</strong></td>
+              <td>
+                Aucune inscription, identifiant utilisateur ni profil côté
+                développeur.
+              </td>
+            </tr>
+            <tr>
+              <td><strong>Pas de backend MarkdownVault</strong></td>
+              <td>
+                L'application ne synchronise pas votre coffre vers nos serveurs.
+              </td>
+            </tr>
+            <tr>
+              <td><strong>Pas de publicité ni d'analytics tiers</strong></td>
+              <td>
+                Aucun SDK publicitaire, attribution ou analytics tiers en v1.0.
+              </td>
+            </tr>
+            <tr>
+              <td><strong>Pas de vente de données</strong></td>
+              <td>
+                Nous ne vendons, ne louons ni n'échangeons vos informations
+                personnelles.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section aria-labelledby="donnees-appareil">
+        <h2 id="donnees-appareil">3. Données traitées sur votre appareil</h2>
+        <p>
+          Les éléments suivants sont stockés <strong>localement</strong> et ne
+          sont <strong>pas accessibles</strong> au développeur :
+        </p>
+        <ul>
+          <li>
+            <strong>Contenu du coffre</strong> : pages web converties en
+            Markdown, titres, URL source, dates de capture.
+          </li>
+          <li>
+            <strong>Clés de chiffrement</strong> : conservées dans le
+            <strong>Trousseau iOS (Keychain)</strong>, liées à l'appareil.
+          </li>
+          <li>
+            <strong>Recherche</strong> : index de titres consulté uniquement en
+            local.
+          </li>
+          <li>
+            <strong>Préférences d'application</strong> : réglages de
+            verrouillage, options de capture, etc.
+          </li>
+        </ul>
+        <p>
+          Ces données ne constituent pas une « collecte » au sens de la
+          politique App Store tant qu'elles ne quittent pas votre appareil sous
+          notre contrôle.
+        </p>
+      </section>
+
+      <section aria-labelledby="biometrie">
+        <h2 id="biometrie">4. Biométrie (Face ID / Touch ID)</h2>
+        <p>
+          MarkdownVault peut utiliser <strong>Face ID</strong> ou
+          <strong>Touch ID</strong> pour déverrouiller votre coffre local.
+        </p>
+        <ul>
+          <li>
+            Les données biométriques sont gérées par <strong>iOS</strong>
+            (Secure Enclave) ; l'application ne reçoit qu'un résultat
+            succès/échec.
+          </li>
+          <li>
+            <strong>Aucune donnée biométrique n'est transmise</strong> à
+            MarkdownVault ni à des tiers.
+          </li>
+          <li>
+            Un <strong>code de repli</strong> défini par vous reste disponible si
+            la biométrie est indisponible ou refusée.
+          </li>
+        </ul>
+      </section>
+
+      <section aria-labelledby="reseau">
+        <h2 id="reseau">5. Réseau et capture web</h2>
+        <p>
+          Lorsque <strong>vous</strong> demandez la capture d'une page web :
+        </p>
+        <ul>
+          <li>
+            L'application contacte
+            <strong>uniquement les serveurs du site que vous avez indiqué</strong>
+            (HTTPS par défaut).
+          </li>
+          <li>
+            Nous ne recevons pas le contenu capturé : il est converti et
+            enregistré <strong>sur votre appareil</strong>.
+          </li>
+          <li>
+            Nous ne consultons pas <code>robots.txt</code> ; l'archivage est
+            <strong>initié par vous</strong> à des fins personnelles locales.
+          </li>
+          <li>
+            Aucun cookie persistant cross-sites n'est conservé au-delà du besoin
+            technique de la capture.
+          </li>
+        </ul>
+      </section>
+
+      <section aria-labelledby="export">
+        <h2 id="export">6. Export et partage</h2>
+        <p>
+          Si vous utilisez la fonction <strong>Partager / Exporter</strong> :
+        </p>
+        <ul>
+          <li>
+            Vous choisissez la destination (fichiers, autre application, etc.).
+          </li>
+          <li>
+            L'export sort du périmètre chiffré du coffre ; vous en assumez le
+            contrôle.
+          </li>
+          <li>
+            Le développeur <strong>ne reçoit pas</strong> le fichier exporté.
+          </li>
+        </ul>
+      </section>
+
+      <section aria-labelledby="diagnostics">
+        <h2 id="diagnostics">
+          7. Données que nous pouvons recevoir (diagnostics Apple)
+        </h2>
+        <p>
+          Conformément aux principes produit définis pour la version 1.0 :
+        </p>
+        <table>
+          <thead>
+            <tr>
+              <th>Type</th>
+              <th>Source</th>
+              <th>Finalité</th>
+              <th>Lié à vous ?</th>
+              <th>Tracking ?</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Rapports de plantage (Crash Data)</strong></td>
+              <td>
+                Xcode Organizer / App Store Connect, via les mécanismes
+                <strong>natifs Apple</strong>
+              </td>
+              <td>Corriger les bugs et améliorer la stabilité</td>
+              <td><strong>Non</strong></td>
+              <td><strong>Non</strong></td>
+            </tr>
+          </tbody>
+        </table>
+        <ul>
+          <li>
+            Ce partage dépend du
+            <strong>réglage Diagnostics &amp; améliorations</strong> de votre
+            appareil iOS (opt-in utilisateur).
+          </li>
+          <li>
+            Nous n'utilisons <strong>aucun SDK tiers</strong> de crash reporting
+            en v1.0.
+          </li>
+          <li>
+            Nous n'utilisons pas ces données à des fins publicitaires ni de
+            profilage cross-apps.
+          </li>
+        </ul>
+        <p>
+          <strong>Tous les autres types de données</strong> du questionnaire App
+          Store (identifiants, contenu utilisateur, historique de navigation,
+          localisation, achats, etc.) sont <strong>non collectés</strong> par le
+          développeur en v1.0.
+        </p>
+      </section>
+
+      <section aria-labelledby="services-tiers">
+        <h2 id="services-tiers">8. Services tiers</h2>
+        <p>
+          En v1.0, MarkdownVault <strong>n'intègre pas</strong> de SDK analytics,
+          publicité, attribution ou synchronisation cloud tiers.
+        </p>
+        <p>
+          Les sites web que vous capturez ne sont pas des « partenaires »
+          MarkdownVault : ce sont des destinations
+          <strong>choisies par vous</strong>.
+        </p>
+      </section>
+
+      <section aria-labelledby="conservation">
+        <h2 id="conservation">9. Conservation et suppression</h2>
+        <ul>
+          <li>
+            Vos documents restent sur l'appareil jusqu'à
+            <strong>suppression par vous</strong> dans l'application ou
+            <strong>désinstallation</strong> de l'app.
+          </li>
+          <li>
+            La suppression d'un document retire le fichier chiffré et son entrée
+            d'index de façon <strong>irréversible</strong> (après confirmation
+            dans l'app).
+          </li>
+          <li>
+            Les rapports de plantage éventuels sont conservés selon les
+            politiques <strong>d'Apple</strong> ; contactez-nous pour toute
+            demande liée à ces données.
+          </li>
+        </ul>
+      </section>
+
+      <section aria-labelledby="mineurs">
+        <h2 id="mineurs">10. Mineurs</h2>
+        <p>
+          MarkdownVault ne s'adresse pas spécifiquement aux enfants de moins de
+          13 ans. Nous ne collectons pas sciemment d'informations personnelles
+          d'enfants.
+        </p>
+      </section>
+
+      <section aria-labelledby="vos-droits">
+        <h2 id="vos-droits">11. Vos droits</h2>
+        <p>
+          MarkdownVault v1.0 ne crée pas de compte développeur associé à votre
+          identité. Pour les données stockées localement, vous gardez le contrôle
+          via l'application (consultation, export, suppression).
+        </p>
+        <p>
+          Pour toute question ou demande relative à cette politique :
+          <a href="mailto:quentinveys@gmail.com">quentinveys@gmail.com</a>.
+        </p>
+        <p>
+          Si vous êtes dans l'Espace économique européen, vous pouvez exercer
+          vos droits (accès, rectification, effacement, opposition) dans la
+          mesure applicable. Étant donné le modèle local-first, la plupart des
+          actions se font <strong>directement sur votre appareil</strong>.
+        </p>
+      </section>
+
+      <section aria-labelledby="modifications">
+        <h2 id="modifications">12. Modifications</h2>
+        <p>
+          Nous mettrons à jour cette politique si le produit évolue (ex.
+          synchronisation cloud, comptes, analytics). La date « Dernière mise à
+          jour » sera révisée ; une version matériellement différente pourra être
+          signalée dans l'application ou sur cette page avant soumission App
+          Store.
+        </p>
+      </section>
+
+      <section class="summary" lang="en" aria-labelledby="english-summary">
+        <h2
+          id="english-summary"
+          style="margin-top: 0; padding-top: 0; border-top: 0"
+        >
+          13. English summary
+        </h2>
+        <p>
+          <strong>MarkdownVault</strong> is a <strong>local-first</strong> iOS
+          app. Your captured Markdown vault stays
+          <strong>encrypted on your device</strong>. We do not sell your data.
+          There is <strong>no MarkdownVault account or backend</strong> in v1.0,
+          and <strong>no third-party analytics or advertising SDKs</strong>.
+        </p>
+        <p>
+          <strong>Network use</strong> occurs only when <strong>you</strong>
+          request capture of a URL; requests go to
+          <strong>that website</strong>, not to MarkdownVault servers.
+          <strong>Face ID / Touch ID</strong> unlocks your local vault; biometric
+          data never leaves your device or is sent to us.
+        </p>
+        <p>
+          <strong>Export/share</strong> is <strong>user-initiated</strong>; we do
+          not receive exported files.
+        </p>
+        <p>
+          The <strong>only data</strong> we may receive is
+          <strong>Crash Data</strong> through <strong>Apple's native</strong>
+          Xcode Organizer / App Store Connect crash reporting, if you have opted
+          in to share diagnostics on your device. It is
+          <strong>not linked to your identity</strong> and
+          <strong>not used for tracking</strong>. All other App Store privacy
+          categories are <strong>not collected</strong> by the developer in v1.0.
+        </p>
+        <p>
+          <strong>Data controller:</strong> Quentin Veys (individual developer).
+          <strong>Contact:</strong>
+          <a href="mailto:quentinveys@gmail.com">quentinveys@gmail.com</a>.
+          <strong>Last updated:</strong> July 18, 2026.
+        </p>
+      </section>
+
+      <footer>
+        <p>
+          <em>Ce document ne constitue pas un avis juridique.</em>
+        </p>
+        <p>
+          MarkdownVault · Privacy Policy ·
+          <a href="https://qveys.github.io/webpage-to-markdown/privacy/"
+            >https://qveys.github.io/webpage-to-markdown/privacy/</a
+          >
+        </p>
+      </footer>
+    </main>
+  </body>
 </html>

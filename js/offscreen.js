@@ -226,15 +226,19 @@ function resolveUrls(doc, pageUrl) {
   // Resolve relative hrefs on anchors
   doc.querySelectorAll("a[href]").forEach((a) => {
     const href = a.getAttribute("href");
+    // URI schemes are case-insensitive; trim + lowercase before allow/deny checks.
+    const normalizedHref = href ? href.trim().toLowerCase() : "";
     if (
       href &&
-      !href.startsWith("http") &&
-      !href.startsWith("mailto:") &&
-      !href.startsWith("#") &&
-      !href.startsWith("javascript:")
+      !normalizedHref.startsWith("http") &&
+      !normalizedHref.startsWith("mailto:") &&
+      !normalizedHref.startsWith("#") &&
+      !normalizedHref.startsWith("javascript:") &&
+      !normalizedHref.startsWith("data:") &&
+      !normalizedHref.startsWith("vbscript:")
     ) {
       try {
-        a.setAttribute("href", new URL(href, pageUrl).href);
+        a.setAttribute("href", new URL(href.trim(), pageUrl).href);
       } catch (e) {
         // Ignore malformed URLs
       }
@@ -250,16 +254,20 @@ function extractLinks(doc, pageUrl) {
   doc.querySelectorAll("a[href]").forEach((a) => {
     const href = a.getAttribute("href");
     if (!href) return;
+    // URI schemes are case-insensitive; trim + lowercase before allow/deny checks.
+    const normalizedHref = href.trim().toLowerCase();
     if (
-      href.startsWith("mailto:") ||
-      href.startsWith("javascript:") ||
-      href.startsWith("#")
+      normalizedHref.startsWith("mailto:") ||
+      normalizedHref.startsWith("javascript:") ||
+      normalizedHref.startsWith("data:") ||
+      normalizedHref.startsWith("vbscript:") ||
+      normalizedHref.startsWith("#")
     ) {
       return;
     }
 
     try {
-      const resolved = new URL(href, pageUrl);
+      const resolved = new URL(href.trim(), pageUrl);
       // Remove fragment
       resolved.hash = "";
       // Remove trailing slash (only if there's a non-empty pathname beyond root)
