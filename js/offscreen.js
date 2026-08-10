@@ -37,17 +37,33 @@ async function parseAndConvert(pageUrl, html) {
     resolveUrls(doc, pageUrl);
     const links = extractLinks(doc, pageUrl);
 
-    const title = doc.title || "Untitled Page";
+    const fallbackTitle = doc.title || "Untitled Page";
+    let articleTitle = "";
+
+    // Flatten docs widgets (code blocks, cards) before extraction
+    if (typeof W2M !== "undefined" && W2M.preprocessDocument) {
+      W2M.preprocessDocument(doc, pageUrl);
+    }
 
     let content = null;
 
-    // Try Readability first
-    if (typeof Readability !== "undefined") {
+    // Prefer #content (docs) — Readability often drops trailing "What's next" cards
+    if (typeof W2M !== "undefined" && W2M.pickMainContent) {
+      const picked = W2M.pickMainContent(doc);
+      if (picked && picked.html) {
+        content = picked.html;
+        articleTitle = picked.pageTitle || "";
+      }
+    }
+
+    // Try Readability if no docs main content
+    if (!content && typeof Readability !== "undefined") {
       try {
         const docClone = doc.cloneNode(true);
         const article = new Readability(docClone).parse();
         if (article && article.content && article.content.length > 200) {
           content = article.content;
+          articleTitle = article.title || "";
         }
       } catch (e) {
         console.warn("[offscreen] Readability failed, falling back:", e);
@@ -100,10 +116,24 @@ async function parseAndConvert(pageUrl, html) {
       )
       .forEach((el) => el.remove());
 
-    // Remove hidden/decorative elements
-    _clean
-      .querySelectorAll('[aria-hidden="true"]')
-      .forEach((el) => el.remove());
+    // Remove decorative aria-hidden (keep real links / code hosts)
+    if (typeof W2M !== "undefined" && W2M.removeDecorativeAriaHidden) {
+      W2M.removeDecorativeAriaHidden(_clean);
+    } else {
+      _clean.querySelectorAll('[aria-hidden="true"]').forEach((el) => {
+        if (el.nodeName === "A" && el.getAttribute("href")) return;
+        if (el.querySelector && el.querySelector("pre, code")) return;
+        el.remove();
+      });
+    }
+
+    if (typeof W2M !== "undefined") {
+      if (W2M.stripDocsChrome) W2M.stripDocsChrome(_clean);
+      if (W2M.stripHeadingPermalinks) W2M.stripHeadingPermalinks(_clean);
+      if (W2M.flattenCards) W2M.flattenCards(_clean);
+      if (W2M.restoreCodeLanguageClasses) W2M.restoreCodeLanguageClasses(_clean);
+      if (W2M.absolutizeAnchors) W2M.absolutizeAnchors(_clean, pageUrl);
+    }
 
     // Convert embedded tweets to clean blockquotes
     _clean
@@ -153,7 +183,12 @@ async function parseAndConvert(pageUrl, html) {
 
     content = _clean.innerHTML;
 
-    const markdown = convertToMarkdown(title, content);
+    const title =
+      typeof W2M !== "undefined" && W2M.resolveMarkdownTitle
+        ? W2M.resolveMarkdownTitle(articleTitle, content, fallbackTitle)
+        : articleTitle || fallbackTitle;
+
+    const markdown = convertToMarkdown(title, content, pageUrl);
 
     return { url: pageUrl, links, markdown, title };
   } catch (err) {
@@ -243,7 +278,7 @@ function extractLinks(doc, pageUrl) {
 
 // ─── Convert HTML to Markdown via TurndownService ────────────────────────────
 
-function convertToMarkdown(title, html) {
+function convertToMarkdown(title, html, pageUrl) {
   const service = new TurndownService({
     headingStyle: "atx",
     hr: "---",
@@ -266,14 +301,18 @@ function convertToMarkdown(title, html) {
     replacement: (content, node) => {
       const code = node.querySelector("code");
       const rawCode = code.textContent || "";
-
       const lang =
-        (code.className.match(/(?:language-|lang-)(\S+)/) || [])[1] ||
-        code.getAttribute("data-lang") ||
-        node.getAttribute("data-lang") ||
-        code.getAttribute("data-language") ||
-        node.getAttribute("data-language") ||
-        "";
+        typeof W2M !== "undefined" && W2M.detectCodeLanguage
+          ? W2M.detectCodeLanguage(code, node)
+          : (code.className.match(/(?:language-|lang-)(\S+)/) || [])[1] ||
+            code.getAttribute("data-lang") ||
+            node.getAttribute("data-lang") ||
+            code.getAttribute("data-language") ||
+            node.getAttribute("data-language") ||
+            code.getAttribute("language") ||
+            node.getAttribute("language") ||
+            code.getAttribute("lang") ||
+            "";
 
       return `\n\n\`\`\`${lang}\n${rawCode.replace(/\n$/, "")}\n\`\`\`\n\n`;
     },
@@ -312,9 +351,15 @@ function convertToMarkdown(title, html) {
     },
   });
 
-  let markdown = service.turndown(`<div><h1>${title}</h1>${html}</div>`);
+  let markdown = service.turndown(
+    typeof W2M !== "undefined" && W2M.wrapHtmlForTurndown
+      ? W2M.wrapHtmlForTurndown(title, html)
+      : `<div><h1>${title}</h1>${html}</div>`,
+  );
   markdown = cleanupMarkdown(markdown);
-
+  if (pageUrl && typeof W2M !== "undefined" && W2M.absolutizeMarkdownLinks) {
+    markdown = W2M.absolutizeMarkdownLinks(markdown, pageUrl);
+  }
   return markdown;
 }
 

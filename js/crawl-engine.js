@@ -473,6 +473,12 @@ class CrawlEngine {
       });
     }
 
+    if (typeof rewriteCrawlLinks === "function") {
+      finalMarkdown = rewriteCrawlLinks(finalMarkdown, pageUrl, urlToPath);
+    } else if (typeof W2M !== "undefined" && W2M.rewriteCrawlLinks) {
+      finalMarkdown = W2M.rewriteCrawlLinks(finalMarkdown, pageUrl, urlToPath);
+    }
+
     const encoded = encodeURIComponent(finalMarkdown);
     await w2mDownload({
       url: `data:text/markdown;charset=utf-8,${encoded}`,
