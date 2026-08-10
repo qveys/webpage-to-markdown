@@ -15,6 +15,26 @@
       function (_m, label, href) { return '[' + label.trim() + '](' + href.trim() + ')'; }
     );
 
+    // Docs UI chrome (before orphan-noise pass, which would also eat short lines)
+    out = out.replace(/^(?:Copy page)+[ \t]*$/gim, '');
+    out = out.replace(/^Was this page helpful\?[ \t]*$/gim, '');
+    out = out.replace(/^(?:Yes\s*No|YesNo)[ \t]*$/gim, '');
+    out = out.replace(/^(?:⌘I|Ctrl\+I)[ \t]*$/gim, '');
+
+    // Drop empty / ZWSP-only permalink anchors: [​](#section)
+    out = out.replace(/\[(?:\u200b|\s)*\]\(([^)]+)\)\s*/g, '');
+
+    // Card leftovers: [## Title\n\nDesc](url) → [Title](url) — Desc
+    out = out.replace(
+      /\[(#{1,6})\s+([^\n\]]+)\n+([^\]]*?)\]\(([^)\n]+)\)/g,
+      function (_m, _hashes, title, desc, href) {
+        var t = String(title || '').trim();
+        var d = String(desc || '').replace(/^#+\s*/, '').trim();
+        if (d && d !== t) return '[' + t + '](' + href + ') — ' + d;
+        return '[' + t + '](' + href + ')';
+      }
+    );
+
     // Recover headings rendered as:
     // ##
     //
@@ -108,6 +128,30 @@
     }
 
     out = lines.join('\n');
+
+    // Leading site-title H1 + optional breadcrumb/noise + page H1 → keep page H1
+    out = out.replace(
+      /^#\s+(.+?)\n+(?:(?:\[[^\]]*\]\([^)]+\)|#\s+\1)\n+)*#\s+(.+)(\n|$)/m,
+      function (_m, first, second, tail) {
+        var a = String(first).trim();
+        var b = String(second).trim();
+        if (a === b) return '# ' + a + (tail || '\n');
+        if (/documentation/i.test(a) || a.length > b.length + 20) {
+          return '# ' + b + (tail || '\n');
+        }
+        return _m;
+      }
+    );
+
+    // Plan/badge text glued onto the next sentence: "Enterprise Plan The API…"
+    out = out.replace(
+      /(?:^|\n)((?:Enterprise|Team|Pro|Business|Free|Hobby)\s+Plan)\s+(?=[A-Z])/g,
+      '\n',
+    );
+
+    // Badge residue after DOM strip: "## Title |" or a lone "|" line
+    out = out.replace(/^(#{1,6}[ \t]+.+?)[ \t]*\|[ \t]*$/gm, '$1');
+    out = out.replace(/^\|[ \t]*$/gm, '');
 
     // Normalize extra spacing after cleanup.
     out = out.replace(/\n{3,}/g, '\n\n').trim();
