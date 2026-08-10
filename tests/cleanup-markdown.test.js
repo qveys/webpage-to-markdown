@@ -58,4 +58,67 @@ describe('cleanupMarkdown', () => {
     assert.equal(cleanupMarkdown(null), '');
     assert.equal(cleanupMarkdown(undefined), '');
   });
+
+  test('strips Copy page and feedback chrome', () => {
+    const input =
+      '# Title\n\nCopy pageCopy page\n\nHello world this is real content here.\n\nWas this page helpful?\n\nYesNo\n\n⌘I';
+    const result = cleanupMarkdown(input);
+    assert.equal(result.includes('Copy page'), false);
+    assert.equal(result.includes('Was this page helpful'), false);
+    assert.equal(result.includes('YesNo'), false);
+    assert.match(result, /Hello world/);
+  });
+
+  test('unwraps card-style [## Title\\n\\nDesc](url) links', () => {
+    const input =
+      '[## Workspace API tokens\n\nCreate a token.](/api/workspace-api-tokens)';
+    const result = cleanupMarkdown(input);
+    assert.equal(
+      result,
+      '[Workspace API tokens](/api/workspace-api-tokens) — Create a token.',
+    );
+  });
+
+  test('drops empty ZWSP permalink anchors', () => {
+    const input = '[​](#base-url)\n\n## Base URL';
+    const result = cleanupMarkdown(input);
+    assert.equal(result.includes('](#'), false);
+    assert.match(result, /## Base URL/);
+  });
+
+  test('dedupes site-title then page H1', () => {
+    const input =
+      '# Example Docs Documentation - product overview\n\n# Product API\n\nBody.';
+    const result = cleanupMarkdown(input);
+    assert.equal(result.startsWith('# Product API'), true);
+    assert.equal(result.includes('Documentation'), false);
+  });
+
+  test('dedupes site-title H1 with breadcrumb before page H1', () => {
+    const input =
+      '# Example Docs Documentation - product overview for teams and CLI\n\n' +
+      '[Product API](/api/index)\n\n# Product API\n\nBody text here.';
+    const result = cleanupMarkdown(input);
+    assert.equal(result.startsWith('# Product API\n'), true);
+    assert.equal(result.includes('Documentation'), false);
+    assert.equal(result.includes('[Product API](/api/index)'), false);
+  });
+
+  test('preserves plan names that start a real sentence', () => {
+    // Badge chips are stripped in the DOM layer; string cleanup must not
+    // delete commercial plan names from legitimate prose.
+    const input =
+      'Free Plan Users can request two reviews per day.';
+    const result = cleanupMarkdown(input);
+    assert.match(result, /Free Plan Users can request two reviews/);
+  });
+
+  test('strips trailing pipe residue on headings and lone pipe lines', () => {
+    const input =
+      '## Fix CI delivery options |\n\n|\n\nBody paragraph here.';
+    const result = cleanupMarkdown(input);
+    assert.equal(result.includes('|'), false);
+    assert.match(result, /^## Fix CI delivery options\n/);
+    assert.match(result, /Body paragraph here/);
+  });
 });
