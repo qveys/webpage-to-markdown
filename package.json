@@ -3,12 +3,6 @@
   "version": "1.8.0",
   "private": true,
   "scripts": {
-    "test": "jest"
-  },
-  "devDependencies": {
-    "jest": "^29.0.0"
-  },
-  "overrides": {
-    "brace-expansion": "^1.1.14"
+    "test": "node --require ./tests/setup/chrome-mock.js --test tests/*.test.js"
   }
 }
