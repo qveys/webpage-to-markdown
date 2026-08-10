@@ -11,7 +11,8 @@
     frontmatter: false,
     headingStyle: 'atx',
     bulletListMarker: '-',
-    codeBlockStyle: 'fenced'
+    codeBlockStyle: 'fenced',
+    includeImages: true
   };
 
   function mergeSettings(stored) {

@@ -3,21 +3,33 @@
 
 importScripts("/js/turndown.js");
 importScripts("/js/cleanup-markdown.js");
+importScripts("/js/html-preprocess.js");
+importScripts("/js/rewrite-crawl-links.js");
 importScripts("/js/markdown-output.js");
+importScripts("/js/safe-assets.js");
 
-// Reset session on every SW startup (including extension reload)
-// New timestamped folder on each startup, delay preserved
-chrome.storage.local.get("session", ({ session }) => {
-  const ts = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
-  chrome.storage.local.set({
-    session: {
-      active: false,
-      folder: `w2m-session-${ts}`,
-      delay: session?.delay ?? 2000,
-      capturedUrls: [], // New session on SW restart
-    },
+// A service-worker restart must never leave Chrome's download UI disabled.
+try {
+  chrome.downloads.setUiOptions({ enabled: true }).catch((err) => {
+    console.warn("[W2M] Unable to restore download UI on startup:", err.message);
   });
-  chrome.action.setBadgeText({ text: "" });
+} catch (err) {
+  console.warn("[W2M] Unable to restore download UI on startup:", err.message);
+}
+
+// Initialize once. Service-worker wake-ups must preserve completed crawl results.
+chrome.storage.local.get("session", ({ session }) => {
+  if (!session) {
+    const ts = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
+    chrome.storage.local.set({
+      session: {
+        active: false,
+        folder: `w2m-session-${ts}`,
+        delay: 2000,
+        capturedUrls: [],
+      },
+    });
+  }
 });
 
 // ─── Extraction du contenu de la page ────────────────────────────────────────
@@ -99,7 +111,10 @@ function extractPageContent() {
 
 // ─── Conversion HTML → Markdown ───────────────────────────────────────────────
 
-function convertToMarkdown(title, content) {
+function convertToMarkdown(title, content, options) {
+  const opts = options || {};
+  const includeImages = opts.includeImages !== false;
+
   const service = new TurndownService({
     headingStyle: "atx",
     hr: "---",
@@ -113,6 +128,10 @@ function convertToMarkdown(title, content) {
   service.addRule("figures", {
     filter: "figure",
     replacement: (ruleContent, node) => {
+      if (!includeImages) {
+        const caption = node.querySelector("figcaption");
+        return caption ? caption.textContent : "";
+      }
       const img = node.querySelector("img");
       const caption = node.querySelector("figcaption");
       if (img) {
@@ -124,6 +143,24 @@ function convertToMarkdown(title, content) {
       return ruleContent;
     },
   });
+
+  if (!includeImages) {
+    service.addRule("stripImages", {
+      filter: "img",
+      replacement: () => "",
+    });
+  }
+  // Skip tiny images (icons < 16px) — pure noise
+  service.addRule("skipTinyImages", {
+    filter: (node) => {
+      if (node.nodeName !== "IMG") return false;
+      const w = parseInt(node.getAttribute("width") || "0", 10);
+      const h = parseInt(node.getAttribute("height") || "0", 10);
+      return (w > 0 && w < 16) || (h > 0 && h < 16);
+    },
+    replacement: () => "",
+  });
+
   // Constrain small images to their rendered size via HTML <img> tag
   service.addRule("constrainSmallImages", {
     filter: (node) => {
@@ -164,42 +201,20 @@ function convertToMarkdown(title, content) {
 // cleanupMarkdown is provided by /js/cleanup-markdown.js (loaded via importScripts above)
 
 // ─── Force-skip "save as" dialog ─────────────────────────────────────────────
-// Chrome ignores saveAs:false when "Ask where to save" is enabled in settings.
-// We track pending downloads and use onDeterminingFilename to force the filename.
-
-const _pendingDownloads = new Map(); // downloadId → filename
-let _downloadQueue = Promise.resolve(); // serialise chrome.downloads calls
-
-chrome.downloads.onDeterminingFilename.addListener((item, suggest) => {
-  if (_pendingDownloads.has(item.id)) {
-    suggest({ filename: _pendingDownloads.get(item.id), conflictAction: "overwrite" });
-    _pendingDownloads.delete(item.id);
-  }
-});
-
 async function w2mDownload(options) {
-  // Serialise downloads so onDeterminingFilename always finds the pending entry
-  const ticket = _downloadQueue;
-  let release;
-  _downloadQueue = new Promise((r) => { release = r; });
-  await ticket;
-
-  try {
-    const id = await new Promise((resolve, reject) => {
-      chrome.downloads.download(options, (downloadId) => {
-        if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
-        else {
-          // Register INSIDE the callback, before the microtask boundary,
-          // so onDeterminingFilename always finds the entry.
-          if (options.filename) _pendingDownloads.set(downloadId, options.filename);
-          resolve(downloadId);
-        }
-      });
+  // Do not pass saveAs at all. Chrome displays a file chooser when both
+  // filename and saveAs are present, even when saveAs is false.
+  const downloadOptions = { ...options };
+  delete downloadOptions.saveAs;
+  return new Promise((resolve, reject) => {
+    chrome.downloads.download(downloadOptions, (downloadId) => {
+      if (chrome.runtime.lastError) {
+        reject(new Error(chrome.runtime.lastError.message));
+      } else {
+        resolve(downloadId);
+      }
     });
-    return id;
-  } finally {
-    release();
-  }
+  });
 }
 
 // ─── Download via chrome.downloads ──────────────────────────────────────────
@@ -219,7 +234,6 @@ async function downloadMarkdown(markdown, title) {
   await w2mDownload({
     url: dataUrl,
     filename: filename,
-    saveAs: false,
     conflictAction: "overwrite",
   });
 }
@@ -228,10 +242,42 @@ async function downloadMarkdown(markdown, title) {
 // ─── Auto-capture session ──────────────────────────────────────────────────
 
 const DEFAULT_DELAY = 2000;
+let sessionAssetBudget = { used: 0 };
 
 function makeSessionFolder() {
   const ts = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
   return `w2m-session-${ts}`;
+}
+
+function originPermissionPattern(url) {
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return null;
+    return `${parsed.origin}/*`;
+  } catch (_e) {
+    return null;
+  }
+}
+
+function normalizeAssetLimits(source = {}) {
+  const maxAssetSizeMb = Math.min(
+    100,
+    Math.max(1, Number.isFinite(Number(source.maxAssetSizeMb)) ? Number(source.maxAssetSizeMb) : 10),
+  );
+  const requestedSessionMb = Math.min(
+    1000,
+    Math.max(1, Number.isFinite(Number(source.maxSessionAssetSizeMb)) ? Number(source.maxSessionAssetSizeMb) : 50),
+  );
+  return {
+    maxAssetSizeMb,
+    maxSessionAssetSizeMb: Math.max(maxAssetSizeMb, requestedSessionMb),
+  };
+}
+
+async function hasOriginPermission(url) {
+  const pattern = originPermissionPattern(url);
+  if (!pattern) return false;
+  return chrome.permissions.contains({ origins: [pattern] });
 }
 
 async function getSession() {
@@ -280,6 +326,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     const delay = message.delay ?? DEFAULT_DELAY;
     const urlTree = message.urlTree ?? true;
     const saveAssets = message.saveAssets ?? true;
+    const assetLimits = normalizeAssetLimits(message);
+    sessionAssetBudget = { used: 0 };
     // Ne vider les URLs que si le dossier change (= nouvelle session)
     getSession()
       .then((prev) => {
@@ -292,6 +340,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           delay,
           urlTree,
           saveAssets,
+          ...assetLimits,
           capturedUrls: [...capturedUrls],
         });
       })
@@ -304,16 +353,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             active: true,
             lastFocusedWindow: true,
           });
-          if (
-            tab &&
-            tab.id &&
-            tab.url &&
-            !tab.url.startsWith("chrome://") &&
-            !tab.url.startsWith("chrome-extension://") &&
-            !tab.url.startsWith("edge://") &&
-            !tab.url.startsWith("about:") &&
-            !tab.url.includes("chrome.google.com/webstore")
-          ) {
+          if (tab && tab.id && tab.url && !navigationUrlIsRestricted(tab.url)) {
             // Check if the page was already captured
             if (capturedUrls.has(tab.url)) {
               return;
@@ -384,12 +424,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     (async () => {
       let crawlSessionCommitted = false;
       try {
+        if (!(await hasOriginPermission(message.startUrl))) {
+          throw new Error("Site access has not been granted for this crawl origin");
+        }
         await ensureOffscreen();
         const folder = message.folder || makeSessionFolder();
         const delay = message.delay ?? 2000;
         const urlTree = message.urlTree ?? true;
         const saveAssets = message.saveAssets ?? true;
-        await setSession({ active: true, folder, delay, urlTree, saveAssets, crawling: true, startUrl: message.startUrl, lastCrawlResult: null });
+        const assetLimits = normalizeAssetLimits(message);
+        await setSession({ active: true, folder, delay, urlTree, saveAssets, ...assetLimits, crawling: true, startUrl: message.startUrl, lastCrawlResult: null });
         crawlSessionCommitted = true;
         updateBadge(true);
         await crawlEngine.start(message.startUrl, {
@@ -486,6 +530,24 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     sendResponse({ ok: true });
     return true;
   }
+  if (message.type === "W2M_GET_ACTIVE_URL") {
+    (async () => {
+      try {
+        const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+        if (tab?.url) {
+          sendResponse({ ok: true, url: tab.url });
+          return;
+        }
+        // Without the "tabs" permission, tab.url is hidden until the origin is
+        // granted — fall back to the URL tracked via webNavigation events.
+        const url = tab?.id ? await getNavigatedTabUrl(tab.id) : "";
+        sendResponse({ ok: true, url });
+      } catch (e) {
+        sendResponse({ ok: false, error: e.message });
+      }
+    })();
+    return true;
+  }
   if (message.type === "W2M_OPEN_DASHBOARD") {
     (async () => {
       try {
@@ -524,17 +586,24 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === "W2M_SINGLE_CONVERT") {
     (async () => {
       try {
-        const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+        let tab = null;
+        if (message.tabId != null) {
+          try {
+            tab = await chrome.tabs.get(message.tabId);
+          } catch (e) {
+            tab = null;
+          }
+        }
+        if (!tab || !tab.id || !tab.url) {
+          const [active] = await chrome.tabs.query({
+            active: true,
+            lastFocusedWindow: true,
+          });
+          tab = active;
+        }
         if (!tab || !tab.id || !tab.url) throw new Error("No active tab found");
         const url = tab.url;
-        if (
-          url.startsWith("chrome://") ||
-          url.startsWith("chrome-extension://") ||
-          url.startsWith("edge://") ||
-          url.startsWith("about:") ||
-          url.includes("chrome.google.com/webstore") ||
-          url.includes("chromewebstore.google.com")
-        ) {
+        if (navigationUrlIsRestricted(url)) {
           throw new Error("Cannot convert system pages or Web Store");
         }
         const res = await extractMarkdownFromTab(tab.id, url);
@@ -582,6 +651,31 @@ const pendingSingleCaptures = new Map(); // tabId → timeoutId for auto single-
 const SINGLE_CONVERT_DEBOUNCE_MS = 1000; // debounce for single-page auto-convert on navigation
 let capturedUrls = new Set(); // URLs already processed in the current session
 
+// Main-frame URL last seen per tab. webNavigation exposes URLs without the
+// "tabs" permission, so the dashboard can still discover the current page
+// when chrome.tabs.query hides tab.url (origin not yet granted).
+let navigatedTabUrls = new Map(); // tabId → url
+
+function rememberTabUrl(tabId, url) {
+  navigatedTabUrls.set(tabId, url);
+  chrome.storage.session
+    .set({ navigatedTabUrls: [...navigatedTabUrls] })
+    .catch((err) => {
+      console.warn("[W2M] rememberTabUrl:", err.message);
+    });
+}
+
+async function getNavigatedTabUrl(tabId) {
+  if (navigatedTabUrls.size === 0) {
+    // Restore after a service worker restart.
+    const stored = await chrome.storage.session.get("navigatedTabUrls");
+    if (Array.isArray(stored.navigatedTabUrls)) {
+      navigatedTabUrls = new Map(stored.navigatedTabUrls);
+    }
+  }
+  return navigatedTabUrls.get(tabId) || "";
+}
+
 // Reload captured URLs from storage on SW startup
 chrome.storage.local.get("session", ({ session }) => {
   if (session?.capturedUrls?.length) {
@@ -595,14 +689,27 @@ async function addCapturedUrl(url) {
   await setSession({ capturedUrls: [...capturedUrls] });
 }
 
+function isChromeWebStoreUrl(url) {
+  try {
+    const parsedUrl = new URL(url);
+    return (
+      parsedUrl.hostname === "chromewebstore.google.com" ||
+      (parsedUrl.hostname === "chrome.google.com" &&
+        parsedUrl.pathname.startsWith("/webstore"))
+    );
+  } catch (_err) {
+    return false;
+  }
+}
+
 function navigationUrlIsRestricted(url) {
   return (
     url.startsWith("chrome://") ||
     url.startsWith("chrome-extension://") ||
     url.startsWith("edge://") ||
     url.startsWith("about:") ||
-    url.includes("chrome.google.com/webstore") ||
-    url.includes("chromewebstore.google.com")
+    url.startsWith("view-source:") ||
+    isChromeWebStoreUrl(url)
   );
 }
 
@@ -718,6 +825,8 @@ chrome.webNavigation.onCompleted.addListener(async (details) => {
   const url = details.url;
   const isRestricted = navigationUrlIsRestricted(url);
 
+  if (!isRestricted) rememberTabUrl(details.tabId, url);
+
   const foregroundOk = await isForegroundActiveTab(details.tabId);
 
   // ─── Session auto-capture (existing behaviour) ──────────────────────────
@@ -793,6 +902,7 @@ chrome.webNavigation.onHistoryStateUpdated.addListener(async (details) => {
   if (details.frameId !== 0) return;
   const url = details.url;
   if (navigationUrlIsRestricted(url)) return;
+  rememberTabUrl(details.tabId, url);
   if (!(await isForegroundActiveTab(details.tabId))) return;
   await scheduleSinglePageAutoConvert(details.tabId, url);
 });
@@ -802,11 +912,17 @@ chrome.webNavigation.onReferenceFragmentUpdated.addListener(async (details) => {
   if (details.frameId !== 0) return;
   const url = details.url;
   if (navigationUrlIsRestricted(url)) return;
+  rememberTabUrl(details.tabId, url);
   if (!(await isForegroundActiveTab(details.tabId))) return;
   await scheduleSinglePageAutoConvert(details.tabId, url);
 });
 
 chrome.tabs.onRemoved.addListener((tabId) => {
+  if (navigatedTabUrls.delete(tabId)) {
+    chrome.storage.session
+      .set({ navigatedTabUrls: [...navigatedTabUrls] })
+      .catch(() => {});
+  }
   if (pendingCaptures.has(tabId)) {
     clearTimeout(pendingCaptures.get(tabId));
     pendingCaptures.delete(tabId);
@@ -825,6 +941,8 @@ async function injectConversionLibraries(tabId) {
       "/js/turndown.js",
       "/js/turndown-plugin-gfm.js",
       "/js/cleanup-markdown.js",
+      "/js/html-preprocess.js",
+      "/js/rewrite-crawl-links.js",
     ],
   });
 }
@@ -840,6 +958,7 @@ async function extractMarkdownFromTab(tabId, pageUrl) {
     headingStyle: m.headingStyle,
     bulletListMarker: m.bulletListMarker,
     codeBlockStyle: m.codeBlockStyle,
+    includeImages: m.includeImages,
   };
   const results = await chrome.scripting.executeScript({
     target: { tabId },
@@ -935,15 +1054,58 @@ function extractAndConvert(options) {
       .forEach((el) => el.remove());
 
     let html;
+    let articleTitle = "";
 
-    if (typeof Readability !== "undefined") {
+    // Full-document clone: preprocess (code/cards) then Readability
+    const docClone = document.cloneNode(true);
+    if (typeof preprocessDocument === "function") {
+      preprocessDocument(docClone, baseUrl);
+    } else if (typeof W2M !== "undefined" && W2M.preprocessDocument) {
+      W2M.preprocessDocument(docClone, baseUrl);
+    }
+    // Mirror absolute URL resolution onto the Readability clone
+    if (docClone.body) {
+      docClone.body.querySelectorAll("a[href]").forEach((a) => {
+        const href = a.getAttribute("href");
+        if (
+          href &&
+          !href.startsWith("http") &&
+          !href.startsWith("mailto:") &&
+          !href.startsWith("#")
+        ) {
+          try {
+            a.setAttribute("href", new URL(href, baseUrl).href);
+          } catch (e) { /* ignore */ }
+        }
+      });
+    }
+    if (typeof preprocessDocument === "function") {
+      preprocessDocument(bodyClone, baseUrl);
+    } else if (typeof W2M !== "undefined" && W2M.preprocessDocument) {
+      W2M.preprocessDocument(bodyClone, baseUrl);
+    }
+
+    // Prefer #content (docs sites) — Readability drops trailing card grids like "What's next"
+    const pickFn =
+      typeof pickMainContent === "function"
+        ? pickMainContent
+        : typeof W2M !== "undefined" && W2M.pickMainContent
+          ? W2M.pickMainContent
+          : null;
+    const picked = pickFn ? pickFn(docClone) : null;
+    if (picked && picked.html) {
+      html = picked.html;
+      articleTitle = picked.pageTitle || "";
+    }
+
+    if (!html && typeof Readability !== "undefined") {
       try {
-        const docClone = document.cloneNode(true);
         const article = new Readability(docClone, {
           keepClasses: false,
         }).parse();
         if (article && article.content && article.content.length > 200) {
           html = article.content;
+          articleTitle = article.title || "";
         }
       } catch (e) {
         console.warn("[W2M] Readability failed, falling back", e);
@@ -990,10 +1152,30 @@ function extractAndConvert(options) {
       )
       .forEach((el) => el.remove());
 
-    // Remove hidden/decorative elements (tooltips, screen-reader duplicates)
-    _clean
-      .querySelectorAll("[aria-hidden=\"true\"]")
-      .forEach((el) => el.remove());
+    // Remove decorative aria-hidden (keep real links / code hosts)
+    if (typeof removeDecorativeAriaHidden === "function") {
+      removeDecorativeAriaHidden(_clean);
+    } else if (typeof W2M !== "undefined" && W2M.removeDecorativeAriaHidden) {
+      W2M.removeDecorativeAriaHidden(_clean);
+    } else {
+      _clean.querySelectorAll('[aria-hidden="true"]').forEach((el) => {
+        if (el.nodeName === "A" && el.getAttribute("href")) return;
+        if (el.querySelector && el.querySelector("pre, code")) return;
+        el.remove();
+      });
+    }
+
+    // Re-strip docs chrome + permalinks + cards; restore code lang classes
+    if (typeof W2M !== "undefined") {
+      if (W2M.stripDocsChrome) W2M.stripDocsChrome(_clean);
+      if (W2M.stripHeadingPermalinks) W2M.stripHeadingPermalinks(_clean);
+      if (W2M.flattenCards) W2M.flattenCards(_clean);
+      if (W2M.restoreCodeLanguageClasses) W2M.restoreCodeLanguageClasses(_clean);
+      if (W2M.absolutizeAnchors) W2M.absolutizeAnchors(_clean, baseUrl);
+    } else if (typeof restoreCodeLanguageClasses === "function") {
+      restoreCodeLanguageClasses(_clean);
+      if (typeof absolutizeAnchors === "function") absolutizeAnchors(_clean, baseUrl);
+    }
 
     // Convert embedded tweets to clean blockquotes (for non-Twitter pages)
     _clean
@@ -1015,7 +1197,7 @@ function extractAndConvert(options) {
         const src = tweetLinks.length
           ? tweetLinks[tweetLinks.length - 1].href
           : "";
-        el.innerHTML = `<p>${text}</p>${src ? `<p><a href="${src}">Source</a></p>` : ""}`;
+        el.innerHTML = `<p>${escapeHtml(text)}</p>${src ? `<p><a href="${escapeHtml(src)}">Source</a></p>` : ""}`;
       });
 
     // Remove social share/follow widgets by class patterns
@@ -1050,12 +1232,21 @@ function extractAndConvert(options) {
     html = _clean.innerHTML;
     // ─── End HTML cleanup ─────────────────────────────────────────────
 
-    const title = document.title || "Untitled Page";
+    const resolveTitle =
+      typeof resolveMarkdownTitle === "function"
+        ? resolveMarkdownTitle
+        : typeof W2M !== "undefined" && W2M.resolveMarkdownTitle
+          ? W2M.resolveMarkdownTitle
+          : null;
+    const title = resolveTitle
+      ? resolveTitle(articleTitle, html, document.title || "Untitled Page")
+      : articleTitle || document.title || "Untitled Page";
     const opts = options || {};
     const headingStyle = opts.headingStyle === "setext" ? "setext" : "atx";
     let bullet = opts.bulletListMarker;
     if (bullet !== "-" && bullet !== "*" && bullet !== "+") bullet = "-";
     const codeBlockStyle = opts.codeBlockStyle === "indented" ? "indented" : "fenced";
+    const includeImages = opts.includeImages !== false;
 
     function escapeHtml(s) {
       return String(s)
@@ -1064,6 +1255,13 @@ function extractAndConvert(options) {
         .replace(/>/g, "&gt;")
         .replace(/"/g, "&quot;");
     }
+
+    const detectLang =
+      typeof detectCodeLanguage === "function"
+        ? detectCodeLanguage
+        : typeof W2M !== "undefined" && W2M.detectCodeLanguage
+          ? W2M.detectCodeLanguage
+          : null;
 
     const service = new TurndownService({
       headingStyle,
@@ -1081,20 +1279,17 @@ function extractAndConvert(options) {
       replacement: (content, node) => {
         const code = node.querySelector("code");
         const rawCode = code.textContent || "";
-
-        // Detect language from multiple possible attributes
-        const lang =
-          // class="language-json" ou class="lang-json"
-          (code.className.match(/(?:language-|lang-)(\S+)/) || [])[1] ||
-          // data-lang="json"
-          code.getAttribute("data-lang") ||
-          node.getAttribute("data-lang") ||
-          // data-language="json"
-          code.getAttribute("data-language") ||
-          node.getAttribute("data-language") ||
-          // GitLab: <code data-sourcepos lang="json">
-          code.getAttribute("lang") ||
-          "";
+        const lang = detectLang
+          ? detectLang(code, node)
+          : (code.className.match(/(?:language-|lang-)(\S+)/) || [])[1] ||
+            code.getAttribute("data-lang") ||
+            node.getAttribute("data-lang") ||
+            code.getAttribute("data-language") ||
+            node.getAttribute("data-language") ||
+            code.getAttribute("language") ||
+            node.getAttribute("language") ||
+            code.getAttribute("lang") ||
+            "";
 
         return `\n\n\`\`\`${lang}\n${rawCode.replace(/\n$/, "")}\n\`\`\`\n\n`;
       },
@@ -1102,6 +1297,10 @@ function extractAndConvert(options) {
     service.addRule("figures", {
       filter: "figure",
       replacement: (content, node) => {
+        if (!includeImages) {
+          const cap = node.querySelector("figcaption");
+          return cap ? cap.textContent : "";
+        }
         const img = node.querySelector("img");
         if (img) {
           const alt = img.getAttribute("alt") || "";
@@ -1112,6 +1311,12 @@ function extractAndConvert(options) {
         return content;
       },
     });
+    if (!includeImages) {
+      service.addRule("stripImages", {
+        filter: "img",
+        replacement: () => "",
+      });
+    }
     service.addRule("details", {
       filter: "details",
       replacement: (content, node) => {
@@ -1132,6 +1337,17 @@ function extractAndConvert(options) {
         return src ? `![${alt}](${src})` : "";
       },
     });
+    // Skip tiny images (icons < 16px) — pure noise; matches former popup rule
+    service.addRule("skipTinyImages", {
+      filter: (node) => {
+        if (node.nodeName !== "IMG") return false;
+        const rw = parseInt(node.getAttribute("data-w2m-width") || "0", 10);
+        const w = parseInt(node.getAttribute("width") || "0", 10);
+        const h = parseInt(node.getAttribute("height") || "0", 10);
+        return (rw > 0 && rw < 16) || (w > 0 && w < 16) || (h > 0 && h < 16);
+      },
+      replacement: () => "",
+    });
     // Constrain small images to their rendered size via HTML <img> tag
     service.addRule("constrainSmallImages", {
       filter: (node) => {
@@ -1150,9 +1366,19 @@ function extractAndConvert(options) {
       },
     });
 
-    const wrapHtml = `<div><h1>${escapeHtml(title)}</h1>${html}</div>`;
+    const wrapHtml =
+      typeof wrapHtmlForTurndown === "function"
+        ? wrapHtmlForTurndown(title, html, escapeHtml)
+        : typeof W2M !== "undefined" && W2M.wrapHtmlForTurndown
+          ? W2M.wrapHtmlForTurndown(title, html, escapeHtml)
+          : `<div><h1>${escapeHtml(title)}</h1>${html}</div>`;
     let markdown = service.turndown(wrapHtml);
     markdown = cleanupMarkdown(markdown);
+    if (typeof absolutizeMarkdownLinks === "function") {
+      markdown = absolutizeMarkdownLinks(markdown, baseUrl);
+    } else if (typeof W2M !== "undefined" && W2M.absolutizeMarkdownLinks) {
+      markdown = W2M.absolutizeMarkdownLinks(markdown, baseUrl);
+    }
 
     return { success: true, markdown, title };
   } catch (err) {
@@ -1203,14 +1429,26 @@ async function downloadInSession(markdown, title, folder, pageUrl) {
 
   // Download assets if the option is enabled
   if (session.saveAssets) {
-    markdown = await downloadAssets(markdown, folder, mdPath);
+    markdown = await downloadAssets(markdown, folder, mdPath, {
+      assetBudget: sessionAssetBudget,
+      maxAssetSizeMb: session.maxAssetSizeMb,
+      maxSessionAssetSizeMb: session.maxSessionAssetSizeMb,
+    });
+  }
+
+  // Same-host → relative .md when saving into a URL tree (crawl / session tree)
+  if (session.urlTree && pageUrl) {
+    if (typeof rewriteCrawlLinks === "function") {
+      markdown = rewriteCrawlLinks(markdown, pageUrl, urlToPath);
+    } else if (typeof W2M !== "undefined" && W2M.rewriteCrawlLinks) {
+      markdown = W2M.rewriteCrawlLinks(markdown, pageUrl, urlToPath);
+    }
   }
 
   const encoded = encodeURIComponent(markdown);
   await w2mDownload({
     url: `data:text/markdown;charset=utf-8,${encoded}`,
     filename: `${folder}/${mdPath}`,
-    saveAs: false,
     conflictAction: "overwrite",
   });
 }
@@ -1255,10 +1493,6 @@ async function downloadAssets(markdown, folder, mdPath, options = {}) {
       const urlObj = new URL(imgUrl);
       const rawName = urlObj.pathname.split("/").pop() || "image";
       const dotIdx = rawName.lastIndexOf(".");
-      const ext =
-        dotIdx > -1
-          ? rawName.slice(dotIdx).split("?")[0].toLowerCase()
-          : ".jpg";
       let stem = rawName
         .slice(0, dotIdx > -1 ? dotIdx : undefined)
         .replace(/[^a-z0-9\-_]/gi, "-")
@@ -1266,13 +1500,6 @@ async function downloadAssets(markdown, folder, mdPath, options = {}) {
         .slice(0, 28);
       if (!stem) stem = "img";
       const id = w2mAssetIdFromUrl(imgUrl);
-      let localName = `${stem}-${id}${ext}`.replace(/[/\\:*?"<>|]/g, "-");
-      let n = 0;
-      while (usedLocalNames.has(localName)) {
-        n++;
-        localName = `${stem}-${id}-${n}${ext}`.replace(/[/\\:*?"<>|]/g, "-");
-      }
-      usedLocalNames.add(localName);
 
       // Skip if already downloaded in this session (e.g. shared across pages)
       const downloadedAssets = options.downloadedAssets;
@@ -1281,12 +1508,45 @@ async function downloadAssets(markdown, folder, mdPath, options = {}) {
         continue;
       }
 
-      await w2mDownload({
-        url: imgUrl,
-        filename: `${assetsDir}/${localName}`,
-        saveAs: false,
-        conflictAction: "uniquify",
-      });
+      const budget = options.assetBudget || { used: 0 };
+      const limits = normalizeAssetLimits(options);
+      const maxAssetBytes = limits.maxAssetSizeMb * 1024 * 1024;
+      const maxSessionBytes = limits.maxSessionAssetSizeMb * 1024 * 1024;
+      const remaining = maxSessionBytes - budget.used;
+      if (remaining <= 0) throw new Error("Session image budget exceeded");
+      // Reserve the upper bound before fetching so concurrent pages cannot
+      // collectively exceed the session budget; refund what the asset did not use.
+      const reservedBytes = Math.min(maxAssetBytes, remaining);
+      W2M.safeAssets.reserveAssetBytes(budget, reservedBytes, maxSessionBytes);
+      let asset;
+      try {
+        asset = await W2M.safeAssets.fetchValidatedAsset(imgUrl, {
+          maxBytes: reservedBytes,
+        });
+      } catch (fetchError) {
+        budget.used -= reservedBytes;
+        throw fetchError;
+      }
+      budget.used -= reservedBytes - asset.bytes;
+
+      let localName = `${stem}-${id}${asset.extension}`.replace(/[/\\:*?"<>|]/g, "-");
+      let n = 0;
+      while (usedLocalNames.has(localName)) {
+        n++;
+        localName = `${stem}-${id}-${n}${asset.extension}`.replace(/[/\\:*?"<>|]/g, "-");
+      }
+      usedLocalNames.add(localName);
+
+      try {
+        await w2mDownload({
+          url: asset.dataUrl,
+          filename: `${assetsDir}/${localName}`,
+          conflictAction: "uniquify",
+        });
+      } catch (downloadError) {
+        budget.used -= asset.bytes;
+        throw downloadError;
+      }
 
       downloaded.set(imgUrl, localName);
       if (downloadedAssets) downloadedAssets.set(imgUrl, localName);
@@ -1305,6 +1565,17 @@ async function downloadAssets(markdown, folder, mdPath, options = {}) {
       }
     } catch (err) {
       console.warn("[W2M] Asset download failed:", imgUrl, err);
+      if (typeof options.onAssetSkipped === "function") {
+        try {
+          options.onAssetSkipped({
+            imgUrl,
+            pageUrl: options.pageUrl,
+            reason: err.message || String(err),
+          });
+        } catch (callbackError) {
+          console.warn("[W2M] onAssetSkipped callback:", callbackError.message);
+        }
+      }
     }
   }
 
@@ -1362,6 +1633,10 @@ async function closeOffscreen() {
 // ─── Port-based messaging for crawl ──────────────────────
 chrome.runtime.onConnect.addListener((port) => {
   if (port.name === "crawl") {
+    // Register the port immediately: Chrome does not buffer messages for a
+    // late onMessage listener, so the dashboard's initial crawl:get-status /
+    // crawl:get-debug-snapshot requests must not be dropped. restoreState()
+    // re-broadcasts the accurate snapshot once storage has loaded.
     crawlEngine.addPort(port);
   }
 });
@@ -1428,7 +1703,7 @@ async function shouldAllowSinglePageAutoDownload() {
   return crawlEngine.ports.size > 0;
 }
 
-crawlEngine.restoreState();
+crawlEngine.restoreState().catch((err) => console.warn("[W2M] Crawl state restore:", err.message));
 
 // ─── Keyboard shortcut (manifest commands) ──────────────────────────────────
 chrome.commands.onCommand.addListener((command) => {
@@ -1438,16 +1713,7 @@ chrome.commands.onCommand.addListener((command) => {
       const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
       if (!tab || !tab.id || !tab.url) return;
       const url = tab.url;
-      if (
-        url.startsWith("chrome://") ||
-        url.startsWith("chrome-extension://") ||
-        url.startsWith("edge://") ||
-        url.startsWith("about:")
-      ) return;
-      try {
-        const host = new URL(url).hostname;
-        if (host === "chromewebstore.google.com" || host === "chrome.google.com") return;
-      } catch (_) { return; }
+      if (navigationUrlIsRestricted(url)) return;
       const res = await extractMarkdownFromTab(tab.id, url);
       if (!res || !res.success) return;
       await chrome.storage.local.set({
@@ -1462,3 +1728,4 @@ chrome.commands.onCommand.addListener((command) => {
     }
   })();
 });
+

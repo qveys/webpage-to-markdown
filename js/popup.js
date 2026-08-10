@@ -11,6 +11,7 @@
   var DEFAULT_CAPTURE_SETTINGS = W2M.DEFAULT_CAPTURE_SETTINGS;
   var DEFAULT_CRAWL_SETTINGS = W2M.DEFAULT_CRAWL_SETTINGS;
   var defaultSessionFolder = W2M.defaultSettings.defaultSessionFolder;
+  var requestOriginPermission = W2M.defaultSettings.requestOriginPermission;
 
   function precrawlDelayLabel(ms) {
     if (ms <= 500) return t('precrawl.delay.fast');
@@ -67,45 +68,9 @@
     });
   };
 
-  MarkdownConverter.prototype.createTurndownService = function () {
-    var service = new TurndownService({
-      headingStyle: this.settings.headingStyle,
-      hr: '---',
-      bulletListMarker: this.settings.bulletListMarker,
-      codeBlockStyle: this.settings.codeBlockStyle,
-      emDelimiter: '_'
-    });
+  // Conversion runs in the service worker (W2M_SINGLE_CONVERT → extractAndConvert).
+  // Turndown rules (includeImages strip, skipTinyImages, constrainSmallImages, etc.) live there.
 
-    service.keep(['iframe', 'script', 'style']);
-
-    service.addRule('figures', {
-      filter: 'figure',
-      replacement: function (content, node) {
-        var img = node.querySelector('img');
-        var caption = node.querySelector('figcaption');
-        if (img) {
-          var alt = img.getAttribute('alt') || '';
-          var src = img.getAttribute('src') || '';
-          var captionText = caption ? caption.textContent : '';
-          return '\n\n![' + alt + '](' + src + ')\n' + captionText + '\n\n';
-        }
-        return content;
-      }
-    });
-
-    // Skip tiny images (icons < 16px) -- pure noise
-    service.addRule('skipTinyImages', {
-      filter: function (node) {
-        if (node.nodeName !== 'IMG') return false;
-        var w = parseInt(node.getAttribute('width') || '0', 10);
-        var h = parseInt(node.getAttribute('height') || '0', 10);
-        return (w > 0 && w < 16) || (h > 0 && h < 16);
-      },
-      replacement: function () { return ''; }
-    });
-
-    return service;
-  };
 
   // cleanupMarkdown is provided by /js/cleanup-markdown.js (loaded via <script> in popup.html)
   MarkdownConverter.prototype.cleanupMarkdown = function (markdown) {
@@ -113,156 +78,27 @@
   };
 
   MarkdownConverter.prototype.convert = function (callback) {
-    var self = this;
     chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
       var tab = tabs && tabs[0];
-      if (!tab || !tab.id) {
-        callback(new Error('No active tab found'), null);
-        return;
-      }
+      var payload = { type: 'W2M_SINGLE_CONVERT' };
+      if (tab && tab.id) payload.tabId = tab.id;
 
-      // Prevent scripting on restricted pages
-      if (
-        tab.url.indexOf('chrome://') === 0 ||
-        tab.url.indexOf('chrome-extension://') === 0 ||
-        tab.url.indexOf('edge://') === 0 ||
-        tab.url.indexOf('about:') === 0 ||
-        tab.url.indexOf('chrome.google.com/webstore') !== -1
-      ) {
-        callback(new Error('Cannot convert system pages or Web Store'), null);
-        return;
-      }
-
-      chrome.scripting.executeScript({
-        target: { tabId: tab.id },
-        func: function () {
-          try {
-            if (!document || !document.body) {
-              throw new Error('Document body not found');
-            }
-
-            var getIframeContent = function (iframe) {
-              try {
-                var iframeDoc = iframe.contentDocument || (iframe.contentWindow ? iframe.contentWindow.document : null);
-                if (!iframeDoc || !iframeDoc.body) return '';
-                var iframeClone = iframeDoc.body.cloneNode(true);
-                var unwantedIframe = iframeClone.querySelectorAll('script, style, nav, footer, aside, .ads, .comments');
-                for (var u = 0; u < unwantedIframe.length; u++) unwantedIframe[u].remove();
-                return '<div class="iframe-content">' + iframeClone.innerHTML + '</div>';
-              } catch (e) {
-                return '';
-              }
-            };
-
-            // Collect rendered dimensions of small images for post-processing
-            var smallImgSizes = {};
-            var allImgs = document.querySelectorAll('img');
-            for (var si = 0; si < allImgs.length; si++) {
-              var rect = allImgs[si].getBoundingClientRect();
-              var imgW = Math.round(rect.width);
-              var imgSrc = allImgs[si].src;
-              if (imgW > 0 && imgW < 200 && imgSrc) {
-                smallImgSizes[imgSrc] = imgW;
-              }
-            }
-
-            var bodyClone = document.body.cloneNode(true);
-
-            var iframes = document.querySelectorAll('iframe');
-            var iframeContents = [];
-            for (var fi = 0; fi < iframes.length; fi++) {
-              var fc = getIframeContent(iframes[fi]);
-              if (fc) iframeContents.push(fc);
-            }
-
-            var unwanted = bodyClone.querySelectorAll(
-              'script, style, nav, footer, aside, .ads, .comments, [role="complementary"], .cookie-banner, .popup, .overlay, .modal'
-            );
-            for (var ui = 0; ui < unwanted.length; ui++) unwanted[ui].remove();
-
-            var mainSelectors = ['main', 'article', '.content', '.post', '.entry', '[role="main"]', '#content', '.main'];
-            var mainContent = null;
-
-            for (var ms = 0; ms < mainSelectors.length; ms++) {
-              var found = bodyClone.querySelector(mainSelectors[ms]);
-              if (found && found.innerHTML.trim().length > 100) {
-                mainContent = found;
-                break;
-              }
-            }
-
-            var finalContent = mainContent ? mainContent.innerHTML : bodyClone.innerHTML;
-
-            if (iframeContents.length > 0) {
-              finalContent += '<h2>Embedded Content</h2>' + iframeContents.join('<hr>');
-            }
-
-            return {
-              title: document.title || 'Untitled Page',
-              url: document.location.href,
-              content: finalContent,
-              smallImgSizes: smallImgSizes,
-              success: true
-            };
-          } catch (error) {
-            return { success: false, error: error.message };
-          }
-        }
-      }, function (results) {
+      chrome.runtime.sendMessage(payload, function (res) {
         if (chrome.runtime.lastError) {
           callback(new Error(chrome.runtime.lastError.message), null);
           return;
         }
-        if (!results || !results[0] || !results[0].result) {
-          callback(new Error('Failed to get page content'), null);
+        if (!res || !res.ok) {
+          callback(new Error((res && res.error) || 'Extraction failed'), null);
           return;
         }
 
-        var result = results[0].result;
-        if (!result.success) {
-          callback(new Error(result.error || 'Failed to extract content'), null);
-          return;
-        }
-
-        var title = result.title;
-        var url = result.url;
-        var content = result.content;
-        var smallImgSizes = result.smallImgSizes;
-
-        function escapeHtmlText(s) {
-          return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-        }
-
-        var wrappedContent =
-          '<div class="markdown-content"><h1>' + escapeHtmlText(title) + '</h1>' + content + '</div>';
-
-        // Initialize Turndown with current settings
-        var turndownService = self.createTurndownService();
-        var markdown = turndownService.turndown(wrappedContent);
-
-        markdown = self.cleanupMarkdown(markdown);
-
-        // Constrain small images to their rendered CSS size
-        if (smallImgSizes && Object.keys(smallImgSizes).length > 0) {
-          markdown = markdown.replace(
-            /!\[([^\]]*)\]\(([^)\s]+)\)/g,
-            function (match, alt, src) {
-              var w = smallImgSizes[src];
-              if (w) {
-                return '<img src="' + src + '" alt="' + alt + '" style="max-width:' + w + 'px; height:auto;">';
-              }
-              return match;
-            }
-          );
-        }
-
-        if (self.settings.frontmatter && W2M.markdownOutput && W2M.markdownOutput.prependYamlFrontmatter) {
-          markdown = W2M.markdownOutput.prependYamlFrontmatter(markdown, title, url);
-        }
+        var markdown = res.markdown || '';
+        var title = res.title || 'Untitled Page';
+        var url = res.url || '';
 
         callback(null, { markdown: markdown, url: url, title: title });
 
-        // Persist last conversion
         chrome.storage.local.set({
           lastConversion: {
             url: url,
@@ -331,6 +167,20 @@
         }
         actions.appendChild(el('button', { className: 'btn btn-secondary btn-full', textContent: t('home.crawl'), onClick: function () { state.navigate(STATES.PRECRAWL, { url: app.currentUrl }); } }));
         container.appendChild(actions);
+
+        var imgCb = el('input', { type: 'checkbox', id: 'setting-images', checked: app.converter.settings.includeImages !== false ? 'checked' : '' });
+        var imgLabel = el('label', { className: 'inline-option', title: 'Include images in the Markdown output' });
+        imgLabel.appendChild(imgCb);
+        imgLabel.appendChild(el('span', { textContent: 'Images' }));
+        imgCb.addEventListener('change', function () {
+          app.converter.settings.includeImages = imgCb.checked;
+          chrome.storage.local.get('markdownSettings', function (data) {
+            var s = data.markdownSettings || {};
+            s.includeImages = imgCb.checked;
+            chrome.storage.local.set({ markdownSettings: s });
+          });
+        });
+        container.appendChild(imgLabel);
         if (data && data.lastConversion) {
           var hist = el('div', { className: 'view-home__history text-muted' }, t('home.history') + ' ' + data.lastConversion.url + ' — ' + formatTimeAgo(data.lastConversion.timestamp));
           container.appendChild(hist);
@@ -861,44 +711,21 @@
   App.prototype._setupTheme = function () {
     var self = this;
     var themeBtn = document.getElementById('btn-theme');
-    var iconTheme = document.getElementById('icon-theme');
-
-    // Load saved theme from chrome.storage.local
-    chrome.storage.local.get('theme', function (result) {
-      var systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      var isDark = result.theme === 'dark' || (!result.theme && systemDark);
-      self._applyTheme(isDark);
-    });
 
     themeBtn.addEventListener('click', function () {
-      self.isDark = !self.isDark;
-      self._applyTheme(self.isDark);
-      chrome.storage.local.set({ theme: self.isDark ? 'dark' : 'light' });
+      W2M.theme.toggleTheme();
     });
 
-    // Sync theme when changed from another page (e.g. dashboard)
-    chrome.storage.onChanged.addListener(function (changes, area) {
-      if (area === 'local' && changes.theme) {
-        self._applyTheme(changes.theme.newValue === 'dark');
-      }
+    W2M.theme.subscribe(function (theme) {
+      self._updateThemeIcon(theme);
     });
   };
 
-  App.prototype._applyTheme = function (isDark) {
-    this.isDark = isDark;
-    if (isDark) {
-      document.documentElement.setAttribute('data-theme', 'dark');
-    } else {
-      document.documentElement.removeAttribute('data-theme');
-    }
-    this._updateThemeIcon(isDark);
-  };
-
-  App.prototype._updateThemeIcon = function (isDark) {
+  App.prototype._updateThemeIcon = function (theme) {
     var btn = document.getElementById('btn-theme');
     if (!btn) return;
     while (btn.firstChild) btn.removeChild(btn.firstChild);
-    var svg = W2M.buildThemeIcon(isDark);
+    var svg = W2M.buildThemeIcon(W2M.theme.isDarkTheme(theme));
     svg.id = 'icon-theme';
     btn.appendChild(svg);
   };
@@ -1016,60 +843,77 @@
     var self = this;
     var folder = options.folder || '';
 
-    chrome.storage.local.get(['captureSettings', 'crawlSettings'], function (data) {
-      var cap = Object.assign({}, DEFAULT_CAPTURE_SETTINGS, data.captureSettings || {});
-      var cr = Object.assign({}, DEFAULT_CRAWL_SETTINGS, data.crawlSettings || {});
-      cap.urlTree = !!options.urlTree;
-      cap.saveAssets = !!options.saveAssets;
-      chrome.storage.local.set({ captureSettings: cap });
-      chrome.runtime.sendMessage({
-        type: 'W2M_UPDATE_SESSION',
-        patch: { urlTree: cap.urlTree, saveAssets: cap.saveAssets }
-      }).catch(function (err) {
-        if (err.message && err.message.indexOf('Receiving end does not exist') === -1) {
-          console.warn('[W2M] sendMessage:', err.message);
-        }
-      });
-      var delay = cap.delay;
-      var depthNum = Number(cr.depth);
-      var depth = Number.isFinite(depthNum) ? depthNum : DEFAULT_CRAWL_SETTINGS.depth;
-      var concurrency = Number(cr.concurrency) || DEFAULT_CRAWL_SETTINGS.concurrency;
-      var maxBlocksRaw = cr.maxBlocks;
-      var maxBlocks = DEFAULT_CRAWL_SETTINGS.maxBlocks;
-      if (maxBlocksRaw !== undefined && maxBlocksRaw !== null) {
-        var mb = Number(maxBlocksRaw);
-        if (Number.isFinite(mb)) maxBlocks = mb;
+    requestOriginPermission(this.currentUrl, function (granted) {
+      if (!granted) {
+        state.navigate(STATES.ERROR, {
+          errorType: 'permission',
+          message: t('error.permission')
+        });
+        return;
       }
 
-      chrome.runtime.sendMessage({
-        type: 'W2M_CRAWL_START',
-        startUrl: self.currentUrl,
-        folder: folder,
-        delay: delay,
-        urlTree: options.urlTree,
-        saveAssets: options.saveAssets,
-        concurrency: concurrency,
-        maxBlocks: maxBlocks,
-        depth: depth
-      }, function (res) {
-        if (chrome.runtime.lastError) {
-          state.navigate(STATES.ERROR, { errorType: 'network' });
-          return;
+      chrome.storage.local.get(['captureSettings', 'crawlSettings'], function (data) {
+        var cap = Object.assign({}, DEFAULT_CAPTURE_SETTINGS, data.captureSettings || {});
+        var cr = Object.assign({}, DEFAULT_CRAWL_SETTINGS, data.crawlSettings || {});
+        cap.urlTree = !!options.urlTree;
+        cap.saveAssets = !!options.saveAssets;
+        chrome.storage.local.set({ captureSettings: cap });
+        chrome.runtime.sendMessage({
+          type: 'W2M_UPDATE_SESSION',
+          patch: {
+            urlTree: cap.urlTree,
+            saveAssets: cap.saveAssets,
+            maxAssetSizeMb: cap.maxAssetSizeMb,
+            maxSessionAssetSizeMb: cap.maxSessionAssetSizeMb
+          }
+        }).catch(function (err) {
+          if (err.message && err.message.indexOf('Receiving end does not exist') === -1) {
+            console.warn('[W2M] sendMessage:', err.message);
+          }
+        });
+        var delay = cap.delay;
+        var depthNum = Number(cr.depth);
+        var depth = Number.isFinite(depthNum) ? depthNum : DEFAULT_CRAWL_SETTINGS.depth;
+        var concurrency = Number(cr.concurrency) || DEFAULT_CRAWL_SETTINGS.concurrency;
+        var maxBlocksRaw = cr.maxBlocks;
+        var maxBlocks = DEFAULT_CRAWL_SETTINGS.maxBlocks;
+        if (maxBlocksRaw !== undefined && maxBlocksRaw !== null) {
+          var mb = Number(maxBlocksRaw);
+          if (Number.isFinite(mb)) maxBlocks = mb;
         }
-        if (res && res.ok) {
-          // Keep side panel and popup aligned on Crawl mode when a crawl starts.
-          chrome.storage.local.set({ dashboardMode: 'crawl' }, function () {
-            chrome.runtime.sendMessage({ type: 'W2M_APPLY_DASHBOARD_MODE', mode: 'crawl' }).catch(function (err) {
-              if (err && err.message && err.message.indexOf('Receiving end does not exist') === -1) {
-                console.warn('[W2M] sendMessage:', err.message);
-              }
+
+        chrome.runtime.sendMessage({
+          type: 'W2M_CRAWL_START',
+          startUrl: self.currentUrl,
+          folder: folder,
+          delay: delay,
+          urlTree: options.urlTree,
+          saveAssets: options.saveAssets,
+          maxAssetSizeMb: cap.maxAssetSizeMb,
+          maxSessionAssetSizeMb: cap.maxSessionAssetSizeMb,
+          concurrency: concurrency,
+          maxBlocks: maxBlocks,
+          depth: depth
+        }, function (res) {
+          if (chrome.runtime.lastError) {
+            state.navigate(STATES.ERROR, { errorType: 'network' });
+            return;
+          }
+          if (res && res.ok) {
+            // Keep side panel and popup aligned on Crawl mode when a crawl starts.
+            chrome.storage.local.set({ dashboardMode: 'crawl' }, function () {
+              chrome.runtime.sendMessage({ type: 'W2M_APPLY_DASHBOARD_MODE', mode: 'crawl' }).catch(function (err) {
+                if (err && err.message && err.message.indexOf('Receiving end does not exist') === -1) {
+                  console.warn('[W2M] sendMessage:', err.message);
+                }
+              });
             });
-          });
-          state.navigate(STATES.RUNNING, { url: self.currentUrl, folder: folder });
-          self.connectCrawlPort();
-        } else {
-          state.navigate(STATES.ERROR, { errorType: 'convert', message: (res && res.error) || 'Failed to start' });
-        }
+            state.navigate(STATES.RUNNING, { url: self.currentUrl, folder: folder });
+            self.connectCrawlPort();
+          } else {
+            state.navigate(STATES.ERROR, { errorType: 'convert', message: (res && res.error) || 'Failed to start' });
+          }
+        });
       });
     });
   };

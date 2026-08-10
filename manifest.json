@@ -26,14 +26,14 @@
     "storage",
     "downloads",
     "downloads.ui",
-    "tabs",
     "webNavigation",
     "sidePanel",
     "offscreen",
     "alarms"
   ],
-  "host_permissions": [
-    "<all_urls>"
+  "optional_host_permissions": [
+    "http://*/*",
+    "https://*/*"
   ],
   "commands": {
     "convert-page": {
@@ -48,5 +48,5 @@
     "default_path": "dashboard.html"
   },
   "options_page": "settings.html",
-  "version": "1.0.1"
+  "version": "1.8.0"
 }

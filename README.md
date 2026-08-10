@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/qveys/webpage-to-markdown/actions/workflows/test.yml"><img src="https://img.shields.io/github/actions/workflow/status/qveys/webpage-to-markdown/test.yml?branch=main&style=flat-square&label=tests&logo=jest" alt="Tests" /></a>
+  <a href="https://github.com/qveys/webpage-to-markdown/actions/workflows/test.yml"><img src="https://img.shields.io/github/actions/workflow/status/qveys/webpage-to-markdown/test.yml?branch=main&style=flat-square&label=tests&logo=nodedotjs" alt="Tests" /></a>
   <a href="https://github.com/qveys/webpage-to-markdown/security/code-scanning"><img src="https://img.shields.io/github/actions/workflow/status/qveys/webpage-to-markdown/codeql.yml?branch=main&style=flat-square&label=CodeQL&logo=github" alt="CodeQL" /></a>
   <a href="https://github.com/qveys/webpage-to-markdown/releases/latest"><img src="https://img.shields.io/github/v/release/qveys/webpage-to-markdown?style=flat-square&logo=github" alt="Latest release" /></a>
   <img src="https://img.shields.io/badge/Manifest-V3-blue?style=flat-square&logo=googlechrome" alt="Manifest V3" />
@@ -158,7 +158,10 @@ graph LR
 
 ### 🎨 UI
 
-- 🌙 Light / dark theme toggle (shared across popup, dashboard, settings)
+- 🌙 Light, dark, Midnight Blue, Synthwave, Solarized Dark, Catppuccin, Dracula, Nord, Vercel, Retro Terminal, and Paper themes shared across popup, dashboard, and settings
+  - Choose the active theme from **Settings → Appearance**
+  - The sun/moon button switches between light mode and the last selected dark variant
+  - Theme palettes share semantic surface, content, interaction, and feedback tokens
 - 📊 Side-panel dashboard for single-page conversion and crawl monitoring
 - ⚙️ Dedicated settings page with markdown, capture, and crawl preferences
 - 🔒 Inputs disabled during active session to prevent misconfiguration
@@ -186,12 +189,12 @@ git clone https://github.com/qveys/webpage-to-markdown.git
 |   💉 `scripting`    | Inject extraction scripts into pages                     |
 |    💾 `storage`     | Persist settings, session state, and crawl progress      |
 |   📥 `downloads`    | Save `.md` files and image assets                        |
-|     🔄 `tabs`       | Track tab navigation for auto-capture                    |
+|  🙈 `downloads.ui`  | Hide per-file download prompts only while a crawl runs   |
 | 🧭 `webNavigation`  | Detect page loads during sessions                        |
 |   📊 `sidePanel`    | Side-panel dashboard for single-page conversion and crawl monitoring |
 |   📄 `offscreen`    | Isolated DOM parsing for link extraction during crawl    |
 |    ⏰ `alarms`      | Keep Service Worker alive during crawl sessions          |
-| 🌐 `<all_urls>`     | Fetch and convert pages from any website during crawl    |
+| 🌐 Optional origins | Access only the site explicitly authorized for a crawl   |
 
 ---
 
@@ -216,7 +219,7 @@ webpage-to-markdown/
 ├── dashboard.html             # Side-panel crawl dashboard
 ├── settings.html              # Options page
 ├── offscreen.html             # Offscreen document (DOM parsing)
-├── styles.css                 # Global styles (light/dark themes)
+├── styles.css                 # Global token-driven interface themes
 ├── js/
 │   ├── background.js          # Service Worker (sessions, downloads, crawl)
 │   ├── popup.js               # Popup logic, state views, markdown converter
@@ -232,7 +235,7 @@ webpage-to-markdown/
 │   ├── default-settings.js    # Shared DEFAULT_*_SETTINGS + defaultSessionFolder()
 │   ├── single-conversion-result.js # Shared module for building the single-page conversion result UI (used by both popup and side panel)
 │   ├── theme-icon.js          # Shared sun/moon theme icon builder
-│   ├── theme-init.js          # Early theme detection (prevent flash)
+│   ├── theme-init.js          # Shared theme manager and early theme detection
 │   ├── turndown.js            # Turndown.js (vendored)
 │   ├── turndown-plugin-gfm.js # GFM plugin (vendored)
 │   └── Readability.js         # Mozilla Readability (vendored)
@@ -241,6 +244,17 @@ webpage-to-markdown/
 └── docs/
     └── screenshots/           # README screenshots
 ```
+
+---
+
+## Development
+
+For documentation quality checks:
+
+- **Check markdown linting**: `npx markdownlint-cli2 "**/*.md"`
+- **Auto-fix markdown issues**: `npx markdownlint-cli2 --fix "**/*.md"`
+
+For more details, see the [Markdownlint guide](docs/markdownlint-guide.md).
 
 ---
 
