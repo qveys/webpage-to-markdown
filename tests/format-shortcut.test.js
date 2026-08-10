@@ -5,34 +5,52 @@ global.W2M = {};
 require('../js/format-shortcut.js');
 
 const { formatShortcut } = W2M;
+const originalNavigator = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+
+function setPlatform(platform) {
+  Object.defineProperty(globalThis, 'navigator', {
+    value: { platform: platform },
+    configurable: true,
+    writable: true,
+    enumerable: true,
+  });
+}
+
+function restoreNavigator() {
+  if (originalNavigator) {
+    Object.defineProperty(globalThis, 'navigator', originalNavigator);
+  } else {
+    delete globalThis.navigator;
+  }
+}
 
 describe('formatShortcut', () => {
   afterEach(() => {
-    delete global.navigator;
+    restoreNavigator();
   });
 
   test('returns shortcut unchanged on non-Mac', () => {
-    global.navigator = { platform: 'Win32' };
+    setPlatform('Win32');
     assert.equal(formatShortcut('Alt+Shift+M'), 'Alt+Shift+M');
   });
 
   test('replaces modifiers with Mac symbols', () => {
-    global.navigator = { platform: 'MacIntel' };
+    setPlatform('MacIntel');
     assert.equal(formatShortcut('Alt+Shift+M'), '⌥⇧M');
   });
 
   test('handles MacCtrl+ before Ctrl+ to avoid corruption', () => {
-    global.navigator = { platform: 'MacIntel' };
+    setPlatform('MacIntel');
     assert.equal(formatShortcut('MacCtrl+Shift+M'), '⌃⇧M');
   });
 
   test('handles Command+', () => {
-    global.navigator = { platform: 'MacIntel' };
+    setPlatform('MacIntel');
     assert.equal(formatShortcut('Command+Shift+M'), '⌘⇧M');
   });
 
   test('handles Ctrl+ without MacCtrl prefix', () => {
-    global.navigator = { platform: 'MacIntel' };
+    setPlatform('MacIntel');
     assert.equal(formatShortcut('Ctrl+C'), '⌃C');
   });
 });
