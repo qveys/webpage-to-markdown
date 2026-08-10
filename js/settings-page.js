@@ -4,34 +4,18 @@
     var btn = document.getElementById('settings-theme-btn');
     if (!btn) return;
     while (btn.firstChild) btn.removeChild(btn.firstChild);
-    btn.appendChild(W2M.buildThemeIcon(theme === 'dark'));
+    btn.appendChild(W2M.buildThemeIcon(W2M.theme.isDarkTheme(theme)));
   }
 
-  // Set initial icon from saved theme
-  chrome.storage.local.get('theme', function (r) {
-    var theme = r.theme || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-    updateThemeIcon(theme);
-  });
-
-  // Toggle on click
   var btn = document.getElementById('settings-theme-btn');
   if (btn) {
     btn.addEventListener('click', function () {
-      var cur = document.documentElement.getAttribute('data-theme') || 'light';
-      var next = cur === 'dark' ? 'light' : 'dark';
-      document.documentElement.setAttribute('data-theme', next);
-      chrome.storage.local.set({ theme: next });
-      updateThemeIcon(next);
+      W2M.theme.toggleTheme();
     });
   }
 
-  // Sync if changed from another page
-  chrome.storage.onChanged.addListener(function (changes, area) {
-    if (area === 'local' && changes.theme) {
-      var theme = changes.theme.newValue;
-      document.documentElement.setAttribute('data-theme', theme);
-      updateThemeIcon(theme);
-    }
+  W2M.theme.subscribe(function (theme) {
+    updateThemeIcon(theme);
   });
 
   // Title
