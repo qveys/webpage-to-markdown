@@ -35,6 +35,15 @@
     "http://*/*",
     "https://*/*"
   ],
+  "commands": {
+    "convert-page": {
+      "suggested_key": {
+        "default": "Alt+Shift+M",
+        "mac": "Alt+Shift+M"
+      },
+      "description": "Convert active tab to Markdown"
+    }
+  },
   "side_panel": {
     "default_path": "dashboard.html"
   },

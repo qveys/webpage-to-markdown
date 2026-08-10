@@ -31,8 +31,23 @@ global.chrome = {
   alarms: { create: fn(), clear: fn() },
   downloads: { download: fn(), setUiOptions: fn(() => Promise.resolve()) },
   permissions: { contains: fn(() => Promise.resolve(true)), request: fn(() => Promise.resolve(true)) },
-  runtime: { sendMessage: fn(() => Promise.resolve()), lastError: null },
+  runtime: {
+    sendMessage: fn(() => Promise.resolve()),
+    lastError: null,
+    connect: fn(() => ({
+      onMessage: { addListener: fn() },
+      onDisconnect: { addListener: fn() },
+      postMessage: fn(),
+      disconnect: fn(),
+    })),
+  },
+  commands: {
+    getAll: fn(() => Promise.resolve([{ name: 'convert-page', shortcut: 'Alt+Shift+M' }])),
+    onCommand: { addListener: fn() },
+  },
+  tabs: { query: fn(() => Promise.resolve([])), create: fn() },
   action: { setBadgeText: fn(), setBadgeBackgroundColor: fn() },
+
 };
 
 global.window = global.window || global;

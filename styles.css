@@ -1912,3 +1912,19 @@ html.w2m-sidepanel .app {
   min-height: 0;
   overflow-y: auto;
 }
+
+/* Keyboard shortcut badge */
+.shortcut-hint {
+  text-align: center;
+  margin-top: var(--space-2);
+  font-size: 0.8rem;
+}
+.kbd-badge {
+  display: inline-block;
+  padding: 2px 6px;
+  font-family: var(--font-mono, monospace);
+  font-size: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-secondary, #f5f5f5);
+}

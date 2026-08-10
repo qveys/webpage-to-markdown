@@ -95,10 +95,22 @@
 
   SinglePagePanel.prototype.init = function () {
     var self = this;
+    this._shortcutLabel = '';
     this._readSettings(function (s) {
       self._settings = s;
       self._render();
     });
+    if (chrome.commands && chrome.commands.getAll) {
+      chrome.commands.getAll().then(function (commands) {
+        for (var i = 0; i < commands.length; i++) {
+          if (commands[i].name === 'convert-page' && commands[i].shortcut) {
+            self._shortcutLabel = W2M.formatShortcut(commands[i].shortcut);
+            self._render();
+            break;
+          }
+        }
+      }).catch(function () {});
+    }
   };
 
   SinglePagePanel.prototype._readSettings = function (callback) {
@@ -274,6 +286,9 @@
       textContent: t('single.idle.cta'),
       onClick: function () { self._convert(); }
     }));
+    if (self._shortcutLabel) {
+      panel.appendChild(el('div', { className: 'shortcut-hint text-muted' }, el('kbd', { className: 'kbd-badge', textContent: self._shortcutLabel })));
+    }
 
     panel.appendChild(this._buildToggles());
     c.appendChild(panel);
