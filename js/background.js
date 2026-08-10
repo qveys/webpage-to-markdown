@@ -136,6 +136,16 @@ function convertToMarkdown(title, content) {
       return ruleContent;
     },
   });
+  // Skip tiny images (icons < 16px) — pure noise
+  service.addRule("skipTinyImages", {
+    filter: (node) => {
+      if (node.nodeName !== "IMG") return false;
+      const w = parseInt(node.getAttribute("width") || "0", 10);
+      const h = parseInt(node.getAttribute("height") || "0", 10);
+      return (w > 0 && w < 16) || (h > 0 && h < 16);
+    },
+    replacement: () => "",
+  });
   // Constrain small images to their rendered size via HTML <img> tag
   service.addRule("constrainSmallImages", {
     filter: (node) => {
@@ -1302,6 +1312,17 @@ function extractAndConvert(options) {
         const src = node.getAttribute("src") || "";
         return src ? `![${alt}](${src})` : "";
       },
+    });
+    // Skip tiny images (icons < 16px) — pure noise; matches former popup rule
+    service.addRule("skipTinyImages", {
+      filter: (node) => {
+        if (node.nodeName !== "IMG") return false;
+        const rw = parseInt(node.getAttribute("data-w2m-width") || "0", 10);
+        const w = parseInt(node.getAttribute("width") || "0", 10);
+        const h = parseInt(node.getAttribute("height") || "0", 10);
+        return (rw > 0 && rw < 16) || (w > 0 && w < 16) || (h > 0 && h < 16);
+      },
+      replacement: () => "",
     });
     // Constrain small images to their rendered size via HTML <img> tag
     service.addRule("constrainSmallImages", {

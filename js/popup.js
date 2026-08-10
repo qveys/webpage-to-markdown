@@ -68,45 +68,8 @@
     });
   };
 
-  MarkdownConverter.prototype.createTurndownService = function () {
-    var service = new TurndownService({
-      headingStyle: this.settings.headingStyle,
-      hr: '---',
-      bulletListMarker: this.settings.bulletListMarker,
-      codeBlockStyle: this.settings.codeBlockStyle,
-      emDelimiter: '_'
-    });
-
-    service.keep(['iframe', 'script', 'style']);
-
-    service.addRule('figures', {
-      filter: 'figure',
-      replacement: function (content, node) {
-        var img = node.querySelector('img');
-        var caption = node.querySelector('figcaption');
-        if (img) {
-          var alt = img.getAttribute('alt') || '';
-          var src = img.getAttribute('src') || '';
-          var captionText = caption ? caption.textContent : '';
-          return '\n\n![' + alt + '](' + src + ')\n' + captionText + '\n\n';
-        }
-        return content;
-      }
-    });
-
-    // Skip tiny images (icons < 16px) -- pure noise
-    service.addRule('skipTinyImages', {
-      filter: function (node) {
-        if (node.nodeName !== 'IMG') return false;
-        var w = parseInt(node.getAttribute('width') || '0', 10);
-        var h = parseInt(node.getAttribute('height') || '0', 10);
-        return (w > 0 && w < 16) || (h > 0 && h < 16);
-      },
-      replacement: function () { return ''; }
-    });
-
-    return service;
-  };
+  // Conversion runs in the service worker (W2M_SINGLE_CONVERT → extractAndConvert).
+  // Turndown rules (skipTinyImages, constrainSmallImages, etc.) live there.
 
   // cleanupMarkdown is provided by /js/cleanup-markdown.js (loaded via <script> in popup.html)
   MarkdownConverter.prototype.cleanupMarkdown = function (markdown) {
