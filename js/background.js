@@ -598,6 +598,7 @@ function navigationUrlIsRestricted(url) {
     url.startsWith("chrome-extension://") ||
     url.startsWith("edge://") ||
     url.startsWith("about:") ||
+    url.startsWith("view-source:") ||
     isChromeWebStoreUrl(url)
   );
 }

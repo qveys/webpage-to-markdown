@@ -42,4 +42,15 @@ describe('navigationUrlIsRestricted', () => {
     expect(navigationUrlIsRestricted('edge://settings')).toBe(true);
     expect(navigationUrlIsRestricted('about:blank')).toBe(true);
   });
+
+  test('restricts view-source URLs (not scriptable; cannot bypass store checks)', () => {
+    expect(
+      navigationUrlIsRestricted('view-source:https://chromewebstore.google.com/detail/test'),
+    ).toBe(true);
+    expect(
+      navigationUrlIsRestricted('view-source:https://chrome.google.com/webstore/detail/test'),
+    ).toBe(true);
+    expect(navigationUrlIsRestricted('view-source:chrome://extensions')).toBe(true);
+    expect(navigationUrlIsRestricted('view-source:https://example.com/')).toBe(true);
+  });
 });
