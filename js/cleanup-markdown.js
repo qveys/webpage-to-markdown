@@ -143,13 +143,8 @@
       }
     );
 
-    // Plan/badge text glued onto the next sentence: "Enterprise Plan The API…"
-    out = out.replace(
-      /(?:^|\n)((?:Enterprise|Team|Pro|Business|Free|Hobby)\s+Plan)\s+(?=[A-Z])/g,
-      '\n',
-    );
-
     // Badge residue after DOM strip: "## Title |" or a lone "|" line
+    // (plan/badge chips are removed in the DOM layer via stripDecorativeBadges)
     out = out.replace(/^(#{1,6}[ \t]+.+?)[ \t]*\|[ \t]*$/gm, '$1');
     out = out.replace(/^\|[ \t]*$/gm, '');
 

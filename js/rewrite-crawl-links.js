@@ -84,10 +84,12 @@
     var fromMdPath = mdPathFromUrlToPath(urlToPathFn, pageUrl);
     var fromDir = dirname(fromMdPath);
 
-    // Absolute http(s) same-site links → relative .md
+    // Absolute http(s) same-site links → relative .md (skip images)
     return markdown.replace(
-      /\]\((https?:\/\/[^)\s]+)\)/g,
-      function (match, href) {
+      /(!?)\[([^\]]*)\]\((https?:\/\/[^)\s]+)\)/g,
+      function (match, bang, label, href) {
+        // Image sources must keep their original URL (not rewritten to .md).
+        if (bang) return match;
         var target;
         try {
           target = new URL(href);
@@ -111,7 +113,7 @@
 
         var toMdPath = mdPathFromUrlToPath(urlToPathFn, target.href);
         var rel = relativePath(fromDir, toMdPath);
-        return "](" + rel + hash + ")";
+        return "[" + label + "](" + rel + hash + ")";
       },
     );
   }
