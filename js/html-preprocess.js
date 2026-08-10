@@ -97,6 +97,15 @@
       var raw = (code.textContent || "").replace(/\n$/, "");
 
       var container = findCodeBlockContainer(pre);
+      // A widget can host several <pre> (tabbed code). Replacing the shared
+      // container would drop the sibling code blocks.
+      if (
+        container !== pre &&
+        container.querySelectorAll &&
+        container.querySelectorAll("pre").length > 1
+      ) {
+        container = pre;
+      }
       var parent = container.parentNode;
       if (!parent) continue;
 
@@ -289,7 +298,8 @@
           /\u200b/g,
           "",
         );
-        if (t.trim() !== "") return false;
+        // Any remaining text, including whitespace, already separates the labels.
+        if (t !== "") return false;
       }
       n = n.nextSibling;
     }
@@ -348,15 +358,8 @@
     for (i = 0; i < anchors.length; i++) {
       var a = anchors[i];
       var href = a.getAttribute("href");
-      if (
-        !href ||
-        href.charAt(0) === "#" ||
-        href.indexOf("mailto:") === 0 ||
-        href.indexOf("javascript:") === 0 ||
-        href.indexOf("http://") === 0 ||
-        href.indexOf("https://") === 0 ||
-        href.indexOf("data:") === 0
-      ) {
+      // Resolve relative references only; leave every explicit scheme as-is.
+      if (!href || href.charAt(0) === "#" || /^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(href)) {
         continue;
       }
       try {
@@ -462,16 +465,17 @@
   }
 
   /**
-   * Prefer docs-site main content (#content) over Readability.
-   * Many doc frameworks put card grids (e.g. "What's next") in #content;
-   * Readability often drops those trailing link sections.
+   * Prefer docs-site main content over Readability when a strong signal exists.
+   * Only #content / [data-page-title] outrank Readability — generic main /
+   * [role=main] often include nav/sidebars on non-docs pages.
    * @returns {{ html: string, pageTitle: string }|null}
    */
   function pickMainContent(root) {
     var queryRoot = queryRootOf(root);
     if (!queryRoot || !queryRoot.querySelector) return null;
 
-    var selectors = ["#content", "[data-page-title]", "main", "[role='main']"];
+    // Strong docs-site signals only; keep Readability as the default elsewhere.
+    var selectors = ["#content", "[data-page-title]"];
     var i;
     var el = null;
     for (i = 0; i < selectors.length; i++) {
