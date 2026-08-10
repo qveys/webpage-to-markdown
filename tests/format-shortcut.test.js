@@ -1,3 +1,6 @@
+const { describe, test, afterEach } = require('node:test');
+const assert = require('node:assert/strict');
+
 global.W2M = {};
 require('../js/format-shortcut.js');
 
@@ -10,26 +13,26 @@ describe('formatShortcut', () => {
 
   test('returns shortcut unchanged on non-Mac', () => {
     global.navigator = { platform: 'Win32' };
-    expect(formatShortcut('Alt+Shift+M')).toBe('Alt+Shift+M');
+    assert.equal(formatShortcut('Alt+Shift+M'), 'Alt+Shift+M');
   });
 
   test('replaces modifiers with Mac symbols', () => {
     global.navigator = { platform: 'MacIntel' };
-    expect(formatShortcut('Alt+Shift+M')).toBe('⌥⇧M');
+    assert.equal(formatShortcut('Alt+Shift+M'), '⌥⇧M');
   });
 
   test('handles MacCtrl+ before Ctrl+ to avoid corruption', () => {
     global.navigator = { platform: 'MacIntel' };
-    expect(formatShortcut('MacCtrl+Shift+M')).toBe('⌃⇧M');
+    assert.equal(formatShortcut('MacCtrl+Shift+M'), '⌃⇧M');
   });
 
   test('handles Command+', () => {
     global.navigator = { platform: 'MacIntel' };
-    expect(formatShortcut('Command+Shift+M')).toBe('⌘⇧M');
+    assert.equal(formatShortcut('Command+Shift+M'), '⌘⇧M');
   });
 
   test('handles Ctrl+ without MacCtrl prefix', () => {
     global.navigator = { platform: 'MacIntel' };
-    expect(formatShortcut('Ctrl+C')).toBe('⌃C');
+    assert.equal(formatShortcut('Ctrl+C'), '⌃C');
   });
 });
