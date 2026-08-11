@@ -54,21 +54,21 @@
   --text-inverse: hsl(var(--primary-foreground));
   --text-on-accent: hsl(var(--primary-foreground));
   --interactive-primary: hsl(var(--primary));
-  --interactive-primary-hover: color-mix(in srgb, hsl(var(--primary)) 85%, hsl(var(--background)));
+  --interactive-primary-hover: color-mix(in sRGB, hsl(var(--primary)) 85%, hsl(var(--background)));
   --interactive-secondary: hsl(var(--muted-foreground));
   --interactive-disabled: hsl(var(--surface-3));
   --feedback-success: hsl(var(--success));
   --feedback-success-foreground: hsl(var(--success-foreground));
-  --feedback-success-subtle: color-mix(in srgb, hsl(var(--success)) 14%, hsl(var(--surface-1)));
+  --feedback-success-subtle: color-mix(in sRGB, hsl(var(--success)) 14%, hsl(var(--surface-1)));
   --feedback-warning: hsl(var(--warning));
   --feedback-warning-foreground: hsl(var(--warning-foreground));
-  --feedback-warning-subtle: color-mix(in srgb, hsl(var(--warning)) 14%, hsl(var(--surface-1)));
+  --feedback-warning-subtle: color-mix(in sRGB, hsl(var(--warning)) 14%, hsl(var(--surface-1)));
   --feedback-error: hsl(var(--destructive));
   --feedback-error-foreground: hsl(var(--destructive-foreground));
-  --feedback-error-subtle: color-mix(in srgb, hsl(var(--destructive)) 14%, hsl(var(--surface-1)));
+  --feedback-error-subtle: color-mix(in sRGB, hsl(var(--destructive)) 14%, hsl(var(--surface-1)));
   --feedback-info: hsl(var(--info));
   --feedback-info-foreground: hsl(var(--info-foreground));
-  --feedback-info-subtle: color-mix(in srgb, hsl(var(--info)) 14%, hsl(var(--surface-1)));
+  --feedback-info-subtle: color-mix(in sRGB, hsl(var(--info)) 14%, hsl(var(--surface-1)));
   --border-default: hsl(var(--border));
   --border-strong: hsl(var(--ring));
 
@@ -87,8 +87,8 @@
   --radius-full: 9999px;
 
   /* Typography */
-  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  --font-sans: -apple-system, "BlinkMacSystemFont", "Segoe UI", "Roboto", "Helvetica Neue", "Arial", sans-serif;
+  --font-mono: ui-monospace, "SFMono-Regular", "Menlo", "Monaco", "Consolas", "Liberation Mono", "Courier New", monospace;
   --type-heading-lg: 18px;
   --type-heading-sm: 14px;
   --type-body: 13px;
