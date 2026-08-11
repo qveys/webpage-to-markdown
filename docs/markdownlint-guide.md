@@ -1,69 +1,37 @@
 # Markdownlint Guide
 
-This guide documents the current Markdownlint situation in this
-repository and the recommended way to use it without relying on
-outdated setup details.
+This repository uses [markdownlint-cli2](https://github.com/DavidAnson/markdownlint-cli2)
+for documentation quality checks.
 
-## Current repository state
-
-- The repository contains a large amount of Markdown documentation,
-  including `README.md`, files under `docs/`, and GitHub templates.
-- `package.json` does not currently define `lint:md`
-  or `lint:md:fix` scripts.
-- No versioned Markdownlint config file is present at the repository
-  root (`.markdownlint.json`, `.markdownlint.yaml`,
-  or `.markdownlint-cli2.jsonc`).
-- The existing automated checks currently cover Jest tests
-  through `npm test`.
-
-Because of that, Markdownlint should not be described as part of the
-default local workflow or CI until the repository actually adds that
-integration.
-
-## Why Markdownlint is still useful
-
-Markdownlint is still useful for:
-
-- keeping headings, lists, and fenced code blocks consistent;
-- catching common Markdown syntax issues early;
-- reducing formatting regressions during documentation updates.
-
-## Recommended usage
-
-For occasional checks, run Markdownlint with `npx` instead of
-documenting npm scripts that do not exist in the repository:
+## Scripts
 
 ```bash
-npx markdownlint-cli2 "**/*.md"
+npm run lint:md        # check
+npm run lint:md:fix   # apply safe auto-fixes
 ```
 
-To try local auto-fixes:
+Config lives in `.markdownlint-cli2.jsonc` at the repository root.
 
-```bash
-npx markdownlint-cli2 --fix "**/*.md"
-```
+## CI
 
-These commands download the tool on demand when needed and keep the
-documentation aligned with the current project setup.
+Pull requests run `npm run lint:md` as part of `.github/workflows/lint.yml`
+(self-hosted runners, same Node/npm setup as the unit-test workflow).
 
-## Repository-specific guidance
+## Config highlights
 
-- Prefer checking the files you changed instead of reformatting the
-  entire repository during a small documentation update.
-- Review auto-fixes carefully when lists, tables, or inline HTML are
-  involved.
-- Avoid large formatting-only rewrites unless they provide clear value.
+Several rules are disabled because they do not fit this corpus:
 
-## If permanent integration is added later
+- **MD013** — line length (long URLs / tables)
+- **MD024** — duplicate headings across independent docs
+- **MD029** — ordered-list prefix style
+- **MD033** — inline HTML in docs
+- **MD034** — bare URLs (e.g. emails in `SECURITY.md`)
+- **MD040** — fenced-code language (some diagrams are plain fences)
+- **MD041** — first-line heading
+- **MD060** — table column style
 
-If the project adopts Markdownlint officially later, update this guide
-at the same time as:
+`AGENTS.md`, `CLAUDE.md`, and local agent memory (`.remember/`) are ignored.
 
-1. adding the dependency to `package.json`;
-2. adding npm scripts for linting and auto-fixing;
-3. committing a versioned Markdownlint config file;
-4. wiring the check into CI if needed.
+## When to run locally
 
-Until those changes exist in the repository, the documentation should
-describe Markdownlint as an optional ad hoc check, not as an existing
-built-in workflow.
+Run `npm run lint:md` before opening a documentation PR, or rely on CI after push.
