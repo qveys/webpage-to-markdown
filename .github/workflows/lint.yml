@@ -24,6 +24,24 @@ on:
       - 'NOTICE'
       - 'AGENTS.md'
       - 'CLAUDE.md'
+      - '.gitignore'
+      - '.nojekyll'
+      - '.prettierignore'
+      - '.github/CODEOWNERS'
+      - '.github/labels.yml'
+      - '.github/labeler.yml'
+      - '.github/dependabot.yml'
+      - '.github/ISSUE_TEMPLATE/*.yml'
+      # None of the 4 lint tools check other workflow files (prettier's
+      # format:check only lists lint.yml among workflow files) — ignore the
+      # whole directory, then un-ignore lint.yml so changes to it still lint.
+      # ORDER MATTERS: GitHub evaluates path-filter patterns sequentially, so
+      # the '!' negation below only re-includes lint.yml because it comes
+      # AFTER '.github/workflows/**'. Do not alphabetize or otherwise reorder
+      # this pair, or lint.yml changes will silently stop triggering this
+      # workflow.
+      - '.github/workflows/**'
+      - '!.github/workflows/lint.yml'
 
 permissions:
   contents: read
