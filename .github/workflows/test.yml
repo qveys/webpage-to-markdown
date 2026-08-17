@@ -3,6 +3,13 @@ name: Tests
 on:
   pull_request:
     branches: [main]
+    paths:
+      - "js/**"
+      - "tests/**"
+      - "manifest.json"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/test.yml"
 
 permissions:
   contents: read
