@@ -3,6 +3,27 @@ name: Lint
 on:
   pull_request:
     branches: [main]
+    paths-ignore:
+      - '**/*.png'
+      - '**/*.jpg'
+      - '**/*.jpeg'
+      - '**/*.gif'
+      - '**/*.ico'
+      - 'img/**'
+      - 'docs/screenshots/**'
+      - 'docs/superpowers/**'
+      - 'beta/**'
+      - 'privacy/**'
+      - 'support/**'
+      - '.remember/**'
+      - '.claude/**'
+      - '.cursor/**'
+      - '*.html'
+      - 'manifest.json'
+      - 'LICENSE'
+      - 'NOTICE'
+      - 'AGENTS.md'
+      - 'CLAUDE.md'
 
 permissions:
   contents: read

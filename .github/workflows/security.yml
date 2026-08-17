@@ -6,8 +6,16 @@ name: Security
 on:
   push:
     branches: [main]
+    paths:
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/security.yml'
   pull_request:
     branches: [main]
+    paths:
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/security.yml'
 
 permissions:
   contents: read
