@@ -1,8 +1,11 @@
 handlers:
   pr-comments-resolver:
     enabled: true
+  # Disabled: rule set is not reconfigurable per-repo in v1 and forbids git
+  # trailers, which breaks on any Co-Authored-By trailer (common with AI-assisted
+  # commits). Re-enable once housekeeper supports per-repo rule overrides.
   commit-message-check:
-    enabled: true
+    enabled: false
   sync-labels:
     enabled: true
   normalize-title:
@@ -13,16 +16,30 @@ handlers:
     enabled: true
   triage:
     enabled: true
+  # requiredFiles overridden: defaults assume .github/pull_request_template.md
+  # (this repo uses uppercase PULL_REQUEST_TEMPLATE.md — Contents API is
+  # case-sensitive) and docs/release-process/branch-protection.md (doesn't
+  # exist here). Point at governance files that actually exist in this repo.
   required-checks:
     enabled: true
+    requiredFiles:
+      - .github/CODEOWNERS
+      - .github/PULL_REQUEST_TEMPLATE.md
+      - SECURITY.md
+  # Disabled: default script scripts/check-logging.sh is Swift/SPM-era and
+  # doesn't exist in this JS/Chrome-extension repo. Re-enable once an
+  # equivalent logging-policy script is added (scriptPath override).
   logging-guard:
-    enabled: true
+    enabled: false
   stale:
     enabled: true
   conflict-resolve:
     enabled: true
+  # Disabled: default script scripts/security_spm_scan.sh is SPM-only and
+  # doesn't exist here. Re-enable once an equivalent dependency scanner is
+  # added (scriptPath override) — npm audit already runs in security.yml.
   dependency-scan:
-    enabled: true
+    enabled: false
   pr-comment:
     enabled: true
   pr-review:
