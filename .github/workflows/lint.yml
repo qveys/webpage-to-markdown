@@ -33,15 +33,21 @@ on:
       - '.github/dependabot.yml'
       - '.github/ISSUE_TEMPLATE/*.yml'
       # None of the 4 lint tools check other workflow files (prettier's
-      # format:check only lists lint.yml among workflow files) — ignore the
-      # whole directory, then un-ignore lint.yml so changes to it still lint.
-      # ORDER MATTERS: GitHub evaluates path-filter patterns sequentially, so
-      # the '!' negation below only re-includes lint.yml because it comes
-      # AFTER '.github/workflows/**'. Do not alphabetize or otherwise reorder
-      # this pair, or lint.yml changes will silently stop triggering this
-      # workflow.
-      - '.github/workflows/**'
-      - '!.github/workflows/lint.yml'
+      # format:check only lists lint.yml among workflow files) — ignore each
+      # one explicitly so lint.yml itself keeps triggering this workflow.
+      # NOTE: a '.github/workflows/**' + '!.github/workflows/lint.yml' pair
+      # was tried first but empirically does NOT re-include lint.yml (verified
+      # via a throwaway PR isolated to a lint.yml-only diff: the workflow
+      # never triggered) — GitHub's negation-in-paths-ignore docs example
+      # apparently doesn't hold here, so list every sibling file by name
+      # instead. Add new workflow files here as they're created.
+      - '.github/workflows/deploy-pages.yml'
+      - '.github/workflows/release.yml'
+      - '.github/workflows/security.yml'
+      - '.github/workflows/stale.yml'
+      - '.github/workflows/sync-labels.yml'
+      - '.github/workflows/test.yml'
+      - '.github/workflows/triage.yml'
 
 permissions:
   contents: read
