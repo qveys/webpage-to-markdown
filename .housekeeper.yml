@@ -1,0 +1,29 @@
+handlers:
+  pr-comments-resolver:
+    enabled: true
+  commit-message-check:
+    enabled: true
+  sync-labels:
+    enabled: true
+  normalize-title:
+    enabled: true
+  require-up-to-date:
+    enabled: true
+  secret-scan:
+    enabled: true
+  triage:
+    enabled: true
+  required-checks:
+    enabled: true
+  logging-guard:
+    enabled: true
+  stale:
+    enabled: true
+  conflict-resolve:
+    enabled: true
+  dependency-scan:
+    enabled: true
+  pr-comment:
+    enabled: true
+  pr-review:
+    enabled: true
