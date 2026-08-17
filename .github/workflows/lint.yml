@@ -42,6 +42,8 @@ on:
       # workflow.
       - '.github/workflows/**'
       - '!.github/workflows/lint.yml'
+      # tmp: empirical check for PR #60 negation pattern (direction 1 — isolated
+      # lint.yml-only diff); revert before merge
 
 permissions:
   contents: read
