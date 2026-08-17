@@ -1,3 +1,4 @@
+# tmp: empirical check for PR #60 negation pattern (paths-ignore); revert before merge
 name: Mark stale issues and pull requests
 
 on:
