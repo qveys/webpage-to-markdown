@@ -48,6 +48,8 @@ on:
       - '.github/workflows/sync-labels.yml'
       - '.github/workflows/test.yml'
       - '.github/workflows/triage.yml'
+      # tmp: empirical re-check of the explicit-list fix (isolated lint.yml
+      # diff); revert before merge
 
 permissions:
   contents: read
