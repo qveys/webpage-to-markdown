@@ -24,6 +24,7 @@ on:
       - 'NOTICE'
       - 'AGENTS.md'
       - 'CLAUDE.md'
+      # tmp: empirical check — base=main, isolated lint.yml diff; revert before merge
 
 permissions:
   contents: read
