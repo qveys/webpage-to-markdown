@@ -276,7 +276,7 @@ For Markdownlint details, see the [Markdownlint guide](docs/markdownlint-guide.m
 
 Contributions welcome! Open an issue or submit a PR. By participating you agree to the [PR template](.github/PULL_REQUEST_TEMPLATE.md) and one of the [issue forms](.github/ISSUE_TEMPLATE/).
 
-Commit messages follow `<emoji> <type>(<scope>): <description>` (Conventional Commits + emoji). PRs auto-label by area and titles are auto-normalized via the `Triage` workflow.
+Commit messages follow `<emoji> <type>(<scope>): <description>` (Conventional Commits + emoji). PRs auto-label by area via the `Label` workflow, and titles are auto-normalized via the [my-housekeeper](https://github.com/qveys/my-housekeeper) `normalize-title` handler.
 
 ---
 
