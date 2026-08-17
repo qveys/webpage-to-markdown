@@ -14,8 +14,17 @@ handlers:
     enabled: true
   secret-scan:
     enabled: true
+  # Disabled: default Priority/Source/Type/Size label names (defaults.ts) don't
+  # match this repo's .github/labels.yml (e.g. 🔴/🟠/🟡/🟢 Priority vs this
+  # repo's 🔥 Priority, no Size labels here) and none of that is configurable
+  # per-repo in v1. The handler skips adding unknown labels but still removes
+  # the old family label, so it would silently strip existing 🔥 Priority /
+  # 🤖 Source: Copilot labels without a valid replacement — the old triage.yml
+  # deliberately avoided this (actions/labeler with sync-labels: false).
+  # Re-enable once family label names are configurable, or after aligning
+  # .github/labels.yml with the handler defaults.
   triage:
-    enabled: true
+    enabled: false
   # requiredFiles overridden: defaults assume .github/pull_request_template.md
   # (this repo uses uppercase PULL_REQUEST_TEMPLATE.md — Contents API is
   # case-sensitive) and docs/release-process/branch-protection.md (doesn't
