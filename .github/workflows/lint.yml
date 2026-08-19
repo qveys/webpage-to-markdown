@@ -27,6 +27,7 @@ on:
       - '.gitignore'
       - '.nojekyll'
       - '.prettierignore'
+      - 'package-lock.json'
       - '.github/CODEOWNERS'
       - '.github/labels.yml'
       - '.github/labeler.yml'
