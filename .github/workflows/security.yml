@@ -2,6 +2,13 @@ name: Security
 
 # Run npm audit against PRs and pushes to main. Works on private repos without
 # GitHub Advanced Security (dependency-review-action requires GHAS).
+#
+# pull_request has no paths filter (unlike push): npm audit is a required status
+# check on main's ruleset, and a required check tied to a path-filtered workflow
+# never posts a status for PRs outside those paths — leaving it "expected"
+# forever and blocking merge. The job itself is cheap on self-hosted runners, so
+# always running it on PRs is simpler than reproducing path-filtering inside the
+# job just to keep the required check honest.
 
 on:
   push:
@@ -12,10 +19,6 @@ on:
       - '.github/workflows/security.yml'
   pull_request:
     branches: [main]
-    paths:
-      - 'package.json'
-      - 'package-lock.json'
-      - '.github/workflows/security.yml'
 
 permissions:
   contents: read
