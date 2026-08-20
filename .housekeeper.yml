@@ -1,0 +1,55 @@
+handlers:
+  pr-comments-resolver:
+    enabled: true
+  # Disabled: rule set is not reconfigurable per-repo in v1 and forbids git
+  # trailers, which breaks on any Co-Authored-By trailer (common with AI-assisted
+  # commits). Re-enable once housekeeper supports per-repo rule overrides.
+  commit-message-check:
+    enabled: false
+  sync-labels:
+    enabled: true
+  normalize-title:
+    enabled: true
+  require-up-to-date:
+    enabled: true
+  secret-scan:
+    enabled: true
+  # Disabled: default Priority/Source/Type/Size label names (defaults.ts) don't
+  # match this repo's .github/labels.yml (e.g. 🔴/🟠/🟡/🟢 Priority vs this
+  # repo's 🔥 Priority, no Size labels here) and none of that is configurable
+  # per-repo in v1. The handler skips adding unknown labels but still removes
+  # the old family label, so it would silently strip existing 🔥 Priority /
+  # 🤖 Source: Copilot labels without a valid replacement — the old triage.yml
+  # deliberately avoided this (actions/labeler with sync-labels: false).
+  # Re-enable once family label names are configurable, or after aligning
+  # .github/labels.yml with the handler defaults.
+  triage:
+    enabled: false
+  # requiredFiles overridden: defaults assume .github/pull_request_template.md
+  # (this repo uses uppercase PULL_REQUEST_TEMPLATE.md — Contents API is
+  # case-sensitive) and docs/release-process/branch-protection.md (doesn't
+  # exist here). Point at governance files that actually exist in this repo.
+  required-checks:
+    enabled: true
+    requiredFiles:
+      - .github/CODEOWNERS
+      - .github/PULL_REQUEST_TEMPLATE.md
+      - SECURITY.md
+  # Disabled: default script scripts/check-logging.sh is Swift/SPM-era and
+  # doesn't exist in this JS/Chrome-extension repo. Re-enable once an
+  # equivalent logging-policy script is added (scriptPath override).
+  logging-guard:
+    enabled: false
+  stale:
+    enabled: true
+  conflict-resolve:
+    enabled: true
+  # Disabled: default script scripts/security_spm_scan.sh is SPM-only and
+  # doesn't exist here. Re-enable once an equivalent dependency scanner is
+  # added (scriptPath override) — npm audit already runs in security.yml.
+  dependency-scan:
+    enabled: false
+  pr-comment:
+    enabled: true
+  pr-review:
+    enabled: true
