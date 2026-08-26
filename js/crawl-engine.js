@@ -285,8 +285,11 @@ class CrawlEngine {
       if (CrawlEngine.looksLikeAsset(url)) return;
 
       const signal = this._abortController ? this._abortController.signal : AbortSignal.timeout(30000);
+      // "include": send the browser's cookies so auth-gated sites (docs portals,
+      // learning platforms) return real content instead of a login redirect.
+      // The user has explicitly granted host permission for this origin at crawl start.
       const response = await fetch(url, {
-        credentials: "omit",
+        credentials: "include",
         headers: { Accept: "text/html" },
         signal,
       });
@@ -359,11 +362,15 @@ class CrawlEngine {
 
   // ─── Offscreen communication ────────────────────────────────────────────────
 
-  parseInOffscreen(url, html) {
+  async parseInOffscreen(url, html) {
+    // Offscreen documents only have chrome.runtime — settings must be read
+    // here in the service worker and passed along in the message.
+    const { markdownSettings } = await chrome.storage.local.get("markdownSettings");
     return chrome.runtime.sendMessage({
       type: "parse:html",
       url,
       html,
+      markdownSettings,
     });
   }
 
