@@ -758,9 +758,55 @@ html.w2m-sidepanel .app {
   border-bottom: none;
 }
 
+/* Activity rows are <button>s toggling a full-text popover */
+button.activity-item {
+  width: 100%;
+  border-top: 0;
+  border-right: 0;
+  border-left: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+button.activity-item:focus-visible {
+  outline: 2px solid var(--interactive-primary);
+  outline-offset: -2px;
+}
+
 .activity-item:hover {
   background-color: var(--surface-secondary);
 }
+
+.activity-entry:last-child .activity-item {
+  border-bottom: none;
+}
+
+.activity-item__popover {
+  inset: auto var(--space-3) var(--space-3);
+  width: calc(100% - (2 * var(--space-3)));
+  max-width: 620px;
+  max-height: 45vh;
+  margin: 0 auto;
+  padding: var(--space-3);
+  overflow: auto;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface-elevated);
+  color: var(--text-primary);
+  box-shadow: 0 12px 32px rgb(0 0 0 / 35%);
+  font-size: var(--type-caption);
+  line-height: 1.45;
+}
+
+.activity-item__popover:popover-open {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
 
 .activity-time {
   color: var(--text-muted);
@@ -831,6 +877,14 @@ html.w2m-sidepanel .app {
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--text-primary);
+}
+
+.activity-item__popover .activity-url,
+.activity-item__popover .activity-item__detail {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 
