@@ -8,9 +8,9 @@
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message?.type !== "parse:html") return false;
 
-  const { url, html } = message;
+  const { url, html, markdownSettings } = message;
 
-  parseAndConvert(url, html)
+  parseAndConvert(url, html, markdownSettings)
     .then((result) => {
       sendResponse({ type: "parse:result", ...result });
     })
@@ -30,7 +30,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 // ─── Main parse + convert function ───────────────────────────────────────────
 
-async function parseAndConvert(pageUrl, html) {
+// markdownSettings comes from the service worker via the parse:html message
+// (chrome.storage is not available in offscreen documents).
+async function parseAndConvert(pageUrl, html, markdownSettings) {
   try {
     const doc = new DOMParser().parseFromString(html, "text/html");
 
@@ -188,7 +190,6 @@ async function parseAndConvert(pageUrl, html) {
         ? W2M.resolveMarkdownTitle(articleTitle, content, fallbackTitle)
         : articleTitle || fallbackTitle;
 
-    const { markdownSettings } = await chrome.storage.local.get("markdownSettings");
     const includeImages = !markdownSettings || markdownSettings.includeImages !== false;
     const markdown = convertToMarkdown(title, content, pageUrl, { includeImages });
 

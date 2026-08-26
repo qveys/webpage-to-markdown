@@ -99,6 +99,18 @@ describe('CrawlEngine scope and queue', () => {
     assert.equal(CrawlEngine.looksLikeAsset('https://example.com/docs/page.html'), false);
     assert.equal(CrawlEngine.looksLikeAsset('https://example.com/'), false);
   });
+
+  test('looksLikeAppShell flags anchor-less client-rendered shells', () => {
+    const shell =
+      '<html><head><script src="/app.js"></script></head>' +
+      '<body><div id="root"></div><a href="/">Home</a></body></html>';
+    assert.equal(CrawlEngine.looksLikeAppShell(shell), true);
+
+    const serverRendered =
+      '<html><body><nav><a href="/a">A</a><a href="/b">B</a></nav>' +
+      '<main><p>Content</p><a href="/c">C</a></main></body></html>';
+    assert.equal(CrawlEngine.looksLikeAppShell(serverRendered), false);
+  });
 });
 
 describe('CrawlEngine anti-bot', () => {
