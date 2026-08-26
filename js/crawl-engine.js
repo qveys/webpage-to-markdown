@@ -316,7 +316,21 @@ class CrawlEngine {
       }
 
       // Parse via offscreen document
-      const result = await this.parseInOffscreen(url, html);
+      let result = await this.parseInOffscreen(url, html);
+
+      // Client-rendered app shells expose few/no links in server HTML —
+      // load the page in a background tab and parse the hydrated DOM instead.
+      if (CrawlEngine.looksLikeAppShell(html)) {
+        const rendered = await this._renderInTab(url).catch((err) => {
+          this.log("info", `Render fallback failed for ${url}: ${err.message}`);
+          return null;
+        });
+        if (rendered) {
+          const renderedResult = await this.parseInOffscreen(url, rendered);
+          if (renderedResult && renderedResult.markdown) result = renderedResult;
+        }
+      }
+
       if (!result || !result.markdown) {
         this.log("error", `Parse failed for: ${url} (${result?.error || 'unknown'})`);
         return;
@@ -372,6 +386,64 @@ class CrawlEngine {
       html,
       markdownSettings,
     });
+  }
+
+  // ─── Rendered fallback for client-side apps ────────────────────────────────
+
+  /**
+   * Server HTML with almost no anchors is a client-rendered app shell —
+   * the real links and content only exist after hydration in a live DOM.
+   */
+  static looksLikeAppShell(html) {
+    return (html.match(/<a[\s>]/gi) || []).length < 3;
+  }
+
+  /** Serialize background-tab renders — one hidden tab at a time is plenty. */
+  _renderInTab(url) {
+    const prev = this._renderChain || Promise.resolve();
+    const run = prev.then(() => this._renderOnce(url));
+    // Keep the chain usable even when a render fails
+    this._renderChain = run.catch(() => {});
+    return run;
+  }
+
+  async _renderOnce(url) {
+    const tab = await chrome.tabs.create({ url, active: false });
+    try {
+      await new Promise((resolve, reject) => {
+        const cleanup = () => {
+          clearTimeout(timer);
+          chrome.tabs.onUpdated.removeListener(listener);
+        };
+        const timer = setTimeout(() => {
+          cleanup();
+          reject(new Error("render timeout"));
+        }, 20000);
+        const listener = (tabId, info) => {
+          if (tabId === tab.id && info.status === "complete") {
+            cleanup();
+            resolve();
+          }
+        };
+        chrome.tabs.onUpdated.addListener(listener);
+        // The tab may already be complete before the listener attached
+        chrome.tabs.get(tab.id).then((t) => {
+          if (t && t.status === "complete") {
+            cleanup();
+            resolve();
+          }
+        }, () => {});
+      });
+      // ponytail: fixed settle delay for hydration; make configurable if slow apps miss content
+      await new Promise((r) => setTimeout(r, 1500));
+      const [res] = await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        func: () => document.documentElement.outerHTML,
+      });
+      return (res && res.result) || null;
+    } finally {
+      chrome.tabs.remove(tab.id).catch(() => {});
+    }
   }
 
   // ─── Anti-bot ───────────────────────────────────────────────────────────────
