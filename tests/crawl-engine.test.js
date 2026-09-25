@@ -1,7 +1,7 @@
 const fs = require('fs');
 const vm = require('vm');
 const path = require('path');
-const { describe, test, before, beforeEach } = require('node:test');
+const { describe, test, before, beforeEach, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
 
 before(() => {
@@ -110,6 +110,197 @@ describe('CrawlEngine scope and queue', () => {
       '<html><body><nav><a href="/a">A</a><a href="/b">B</a></nav>' +
       '<main><p>Content</p><a href="/c">C</a></main></body></html>';
     assert.equal(CrawlEngine.looksLikeAppShell(serverRendered), false);
+  });
+
+  test('looksLikeAppShell does not open a tab for a thin static article', () => {
+    const staticArticle =
+      '<html><body><main><h1>Title</h1><p>Body text</p>' +
+      '<a href="/other">One link</a></main></body></html>';
+    assert.equal(CrawlEngine.looksLikeAppShell(staticArticle), false);
+
+    const linklessStatic =
+      '<html><body><main><h1>Title</h1><p>Paragraph one</p>' +
+      '<p>Paragraph two</p><p>Paragraph three</p></main></body></html>';
+    assert.equal(CrawlEngine.looksLikeAppShell(linklessStatic), false);
+  });
+
+  test('looksLikeAppShell detects framework hydration markers', () => {
+    const nextApp =
+      '<html><body><script id="__NEXT_DATA__" type="application/json">{}</script>' +
+      '<div id="__next"></div></body></html>';
+    assert.equal(CrawlEngine.looksLikeAppShell(nextApp), true);
+  });
+});
+
+describe('CrawlEngine.sameOrigin', () => {
+  test('accepts same-origin URLs with different paths', () => {
+    assert.equal(
+      CrawlEngine.sameOrigin('https://example.com/a', 'https://example.com/b/c'),
+      true,
+    );
+  });
+
+  test('rejects another origin, port, or scheme', () => {
+    assert.equal(
+      CrawlEngine.sameOrigin('https://evil.example/a', 'https://example.com/a'),
+      false,
+    );
+    assert.equal(
+      CrawlEngine.sameOrigin('https://example.com:8443/a', 'https://example.com/a'),
+      false,
+    );
+    assert.equal(
+      CrawlEngine.sameOrigin('http://example.com/a', 'https://example.com/a'),
+      false,
+    );
+  });
+
+  test('rejects unparseable input', () => {
+    assert.equal(CrawlEngine.sameOrigin('not a url', 'https://example.com'), false);
+  });
+});
+
+describe('CrawlEngine redirect and render containment', () => {
+  let engine;
+  let saved;
+  let chromeBackup;
+
+  /** Minimal chrome surface used by processUrl and the render path. */
+  function installChrome(tabsOverrides = {}) {
+    chromeBackup = global.chrome;
+    global.chrome = {
+      tabs: {
+        create: async () => ({ id: 7, url: 'https://example.com/docs/a' }),
+        get: async () => ({ id: 7, url: 'https://example.com/docs/a', status: 'complete' }),
+        onUpdated: { addListener() {}, removeListener() {} },
+        remove: async () => {},
+        ...tabsOverrides,
+      },
+      scripting: { executeScript: async () => [{ result: '<html></html>' }] },
+      storage: { local: { get: async () => ({}) } },
+      runtime: { sendMessage: async () => null },
+    };
+  }
+
+  beforeEach(() => {
+    engine = new CrawlEngine();
+    engine.setScope('https://example.com/docs/');
+    engine.status = 'running';
+    engine._abortController = new AbortController();
+    engine.broadcastStatus = () => {};
+    engine.log = () => {};
+    saved = [];
+    engine.saveMarkdown = async (markdown) => {
+      saved.push(markdown);
+    };
+    installChrome();
+  });
+
+  afterEach(() => {
+    global.chrome = chromeBackup;
+    delete global.fetch;
+  });
+
+  function stubFetch({ url, html = '<html><body><p>x</p></body></html>' }) {
+    global.fetch = async () => ({
+      status: 200,
+      url,
+      headers: { get: () => 'text/html' },
+      text: async () => html,
+    });
+  }
+
+  test('refuses to read a response that redirected off-origin', async () => {
+    stubFetch({ url: 'https://evil.example/docs/a' });
+    engine.parseInOffscreen = async () => ({ markdown: '# leaked', title: 'x' });
+
+    await engine.processUrl('https://example.com/docs/a', 0);
+
+    assert.deepEqual(saved, []);
+  });
+
+  test('does not save a rendered page when the crawl is paused mid-render', async () => {
+    const shell =
+      '<html><head><script src="/app.js"></script></head>' +
+      '<body><div id="root"></div></body></html>';
+    stubFetch({ url: 'https://example.com/docs/a', html: shell });
+    engine.parseInOffscreen = async () => ({ markdown: '# source', title: 'x' });
+    engine._renderInTab = async () => {
+      engine.status = 'paused';
+      return '<html><body><main><p>hydrated</p></main></body></html>';
+    };
+
+    await engine.processUrl('https://example.com/docs/a', 0);
+
+    assert.deepEqual(saved, []);
+    assert.deepEqual(engine.discoveryQueue, [
+      { url: 'https://example.com/docs/a', depth: 0 },
+    ]);
+  });
+
+  test('keeps the source parse when the rendered parse rejects', async () => {
+    const shell =
+      '<html><head><script src="/app.js"></script></head>' +
+      '<body><div id="root"></div></body></html>';
+    stubFetch({ url: 'https://example.com/docs/a', html: shell });
+    engine._renderInTab = async () => '<html><body><main><p>hydrated</p></main></body></html>';
+    let call = 0;
+    engine.parseInOffscreen = async () => {
+      call += 1;
+      if (call === 2) throw new Error('offscreen died');
+      return { markdown: '# source', title: 'Source', links: [] };
+    };
+
+    await engine.processUrl('https://example.com/docs/a', 0);
+
+    assert.deepEqual(saved, ['# source']);
+  });
+
+  test('_renderOnce refuses to serialize a tab that navigated off-origin', async () => {
+    installChrome({
+      get: async () => ({
+        id: 7,
+        url: 'https://evil.example/steal',
+        status: 'complete',
+      }),
+    });
+    let injected = false;
+    global.chrome.scripting.executeScript = async () => {
+      injected = true;
+      return [{ result: '<html></html>' }];
+    };
+
+    await assert.rejects(
+      engine._renderOnce('https://example.com/docs/a', null),
+      /off-origin/,
+    );
+    assert.equal(injected, false);
+  });
+
+  test('_renderOnce aborts a pending render when the crawl stops', async () => {
+    installChrome({
+      // Never reports complete: only the abort signal can end the wait.
+      get: async () => ({ id: 7, url: 'https://example.com/docs/a', status: 'loading' }),
+    });
+
+    const controller = new AbortController();
+    const pending = engine._renderOnce('https://example.com/docs/a', controller.signal);
+    controller.abort();
+
+    await assert.rejects(pending, (err) => err.name === 'AbortError');
+  });
+
+  test('_stillRunning re-queues on pause but not on stop', async () => {
+    engine.status = 'paused';
+    assert.equal(await engine._stillRunning('https://example.com/docs/a', 1), false);
+    assert.deepEqual(engine.discoveryQueue, [
+      { url: 'https://example.com/docs/a', depth: 1 },
+    ]);
+
+    engine.discoveryQueue = [];
+    engine.status = 'stopped';
+    assert.equal(await engine._stillRunning('https://example.com/docs/b', 1), false);
+    assert.deepEqual(engine.discoveryQueue, []);
   });
 });
 

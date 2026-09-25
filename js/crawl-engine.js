@@ -14,6 +14,19 @@ class CrawlEngine {
     }
   }
 
+  /**
+   * Same-origin comparison used to reject redirects (fetch or tab navigation)
+   * that leave the crawl origin. Cookies travel with the request/response, so
+   * content from another origin must never enter this crawl's corpus.
+   */
+  static sameOrigin(a, b) {
+    try {
+      return new URL(a).origin === new URL(b).origin;
+    } catch {
+      return false;
+    }
+  }
+
   constructor(options = {}) {
     this.discoveryQueue = [];
     this.capturedUrls = new Set();
@@ -202,6 +215,12 @@ class CrawlEngine {
     const wasActive =
       this.status === "running" || this.status === "paused";
     this.status = "stopped";
+    // Abort in-flight fetches *and* the tab render path, so a queued render
+    // stops waiting on its 20 s load + 1.5 s hydration delay immediately.
+    if (this._abortController) {
+      this._abortController.abort();
+      this._abortController = null;
+    }
     this.discoveryQueue = [];
     this.stats.queued = 0;
     chrome.alarms.clear("crawl-keepalive");
@@ -276,6 +295,22 @@ class CrawlEngine {
     }
   }
 
+  /**
+   * Guard between long async steps of processUrl: a pause/stop that lands
+   * mid-flight must not save or enqueue anything from the interrupted page.
+   * Returns true while the crawl is still running; re-queues only on pause
+   * (stop clears the queue on purpose).
+   */
+  async _stillRunning(url, depth) {
+    if (this.status === "running") return true;
+    if (this.status === "paused") {
+      this.seenUrls.delete(url);
+      this.discoveryQueue.unshift({ url, depth });
+      this.stats.queued = this.discoveryQueue.length;
+    }
+    return false;
+  }
+
   async processUrl(url, depth) {
     try {
       if (!CrawlEngine.isFetchableHttpUrl(url)) {
@@ -293,6 +328,18 @@ class CrawlEngine {
         headers: { Accept: "text/html" },
         signal,
       });
+
+      // `redirect: "follow"` is the default, so response.url is the *final* URL
+      // after any 302. Queue/isInScope only constrain the pre-redirect URL, and
+      // host permissions accumulate per origin for the whole profile: reading a
+      // cross-origin body here would mix another site's authenticated content
+      // into this crawl. Refuse the body (cookies were already sent; nothing
+      // more we can do about that) and record it as skipped.
+      const finalUrl = response.url || url;
+      if (!CrawlEngine.sameOrigin(finalUrl, url)) {
+        this.log("skip", `Redirected off-origin (${finalUrl}): ${url}`);
+        return;
+      }
 
       // Check for blocking responses
       if (response.status === 403 || response.status === 429) {
@@ -317,6 +364,7 @@ class CrawlEngine {
 
       // Parse via offscreen document
       let result = await this.parseInOffscreen(url, html);
+      if (!(await this._stillRunning(url, depth))) return;
 
       // Client-rendered app shells expose few/no links in server HTML —
       // load the page in a background tab and parse the hydrated DOM instead.
@@ -325,12 +373,21 @@ class CrawlEngine {
           this.log("info", `Render fallback failed for ${url}: ${err.message}`);
           return null;
         });
+        // A pause/stop during the render must not save the hydrated page.
+        if (!(await this._stillRunning(url, depth))) return;
         if (rendered) {
-          const renderedResult = await this.parseInOffscreen(url, rendered);
-          if (renderedResult && renderedResult.markdown) result = renderedResult;
+          // A rejected rendered parse must not discard the source parse we
+          // already have — only replace the result when it produced markdown.
+          try {
+            const renderedResult = await this.parseInOffscreen(url, rendered);
+            if (renderedResult && renderedResult.markdown) result = renderedResult;
+          } catch (err) {
+            this.log("info", `Rendered parse failed for ${url}: ${err.message}`);
+          }
         }
       }
 
+      if (!(await this._stillRunning(url, depth))) return;
       if (!result || !result.markdown) {
         this.log("error", `Parse failed for: ${url} (${result?.error || 'unknown'})`);
         return;
@@ -359,10 +416,9 @@ class CrawlEngine {
       if (this.stats.captured % 5 === 0) await this.saveState();
     } catch (err) {
       if (err.name === "AbortError") {
-        // Paused/stopped — re-queue the URL so it's retried on resume
-        this.seenUrls.delete(url);
-        this.discoveryQueue.unshift({ url, depth });
-        this.stats.queued = this.discoveryQueue.length;
+        // Paused — re-queue the URL so it's retried on resume. Stopped clears
+        // the queue, so re-queueing there would leave orphaned items behind.
+        await this._stillRunning(url, depth);
         return;
       }
       if (err.name === "TimeoutError") {
@@ -391,51 +447,123 @@ class CrawlEngine {
   // ─── Rendered fallback for client-side apps ────────────────────────────────
 
   /**
-   * Server HTML with almost no anchors is a client-rendered app shell —
-   * the real links and content only exist after hydration in a live DOM.
+   * Server HTML with almost no anchors is *candidate* client-rendered app shell.
+   * Anchor count alone is not enough: a thin static article with 0-2 links would
+   * otherwise pay for a background tab plus the hydration delay. Require positive
+   * structural evidence of a client-rendered root, and bail out when the page has
+   * real server-rendered content landmarks.
    */
   static looksLikeAppShell(html) {
-    return (html.match(/<a[\s>]/gi) || []).length < 3;
+    if ((html.match(/<a[\s>]/gi) || []).length >= 3) return false;
+
+    // Empty mount point: <div id="root"></div>, <main id="app"> </main>, …
+    const emptyRoot =
+      /<(div|main|section)[^>]*\bid\s*=\s*["']?(root|app|__next|__nuxt|__app|content|mount)["']?[^>]*>\s*<\/(div|main|section)>/i.test(
+        html,
+      );
+    // Framework hydration markers left in the served markup.
+    const frameworkMarker =
+      /__NEXT_DATA__|__NUXT__|data-reactroot|data-react-helmet|ng-version|data-svelte|data-v-app|data-server-rendered/i.test(
+        html,
+      );
+    // A module/JS entry point that only runs in the browser.
+    const hasScript = (html.match(/<script[\s>]/gi) || []).length > 0;
+    const hasModuleEntry =
+      /<script[^>]+type\s*=\s*["']module["']/i.test(html) ||
+      /<script[^>]+src\s*=\s*["'][^"']*\.m?js(\?|["'])/i.test(html);
+    if (!emptyRoot && !frameworkMarker && !(hasScript && hasModuleEntry)) {
+      return false;
+    }
+
+    // Real content landmarks mean the server HTML is already usable.
+    const contentTags = (html.match(/<(p|li|h[1-6]|td|dt|dd)[\s>]/gi) || []).length;
+    if (/<(main|article)\b/i.test(html) && contentTags >= 3) return false;
+    if (contentTags >= 10) return false;
+
+    return true;
   }
 
   /** Serialize background-tab renders — one hidden tab at a time is plenty. */
   _renderInTab(url) {
+    const signal = this._abortController ? this._abortController.signal : null;
     const prev = this._renderChain || Promise.resolve();
-    const run = prev.then(() => this._renderOnce(url));
+    const run = prev.then(() => this._renderOnce(url, signal));
     // Keep the chain usable even when a render fails
     this._renderChain = run.catch(() => {});
     return run;
   }
 
-  async _renderOnce(url) {
+  /**
+   * Resolve when the tab reports complete, reject on timeout or when the crawl
+   * abort signal fires (pause/stop). `signal` is optional so the render fallback
+   * still works when no crawl is active.
+   */
+  _waitForTabComplete(tabId, signal) {
+    return new Promise((resolve, reject) => {
+      let settled = false;
+      const cleanup = () => {
+        clearTimeout(timer);
+        chrome.tabs.onUpdated.removeListener(listener);
+        if (signal) signal.removeEventListener("abort", onAbort);
+      };
+      const finish = (fn, arg) => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        fn(arg);
+      };
+      const onAbort = () => finish(reject, new DOMException("Crawl aborted", "AbortError"));
+      const timer = setTimeout(() => finish(reject, new Error("render timeout")), 20000);
+      const listener = (tabId2, info) => {
+        if (tabId2 === tabId && info.status === "complete") finish(resolve);
+      };
+      if (signal) {
+        if (signal.aborted) {
+          onAbort();
+          return;
+        }
+        signal.addEventListener("abort", onAbort);
+      }
+      chrome.tabs.onUpdated.addListener(listener);
+      // The tab may already be complete before the listener attached
+      chrome.tabs.get(tabId).then(
+        (t) => {
+          if (t && t.status === "complete") finish(resolve);
+        },
+        () => {},
+      );
+    });
+  }
+
+  async _renderOnce(url, signal) {
+    if (signal && signal.aborted) {
+      throw new DOMException("Crawl aborted", "AbortError");
+    }
     const tab = await chrome.tabs.create({ url, active: false });
+    if (!tab || tab.id === undefined) throw new Error("render tab unavailable");
     try {
-      await new Promise((resolve, reject) => {
-        const cleanup = () => {
-          clearTimeout(timer);
-          chrome.tabs.onUpdated.removeListener(listener);
-        };
-        const timer = setTimeout(() => {
-          cleanup();
-          reject(new Error("render timeout"));
-        }, 20000);
-        const listener = (tabId, info) => {
-          if (tabId === tab.id && info.status === "complete") {
-            cleanup();
-            resolve();
-          }
-        };
-        chrome.tabs.onUpdated.addListener(listener);
-        // The tab may already be complete before the listener attached
-        chrome.tabs.get(tab.id).then((t) => {
-          if (t && t.status === "complete") {
-            cleanup();
-            resolve();
-          }
-        }, () => {});
-      });
+      await this._waitForTabComplete(tab.id, signal);
+
+      // The tab can end up on another origin (302, meta refresh, page JS) while
+      // the extension still holds host permissions for origins granted earlier.
+      // Never serialize a DOM that no longer belongs to the crawled URL.
+      const current = await chrome.tabs.get(tab.id).catch(() => null);
+      if (current && current.url && !CrawlEngine.sameOrigin(current.url, url)) {
+        throw new Error(`render navigated off-origin (${current.url})`);
+      }
+
       // ponytail: fixed settle delay for hydration; make configurable if slow apps miss content
-      await new Promise((r) => setTimeout(r, 1500));
+      await new Promise((resolve, reject) => {
+        const timer = setTimeout(resolve, 1500);
+        if (!signal) return;
+        const onAbort = () => {
+          clearTimeout(timer);
+          reject(new DOMException("Crawl aborted", "AbortError"));
+        };
+        if (signal.aborted) return onAbort();
+        signal.addEventListener("abort", onAbort, { once: true });
+      });
+
       const [res] = await chrome.scripting.executeScript({
         target: { tabId: tab.id },
         func: () => document.documentElement.outerHTML,
