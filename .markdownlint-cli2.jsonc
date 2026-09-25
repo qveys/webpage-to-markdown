@@ -15,8 +15,18 @@
     "node_modules",
     ".paperclip",
     ".remember",
+    ".claude",
+    ".cursor",
     "AGENTS.md",
     "CLAUDE.md",
-    "docs/superpowers/**/*.md"
+    "docs/superpowers/**/*.md",
+    // Mirrors lint.yml's paths-ignore: these dirs hold only .html/.png today,
+    // but keeping local `npm run lint:md` and CI in sync avoids a silent
+    // divergence the day a .md file lands in one of them.
+    "beta",
+    "privacy",
+    "support",
+    "img",
+    "docs/screenshots"
   ]
 }

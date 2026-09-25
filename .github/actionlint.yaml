@@ -1,0 +1,9 @@
+# actionlint configuration
+# https://github.com/rhysd/actionlint/blob/main/docs/config.md
+#
+# This repository runs several jobs on the project's self-hosted "openclaw"
+# runner. Declaring the label here keeps `actionlint` green instead of failing
+# with `label "openclaw" is unknown` on every workflow lint.
+self-hosted-runner:
+  labels:
+    - openclaw

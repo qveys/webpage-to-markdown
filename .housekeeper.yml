@@ -1,0 +1,69 @@
+handlers:
+  pr-comments-resolver:
+    enabled: true
+  # Disabled: rule set is not reconfigurable per-repo in v1 and forbids git
+  # trailers, which breaks on any Co-Authored-By trailer (common with AI-assisted
+  # commits). Re-enable once housekeeper supports per-repo rule overrides.
+  commit-message-check:
+    enabled: false
+  sync-labels:
+    enabled: true
+  # Accepted deltas vs the removed triage.yml normalize-title job (shared handler
+  # is not per-repo configurable in v1):
+  #   - issue titles gain a literal " (#n)" suffix; PR titles do not (GitHub adds
+  #     it at squash-merge), and an existing suffix is stripped before rewriting
+  #   - the repo-only types ⏱️ timing fix / 📡 messaging fix / 🖼️ image fix are
+  #     not in the shared CC_TYPES list, so such titles are re-inferred into a
+  #     standard type by guessType() instead of being preserved
+  #   - the "revert" type is missing from CC_TYPES upstream (tracked separately on
+  #     qveys/my-housekeeper); a `revert:` title is currently re-inferred as chore
+  normalize-title:
+    enabled: true
+  require-up-to-date:
+    enabled: true
+  secret-scan:
+    enabled: true
+  # Disabled: default Priority/Source/Type/Size label names (defaults.ts) don't
+  # match this repo's .github/labels.yml (e.g. 🔴/🟠/🟡/🟢 Priority vs this
+  # repo's 🔥 Priority, no Size labels here) and none of that is configurable
+  # per-repo in v1. The handler skips adding unknown labels but still removes
+  # the old family label, so it would silently strip existing 🔥 Priority /
+  # 🤖 Source: Copilot labels without a valid replacement — the old triage.yml
+  # deliberately avoided this (actions/labeler with sync-labels: false).
+  # Re-enable once family label names are configurable, or after aligning
+  # .github/labels.yml with the handler defaults.
+  triage:
+    enabled: false
+  # requiredFiles overridden: defaults assume .github/pull_request_template.md
+  # (this repo uses uppercase PULL_REQUEST_TEMPLATE.md — Contents API is
+  # case-sensitive) and docs/release-process/branch-protection.md (doesn't
+  # exist here). Point at governance files that actually exist in this repo.
+  required-checks:
+    enabled: true
+    requiredFiles:
+      - .github/CODEOWNERS
+      - .github/PULL_REQUEST_TEMPLATE.md
+      - SECURITY.md
+  # Disabled: default script scripts/check-logging.sh is Swift/SPM-era and
+  # doesn't exist in this JS/Chrome-extension repo. Re-enable once an
+  # equivalent logging-policy script is added (scriptPath override).
+  logging-guard:
+    enabled: false
+  stale:
+    enabled: true
+  conflict-resolve:
+    enabled: true
+  # Disabled: default script scripts/security_spm_scan.sh is SPM-only and
+  # doesn't exist here. Re-enable once an equivalent dependency scanner is
+  # added (scriptPath override) — npm audit already runs in security.yml.
+  dependency-scan:
+    enabled: false
+  # Enabled with app-side French copy. The housekeeper messages (PR comment,
+  # review notices, required-checks/secret-scan failures) are rendered by the
+  # app and are not configurable per repo in v1, so this English-only repo will
+  # show French bot text. Accepted deliberately: disabling these handlers would
+  # drop the useful review/comment automation the migration exists to gain.
+  pr-comment:
+    enabled: true
+  pr-review:
+    enabled: true

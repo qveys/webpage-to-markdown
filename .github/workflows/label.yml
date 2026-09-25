@@ -1,0 +1,19 @@
+name: Label
+
+on:
+  pull_request_target:
+    types: [opened, edited, reopened, synchronize]
+
+jobs:
+  label:
+    runs-on: [self-hosted, Linux, X64, openclaw]
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/labeler@bf12e9b00b37c5c0ca2b87b79b2daf7891dbda13 # v7.0.0
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          pr-number: ${{ github.event.pull_request.number }}
+          # sync-labels false preserves manually-applied taxonomies (Type, Priority, Effort, Browser)
+          sync-labels: false
