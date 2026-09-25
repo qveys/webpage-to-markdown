@@ -8,6 +8,15 @@ handlers:
     enabled: false
   sync-labels:
     enabled: true
+  # Accepted deltas vs the removed triage.yml normalize-title job (shared handler
+  # is not per-repo configurable in v1):
+  #   - issue titles gain a literal " (#n)" suffix; PR titles do not (GitHub adds
+  #     it at squash-merge), and an existing suffix is stripped before rewriting
+  #   - the repo-only types ⏱️ timing fix / 📡 messaging fix / 🖼️ image fix are
+  #     not in the shared CC_TYPES list, so such titles are re-inferred into a
+  #     standard type by guessType() instead of being preserved
+  #   - the "revert" type is missing from CC_TYPES upstream (tracked separately on
+  #     qveys/my-housekeeper); a `revert:` title is currently re-inferred as chore
   normalize-title:
     enabled: true
   require-up-to-date:
@@ -49,6 +58,11 @@ handlers:
   # added (scriptPath override) — npm audit already runs in security.yml.
   dependency-scan:
     enabled: false
+  # Enabled with app-side French copy. The housekeeper messages (PR comment,
+  # review notices, required-checks/secret-scan failures) are rendered by the
+  # app and are not configurable per repo in v1, so this English-only repo will
+  # show French bot text. Accepted deliberately: disabling these handlers would
+  # drop the useful review/comment automation the migration exists to gain.
   pr-comment:
     enabled: true
   pr-review:
