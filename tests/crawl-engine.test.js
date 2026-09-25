@@ -277,6 +277,43 @@ describe('CrawlEngine redirect and render containment', () => {
     assert.equal(injected, false);
   });
 
+  test('_renderOnce re-checks the origin inside the injected function', async () => {
+    installChrome();
+    let injected = null;
+    global.chrome.scripting.executeScript = async (options) => {
+      injected = options;
+      return [{ result: options.func(...options.args) }];
+    };
+    global.window = { location: { origin: 'https://example.com' } };
+    global.document = { documentElement: { outerHTML: '<html>ok</html>' } };
+
+    try {
+      const html = await engine._renderOnce('https://example.com/docs/a', null);
+
+      assert.equal(html, '<html>ok</html>');
+      assert.deepEqual(injected.args, ['https://example.com']);
+
+      // Simulate a navigation during the hydration delay: the injected function
+      // runs in the page context and must refuse to hand back the DOM.
+      global.window.location.origin = 'https://evil.example';
+      const [res] = await global.chrome.scripting.executeScript(injected);
+      assert.equal(res.result, null);
+    } finally {
+      delete global.window;
+      delete global.document;
+    }
+  });
+
+  test('_renderOnce reports an off-origin failure instead of returning DOM', async () => {
+    installChrome();
+    global.chrome.scripting.executeScript = async () => [{ result: null }];
+
+    await assert.rejects(
+      engine._renderOnce('https://example.com/docs/a', null),
+      /origin check failed/,
+    );
+  });
+
   test('_renderOnce aborts a pending render when the crawl stops', async () => {
     installChrome({
       // Never reports complete: only the abort signal can end the wait.

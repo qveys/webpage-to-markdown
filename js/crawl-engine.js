@@ -564,11 +564,26 @@ class CrawlEngine {
         signal.addEventListener("abort", onAbort, { once: true });
       });
 
+      // The tab can navigate during the settle delay, so re-check right before
+      // injecting and let the injected function re-verify against location.origin
+      // in the same context it reads the DOM from — no check-then-read window.
+      const settled = await chrome.tabs.get(tab.id).catch(() => null);
+      if (settled && settled.url && !CrawlEngine.sameOrigin(settled.url, url)) {
+        throw new Error(`render navigated off-origin (${settled.url})`);
+      }
       const [res] = await chrome.scripting.executeScript({
         target: { tabId: tab.id },
-        func: () => document.documentElement.outerHTML,
+        func: (expectedOrigin) =>
+          window.location.origin === expectedOrigin
+            ? document.documentElement.outerHTML
+            : null,
+        args: [new URL(url).origin],
       });
-      return (res && res.result) || null;
+      const html = res && res.result;
+      if (!html) {
+        throw new Error("render origin check failed after hydration");
+      }
+      return html;
     } finally {
       chrome.tabs.remove(tab.id).catch(() => {});
     }
