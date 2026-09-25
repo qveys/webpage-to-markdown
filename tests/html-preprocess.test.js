@@ -211,6 +211,13 @@ function createMiniDom(html) {
         return this.getAttribute('data-component-part') === 'card-content';
       }
       if (selector.startsWith('h1 a') || selector.startsWith('h2 a')) return false;
+      // Generic fallbacks: bare tag selector, bare class selector
+      if (/^[a-z][a-z0-9]*$/.test(selector)) {
+        return this.tagName === selector.toUpperCase();
+      }
+      if (/^\.[\w-]+$/.test(selector)) {
+        return new RegExp('\\b' + selector.slice(1) + '\\b').test(this.className || '');
+      }
       return false;
     }
     querySelector(selector) {
@@ -629,6 +636,61 @@ describe('flattenCards', () => {
   });
 });
 
+describe('isolateMainLandmark', () => {
+  const filler =
+    'Actual page content: an event card with a heading, a date and a couple of action labels. ';
+  const menu = Array.from(
+    { length: 30 },
+    (_, i) => `<a href="/lesson-${i}">Lesson ${i} — a long descriptive navigation label</a>`,
+  ).join('');
+
+  test('drops app chrome outside a single main landmark (nested)', () => {
+    const { document } = createMiniDom(`
+      <div class="drawer"><nav>${menu}</nav></div>
+      <div class="layout">
+        <main><h1>Event title</h1><p>${filler}</p></main>
+        <div class="sidebar">${menu}</div>
+      </div>
+      <footer>Footer links</footer>
+    `);
+    W2M.isolateMainLandmark(document);
+    assert.ok(document.querySelector('main'));
+    assert.match(document.querySelector('main').innerHTML, /Event title/);
+    assert.equal(document.querySelector('nav'), null);
+    assert.equal(document.querySelector('.sidebar'), null);
+    assert.equal(document.querySelector('footer'), null);
+  });
+
+  test('keeps the page when the main landmark is a near-empty shell', () => {
+    const { document } = createMiniDom(`
+      <main>Loading…</main>
+      <div class="app"><p>${filler}${filler}</p></div>
+    `);
+    W2M.isolateMainLandmark(document);
+    assert.ok(document.querySelector('.app'));
+  });
+
+  test('keeps the page when no main landmark exists', () => {
+    const { document } = createMiniDom(`
+      <nav>${menu}</nav>
+      <div class="post"><p>${filler}${filler}</p></div>
+    `);
+    W2M.isolateMainLandmark(document);
+    assert.ok(document.querySelector('nav'));
+    assert.ok(document.querySelector('.post'));
+  });
+
+  test('runs as part of preprocessDocument', () => {
+    const { document } = createMiniDom(`
+      <nav>${menu}</nav>
+      <main><h1>Event title</h1><p>${filler}</p></main>
+    `);
+    W2M.preprocessDocument(document, 'https://example.com/page');
+    assert.equal(document.querySelector('nav'), null);
+    assert.match(document.querySelector('main').innerHTML, /Event title/);
+  });
+});
+
 describe('pickMainContent', () => {
   test('prefers #content and reads data-page-title', () => {
     // Length must meet pickMainContent's minimum (~200 chars of innerHTML).
@@ -651,16 +713,31 @@ describe('pickMainContent', () => {
     assert.match(picked.html, /Explore the API/);
   });
 
-  test('does not outrank Readability for generic main-only pages', () => {
+  test('does not outrank Readability for substantial main-only pages', () => {
     const pad =
       'Generic article body with enough characters to pass a length gate for main content extraction. ';
     const { document } = createMiniDom(`
       <nav>Site nav</nav>
       <main>
-        <p>${pad}${pad}</p>
+        <p>${pad.repeat(8)}</p>
       </main>
     `);
     const picked = W2M.pickMainContent(document);
     assert.equal(picked, null);
+  });
+
+  test('uses a thin single main landmark as-is (below Readability threshold)', () => {
+    const { document } = createMiniDom(`
+      <nav>Site nav with many entries</nav>
+      <main>
+        <h1>Event title — kickoff session</h1>
+        <p>Sunday, September 13 — 10:00-12:00 (local time), 120 minutes, week one.</p>
+      </main>
+    `);
+    const picked = W2M.pickMainContent(document);
+    assert.ok(picked);
+    assert.equal(picked.pageTitle, 'Event title — kickoff session');
+    assert.match(picked.html, /kickoff session/);
+    assert.match(picked.html, /120 minutes/);
   });
 });

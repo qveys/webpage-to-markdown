@@ -452,8 +452,46 @@
    * Mutates the document/subtree in place so Readability keeps code + card links.
    * @param {Document|Element} root
    */
+  /**
+   * Confine extraction to the page's dominant content landmark.
+   * When a document declares a single <main>/[role=main], app chrome outside
+   * it (hidden nav drawers, course sidebars, menus) can hold far more text
+   * than the content itself and win Readability's scoring. Per the HTML spec,
+   * main IS the dominant content — drop everything outside it before
+   * extraction. Readability still prunes within the landmark.
+   */
+  function isolateMainLandmark(root) {
+    var queryRoot = queryRootOf(root);
+    if (!queryRoot || !queryRoot.querySelectorAll) return;
+    var landmarks;
+    try {
+      landmarks = queryRoot.querySelectorAll('main, [role="main"]');
+    } catch (e) {
+      return;
+    }
+    if (!landmarks || landmarks.length !== 1) return;
+    var landmark = landmarks[0];
+    var text = (landmark.textContent || "").trim();
+    // Near-empty landmark: SPA shell rendering elsewhere — keep the full page.
+    if (text.length < 60) return;
+
+    var node = landmark;
+    while (node.parentNode) {
+      var parent = node.parentNode;
+      // Never climb past <body>/<html>: <head> must survive for Readability.
+      if (parent.nodeType !== 1 || parent.tagName === "HTML") break;
+      var siblings = Array.prototype.slice.call(parent.children || []);
+      for (var i = 0; i < siblings.length; i++) {
+        if (siblings[i] !== node) parent.removeChild(siblings[i]);
+      }
+      if (parent === queryRoot || parent.tagName === "BODY") break;
+      node = parent;
+    }
+  }
+
   function preprocessDocument(root, baseUrl) {
     if (!root) return;
+    isolateMainLandmark(root);
     stripDocsChrome(root);
     stripHeadingPermalinks(root);
     promoteAriaHiddenLinks(root);
@@ -486,6 +524,24 @@
       }
       if (el && el.innerHTML && el.innerHTML.trim().length >= 200) break;
       el = null;
+    }
+
+    // Thin single-landmark pages: below Readability's own charThreshold (500)
+    // its scoring can only mangle the landmark (typically dropping the H1 and
+    // title); use the landmark as-is. Substantial landmarks keep Readability.
+    if (!el) {
+      var landmarks;
+      try {
+        landmarks = queryRoot.querySelectorAll('main, [role="main"]');
+      } catch (e) {
+        landmarks = null;
+      }
+      if (landmarks && landmarks.length === 1) {
+        var landmarkText = (landmarks[0].textContent || "").trim();
+        if (landmarkText.length >= 60 && landmarkText.length < 500) {
+          el = landmarks[0];
+        }
+      }
     }
     if (!el) return null;
 
@@ -570,6 +626,7 @@
 
   var api = {
     detectCodeLanguage: detectCodeLanguage,
+    isolateMainLandmark: isolateMainLandmark,
     preprocessDocument: preprocessDocument,
     pickMainContent: pickMainContent,
     resolveMarkdownTitle: resolveMarkdownTitle,
