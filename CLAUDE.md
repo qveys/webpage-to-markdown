@@ -82,18 +82,3 @@ Reject / rewrite proposals that only work for one site (e.g. hardcoded `data-com
 <emoji> <type>(<scope>): <message>
 ```
 Emojis: ✨ feat, 🐛 fix, 📝 docs, 💄 style, 🔧 chore, ⏱️ timing fix, 📡 messaging fix, 🖼️ image fix
-
-## Claude Code Automations
-
-### Hooks (`.claude/settings.json`)
-Two PreToolUse hooks protect the codebase:
-1. **Vendored lib guard** — Blocks edits to `Readability.js`, `turndown.js`, `turndown-plugin-gfm.js`
-2. **Sensitive file guard** — Blocks edits to `.env` and credential files
-
-### Skills
-- **`/release`** — Bumps version in manifest.json, generates changelog from emoji commits, suggests git tag. User-only.
-- **`/security-review`** — Audits extension security: permissions, CSP, message handlers, DOM injection, content scripts.
-
-### Agents
-- **`permission-reviewer`** — Reviews manifest.json permissions, flags unused or overly broad ones
-- **`extension-security`** — Deep security audit of Chrome Extension patterns
