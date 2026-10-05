@@ -8,7 +8,7 @@ Chrome Extension (Manifest V3) that converts webpages to Markdown. Supports sing
 
 ## Development
 
-No build system, bundler, or package manager. Load directly in Chrome:
+No bundler or build step for the shipped extension (load unpacked source). `package.json` exists for **tests / dev tooling only** (`npm test`, using Node's built-in test runner). Load directly in Chrome:
 1. `chrome://extensions/` → Developer mode → "Load unpacked" → select repo root
 2. Reload extension after changes (or Ctrl+R on the extensions page)
 
@@ -20,7 +20,7 @@ Service Worker changes require extension reload. Popup/dashboard changes take ef
 - **Global namespace `W2M`** shares: `i18n`, `AppState`, `STATES`, `el()` (DOM helper)
 - UI modules (`popup.js`, `dashboard.js`, `settings.js`) are wrapped in **IIFEs**
 - Service Worker (`background.js`) loads scripts via `importScripts()`
-- Vendored libs (Turndown, Readability, GFM plugin) — no npm
+- Vendored libs (Turndown, Readability, GFM plugin) — no npm bundle step
 
 ### Entry Points & Communication
 - **Service Worker** (`js/background.js`): extraction, Turndown conversion, downloads, crawl orchestration
@@ -54,8 +54,8 @@ Notable: `sidePanel` for dashboard, `offscreen` for DOM parsing, `alarms` for cr
 
 ## Code Conventions
 
-- **ES5-compatible** in IIFEs: `var`, `function`, prototype methods — no arrow functions
-- Exceptions: `CrawlEngine` and `offscreen.js` use ES6 (arrow functions, const/let) — both run in non-UI contexts (SW and offscreen document)
+- **UI IIFEs** (`popup.js`, `dashboard.js`, `settings.js`): ES5-style — `var`, `function`, prototype methods; no arrow functions (matches existing global `W2M` pattern).
+- **Service worker, offscreen, CrawlEngine** (`background.js`, `offscreen.js`, `crawl-engine.js`): modern JS is fine — `const`/`let`, arrow functions, classes, optional chaining, etc.
 - Constructor functions: `CapitalCase`. Private methods: `_prefix`
 - Comments and identifiers in English
 - Single `styles.css` with CSS custom properties; themes via `data-theme="light|dark"`
