@@ -749,17 +749,48 @@
       textCell = el('span', { className: 'activity-url', textContent: shownUrl, title: item.url });
     }
 
+    // Full-text popover (same pattern as the debug log lines): the row is a
+    // button toggling a native popover that shows untruncated values.
+    this._activityPopSeq = (this._activityPopSeq || 0) + 1;
+    var popId = 'dash-activity-popover-' + this._activityPopSeq;
+
+    var popStack = el('div', { className: 'activity-item__stack' });
+    if (item.type === 'asset' && item.fileName) {
+      popStack.appendChild(el('div', { className: 'activity-url', textContent: item.fileName }));
+      if (item.assetUrl) popStack.appendChild(el('div', { className: 'activity-item__detail text-muted', textContent: 'URL: ' + item.assetUrl }));
+      if (item.pageLabel) popStack.appendChild(el('div', { className: 'activity-item__detail text-muted', textContent: 'Page: ' + item.pageLabel }));
+    } else if (item.type === 'capture' && item.pageUrl) {
+      popStack.appendChild(el('div', { className: 'activity-url', textContent: item.pageUrl }));
+      popStack.appendChild(el('div', { className: 'activity-item__detail text-muted', textContent: 'Title: ' + item.url }));
+    } else {
+      popStack.appendChild(el('div', { className: 'activity-url', textContent: item.url }));
+    }
+
+    var popIconEl = el('span', { className: iconClass });
+    var popSvg = createSvgIcon(iconPaths, 14, 14, 'none', iconStroke);
+    popSvg.setAttribute('stroke-width', '2');
+    popSvg.setAttribute('stroke-linecap', 'round');
+    popSvg.setAttribute('stroke-linejoin', 'round');
+    popIconEl.appendChild(popSvg);
+
+    var ariaLine = timeStr + ' ' + (item.fileName || item.pageUrl || item.url || '');
     var rowClass = 'activity-item' + (item.type === 'asset' ? ' activity-item--asset' : '');
-    var row = el('div', { className: rowClass },
+    var row = el('button', { type: 'button', className: rowClass, popovertarget: popId, 'aria-label': ariaLine },
       el('span', { className: 'activity-time', textContent: timeStr }),
       iconEl,
       textCell
     );
+    var popover = el('div', { id: popId, className: 'activity-item__popover', popover: 'auto' },
+      el('span', { className: 'activity-time', textContent: timeStr }),
+      popIconEl,
+      popStack
+    );
+    var entry = el('div', { className: 'activity-entry' }, row, popover);
 
     if (prepend && this.$activity.firstChild) {
-      this.$activity.insertBefore(row, this.$activity.firstChild);
+      this.$activity.insertBefore(entry, this.$activity.firstChild);
     } else {
-      this.$activity.appendChild(row);
+      this.$activity.appendChild(entry);
     }
   };
 
