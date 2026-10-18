@@ -1,6 +1,6 @@
 # AGENTS.md
 
-This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
+This file provides guidance to code agents when working with code in this repository.
 
 ## Project
 
@@ -8,7 +8,7 @@ Chrome Extension (Manifest V3) that converts webpages to Markdown. Supports sing
 
 ## Development
 
-No bundler or build step for the shipped extension (load unpacked source). `package.json` exists for **tests / dev tooling only** (`npm test`, using Node's built-in test runner). Load directly in Chrome:
+No bundler or build step for the shipped extension (load unpacked source). `package.json` exists for **tests / dev tooling only** (`npm test`, using Node's built-in test runner; `lint`, `lint:css`, `lint:md`, `lint:all` also exist). Load directly in Chrome:
 1. `chrome://extensions/` → Developer mode → "Load unpacked" → select repo root
 2. Reload extension after changes (or Ctrl+R on the extensions page)
 
@@ -82,21 +82,6 @@ Reject / rewrite proposals that only work for one site (e.g. hardcoded `data-com
 <emoji> <type>(<scope>): <message>
 ```
 Emojis: ✨ feat, 🐛 fix, 📝 docs, 💄 style, 🔧 chore, ⏱️ timing fix, 📡 messaging fix, 🖼️ image fix
-
-## Codex Automations
-
-### Hooks (`.Codex/settings.json`)
-Two PreToolUse hooks protect the codebase:
-1. **Vendored lib guard** — Blocks edits to `Readability.js`, `turndown.js`, `turndown-plugin-gfm.js`
-2. **Sensitive file guard** — Blocks edits to `.env` and credential files
-
-### Skills
-- **`/release`** — Bumps version in manifest.json, generates changelog from emoji commits, suggests git tag. User-only.
-- **`/security-review`** — Audits extension security: permissions, CSP, message handlers, DOM injection, content scripts.
-
-### Agents
-- **`permission-reviewer`** — Reviews manifest.json permissions, flags unused or overly broad ones
-- **`extension-security`** — Deep security audit of Chrome Extension patterns
 
 ## Learned Workspace Facts
 
