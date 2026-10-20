@@ -6,6 +6,7 @@ on:
 
 jobs:
   label:
+    if: (github.event_name != 'pull_request' && github.event_name != 'pull_request_target') || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: [self-hosted, Linux, X64, openclaw]
     permissions:
       contents: read
