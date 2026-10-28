@@ -11,3 +11,6 @@ node_modules/
 # Cursor hook machine-local state
 .cursor/hooks/state/
 .tokensave
+
+# Git worktrees
+.worktrees/
