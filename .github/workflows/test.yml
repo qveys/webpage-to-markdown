@@ -3,7 +3,8 @@ name: Tests
 # pull_request has no paths filter: `test` is a required status check on main's
 # ruleset, and a required check tied to a path-filtered workflow never posts a
 # status for PRs outside those paths (e.g. docs-only PRs), leaving it "expected"
-# forever and blocking merge. Always running it on PRs keeps the check honest.
+# forever and blocking merge. The workflow starts for every PR to main;
+# the test job is skipped for fork PRs.
 
 on:
   pull_request:
