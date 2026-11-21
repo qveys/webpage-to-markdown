@@ -199,6 +199,37 @@ describe('auto-capture asset budget persistence', () => {
     assert.equal(worker.budgetUsed(), 0);
   });
 
+  test('a failed new-session write preserves the previous budget and captured URLs', async () => {
+    const store = createStore(MB);
+    store.session.capturedUrls = ['https://example.com/already-captured'];
+    let failNewSession = true;
+    const worker = startWorker(store, {
+      beforeWrite: (patch) => {
+        if (failNewSession && patch.session?.folder === 'new-capture') {
+          throw new Error('Session write failed');
+        }
+      },
+    });
+    const failed = await worker.message({ type: 'W2M_START_SESSION', folder: 'new-capture' });
+    assert.equal(failed.ok, false);
+    assert.equal(store.session.folder, 'capture');
+    assert.equal(worker.budgetUsed(), MB);
+    assert.equal(store.session.assetBytesUsed, MB);
+    const previous = await worker.message({ type: 'W2M_GET_SESSION' });
+    assert.equal(previous.captureCount, 1);
+    await worker.capture();
+    assert.equal(worker.downloads.filter((d) => d.url.startsWith('data:image/')).length, 0);
+
+    failNewSession = false;
+    const started = await worker.message({ type: 'W2M_START_SESSION', folder: 'new-capture' });
+    assert.equal(started.ok, true);
+    assert.equal(store.session.folder, 'new-capture');
+    assert.equal(store.session.assetBytesUsed, 0);
+    assert.equal(worker.budgetUsed(), 0);
+    const current = await worker.message({ type: 'W2M_GET_SESSION' });
+    assert.equal(current.captureCount, 0);
+  });
+
   test('waits for asynchronous storage hydration before reserving bytes', async () => {
     const store = createStore(MB);
     let releaseRead;
@@ -338,12 +369,16 @@ describe('auto-capture asset budget persistence', () => {
     const starting = worker.message({ type: 'W2M_START_SESSION', folder: 'new-capture' });
     await writing;
     assert.equal(store.session.folder, 'capture');
-    await assert.rejects(worker.capture('capture'), /Capture session is no longer current/);
+    const refused = assert.rejects(worker.capture('capture'), /Capture session is no longer current/);
+    await Promise.resolve();
+    const budgetBeforeCommit = worker.budgetUsed();
     assert.equal(worker.downloads.length, 0);
-    assert.equal(worker.budgetUsed(), 0);
     assert.equal(store.session.assetBytesUsed, 20);
     releaseWrite();
     await starting;
+    await refused;
+    assert.equal(budgetBeforeCommit, 20);
+    assert.equal(worker.budgetUsed(), 0);
     assert.equal(store.session.assetBytesUsed, 0);
   });
 

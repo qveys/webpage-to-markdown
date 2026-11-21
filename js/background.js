@@ -313,7 +313,7 @@ async function getSession() {
   );
 }
 
-async function setSession(patch) {
+async function setSession(patch, onCommitted) {
   // Budget writes and other session patches must not overwrite each other's
   // fields with snapshots read before a concurrent write completed.
   const update = sessionUpdateQueue.then(async () => {
@@ -322,6 +322,7 @@ async function setSession(patch) {
     if (!changes) return current;
     const updated = { ...current, ...changes };
     await chrome.storage.local.set({ session: updated });
+    if (onCommitted) onCommitted(updated);
     return updated;
   });
   sessionUpdateQueue = update.catch(() => {});
@@ -366,13 +367,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     const urlTree = message.urlTree ?? true;
     const saveAssets = message.saveAssets ?? true;
     const assetLimits = normalizeAssetLimits(message);
+    let nextBudget;
+    let nextCapturedUrls;
     // Ne vider les URLs que si le dossier change (= nouvelle session)
     restoreSessionAssetBudget()
       .then(() => setSession((prev) => {
-        if (prev.folder !== folder) {
-          capturedUrls.clear();
-          sessionAssetBudget = { used: 0, folder };
-        }
+        const isNewSession = prev.folder !== folder;
+        nextBudget = isNewSession ? { used: 0, folder } : sessionAssetBudget;
+        nextCapturedUrls = isNewSession ? new Set() : capturedUrls;
         return {
           active: true,
           folder,
@@ -380,9 +382,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           urlTree,
           saveAssets,
           ...assetLimits,
-          capturedUrls: [...capturedUrls],
-          assetBytesUsed: sessionAssetBudget.used,
+          capturedUrls: [...nextCapturedUrls],
+          assetBytesUsed: nextBudget.used,
         };
+      }, () => {
+        sessionAssetBudget = nextBudget;
+        capturedUrls = nextCapturedUrls;
       }))
       .then(async (session) => {
         updateBadge(true);
@@ -1451,6 +1456,8 @@ function urlToPath(pageUrl) {
 
 async function downloadInSession(markdown, title, folder, pageUrl) {
   await restoreSessionAssetBudget();
+  // A session switch publishes storage and memory together before capture.
+  await sessionUpdateQueue;
   const assetBudget = sessionAssetBudget;
   const session = await getSession();
   // Extraction or the storage read may outlive the session that requested it.
