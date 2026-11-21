@@ -99,6 +99,7 @@ function startWorker(store, { assetBytes = 8, failFetch = false, failDownload = 
     downloads,
     budgetUsed: () => vm.runInContext('sessionAssetBudget.used', context),
     capture: (folder = 'capture') => context.downloadInSession(IMAGE, 'page', folder, 'https://example.com/page'),
+    assets: (options) => context.downloadAssets(IMAGE, 'capture', 'page.md', options),
     setSession: (patch) => context.setSession(patch),
     message: (message) => new Promise((resolve) => listeners[0](message, {}, resolve)),
   };
@@ -405,5 +406,52 @@ describe('auto-capture asset budget persistence', () => {
     assert.equal(fetched, false);
     assert.equal(store.session.assetBytesUsed, 20);
     assert.equal(worker.budgetUsed(), 20);
+  });
+
+  test('a final persistence failure does not discard a successful session image download', async () => {
+    const store = createStore(20);
+    let imageDownloaded = false;
+    let finalWriteAttempted = false;
+    const worker = startWorker(store, {
+      beforeDownload: () => { imageDownloaded = true; },
+      beforeWrite: () => {
+        if (imageDownloaded) {
+          finalWriteAttempted = true;
+          throw new Error('Final write failed');
+        }
+      },
+    });
+    await worker.capture();
+    assert.equal(finalWriteAttempted, true);
+    assert.equal(store.session.assetBytesUsed, 28);
+    assert.equal(worker.budgetUsed(), 28);
+    assert.match(decodeURIComponent(worker.downloads.at(-1).url), /\.\/assets\//);
+  });
+
+  test('a final persistence failure reports the downloaded image as saved, without refund or skip', async () => {
+    const store = createStore(20);
+    const budget = { used: 20 };
+    const saved = [];
+    const skipped = [];
+    let imageDownloaded = false;
+    const worker = startWorker(store, {
+      beforeDownload: () => { imageDownloaded = true; },
+      beforeWrite: () => {
+        if (imageDownloaded) throw new Error('Final write failed');
+      },
+    });
+    const markdown = await worker.assets({
+      assetBudget: budget,
+      maxAssetSizeMb: 1,
+      maxSessionAssetSizeMb: 1,
+      persistAssetBudget: () => worker.setSession({ assetBytesUsed: budget.used }),
+      onAssetSaved: (asset) => saved.push(asset),
+      onAssetSkipped: (asset) => skipped.push(asset),
+    });
+    assert.equal(budget.used, 28);
+    assert.equal(store.session.assetBytesUsed, 28);
+    assert.match(markdown, /\.\/assets\//);
+    assert.equal(saved.length, 1);
+    assert.equal(skipped.length, 0);
   });
 });

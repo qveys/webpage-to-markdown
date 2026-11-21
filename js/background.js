@@ -1609,7 +1609,13 @@ async function downloadAssets(markdown, folder, mdPath, options = {}) {
         await persistBudget();
         throw downloadError;
       }
-      await persistBudget();
+      try {
+        await persistBudget();
+      } catch (commitError) {
+        // The actual charge was persisted before download. A failed redundant
+        // write must not discard a saved image or report it as skipped.
+        console.warn("[W2M] Asset budget commit:", commitError.message);
+      }
 
       downloaded.set(imgUrl, localName);
       if (downloadedAssets) downloadedAssets.set(imgUrl, localName);
