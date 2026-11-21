@@ -37,7 +37,7 @@ function startWorker(store, { assetBytes = 8, failFetch = false, failDownload = 
   };
   const storage = {
     async get(key, callback) {
-      if (beforeRead) await beforeRead();
+      if (beforeRead) await beforeRead(key, callback);
       const result = { [key]: structuredClone(store[key]) };
       if (afterRead) await afterRead();
       if (callback) callback(result);
@@ -105,6 +105,38 @@ function startWorker(store, { assetBytes = 8, failFetch = false, failDownload = 
 }
 
 describe('auto-capture asset budget persistence', () => {
+  for (const operation of ['capture', 'start']) {
+    test(`retries budget restoration after a transient read failure during ${operation}`, async () => {
+      const store = createStore(MB);
+      let failReads = true;
+      const worker = startWorker(store, {
+        beforeRead: (key, callback) => {
+          if (!callback && failReads) throw new Error('Temporary storage read failure');
+        },
+      });
+      if (operation === 'capture') {
+        await assert.rejects(worker.capture(), /Temporary storage read failure/);
+      } else {
+        const failed = await worker.message({ type: 'W2M_START_SESSION', folder: 'capture' });
+        assert.equal(failed.ok, false);
+      }
+      assert.equal(worker.downloads.length, 0);
+      assert.equal(store.session.assetBytesUsed, MB);
+      failReads = false;
+      if (operation === 'capture') {
+        await worker.capture();
+        assert.equal(worker.downloads.filter((d) => d.url.startsWith('data:image/')).length, 0);
+      } else {
+        const resumed = await worker.message({ type: 'W2M_START_SESSION', folder: 'capture', saveAssets: false });
+        assert.equal(resumed.ok, true);
+        await worker.capture();
+      }
+      assert.equal(worker.budgetUsed(), MB);
+      assert.equal(store.session.assetBytesUsed, MB);
+      assert.equal(worker.downloads.length, 1);
+    });
+  }
+
   test('restores committed bytes in a new worker and enforces the combined limit', async () => {
     const store = createStore();
     const first = startWorker(store, { assetBytes: MB });

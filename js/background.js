@@ -247,14 +247,24 @@ let sessionAssetBudget = { used: 0 };
 let sessionUpdateQueue = Promise.resolve();
 // session.assetBytesUsed includes outstanding reservations so a worker restart
 // cannot make already allocated bytes available for another download.
-const sessionAssetBudgetReady = getSession().then((session) => {
-  const used = Number(session.assetBytesUsed);
-  sessionAssetBudget.used = Number.isFinite(used) && used >= 0 ? used : 0;
-  sessionAssetBudget.folder = session.folder;
-});
-sessionAssetBudgetReady.catch((err) => {
-  console.warn("[W2M] Session asset budget restore:", err.message);
-});
+let sessionAssetBudgetReady;
+
+function restoreSessionAssetBudget() {
+  if (!sessionAssetBudgetReady) {
+    sessionAssetBudgetReady = getSession().then((session) => {
+      const used = Number(session.assetBytesUsed);
+      sessionAssetBudget.used = Number.isFinite(used) && used >= 0 ? used : 0;
+      sessionAssetBudget.folder = session.folder;
+    });
+    sessionAssetBudgetReady.catch((err) => {
+      sessionAssetBudgetReady = undefined;
+      console.warn("[W2M] Session asset budget restore:", err.message);
+    });
+  }
+  return sessionAssetBudgetReady;
+}
+
+restoreSessionAssetBudget();
 
 function makeSessionFolder() {
   const ts = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
@@ -357,7 +367,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     const saveAssets = message.saveAssets ?? true;
     const assetLimits = normalizeAssetLimits(message);
     // Ne vider les URLs que si le dossier change (= nouvelle session)
-    sessionAssetBudgetReady
+    restoreSessionAssetBudget()
       .then(() => setSession((prev) => {
         if (prev.folder !== folder) {
           capturedUrls.clear();
@@ -1440,7 +1450,7 @@ function urlToPath(pageUrl) {
 }
 
 async function downloadInSession(markdown, title, folder, pageUrl) {
-  await sessionAssetBudgetReady;
+  await restoreSessionAssetBudget();
   const assetBudget = sessionAssetBudget;
   const session = await getSession();
   // Extraction or the storage read may outlive the session that requested it.
