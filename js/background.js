@@ -27,6 +27,7 @@ chrome.storage.local.get("session", ({ session }) => {
         folder: `w2m-session-${ts}`,
         delay: 2000,
         capturedUrls: [],
+        assetBytesUsed: 0,
       },
     });
   }
@@ -243,6 +244,27 @@ async function downloadMarkdown(markdown, title) {
 
 const DEFAULT_DELAY = 2000;
 let sessionAssetBudget = { used: 0 };
+let sessionUpdateQueue = Promise.resolve();
+// session.assetBytesUsed includes outstanding reservations so a worker restart
+// cannot make already allocated bytes available for another download.
+let sessionAssetBudgetReady;
+
+function restoreSessionAssetBudget() {
+  if (!sessionAssetBudgetReady) {
+    sessionAssetBudgetReady = getSession().then((session) => {
+      const used = Number(session.assetBytesUsed);
+      sessionAssetBudget.used = Number.isFinite(used) && used >= 0 ? used : 0;
+      sessionAssetBudget.folder = session.folder;
+    });
+    sessionAssetBudgetReady.catch((err) => {
+      sessionAssetBudgetReady = undefined;
+      console.warn("[W2M] Session asset budget restore:", err.message);
+    });
+  }
+  return sessionAssetBudgetReady;
+}
+
+restoreSessionAssetBudget();
 
 function makeSessionFolder() {
   const ts = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
@@ -291,11 +313,29 @@ async function getSession() {
   );
 }
 
-async function setSession(patch) {
-  const current = await getSession();
-  const updated = { ...current, ...patch };
-  await chrome.storage.local.set({ session: updated });
-  return updated;
+async function setSession(patch, onCommitted) {
+  // Budget writes and other session patches must not overwrite each other's
+  // fields with snapshots read before a concurrent write completed.
+  const update = sessionUpdateQueue.then(async () => {
+    const current = await getSession();
+    const changes = typeof patch === "function" ? patch(current) : patch;
+    if (!changes) return current;
+    const updated = { ...current, ...changes };
+    await chrome.storage.local.set({ session: updated });
+    if (onCommitted) onCommitted(updated);
+    return updated;
+  });
+  sessionUpdateQueue = update.catch(() => {});
+  return update;
+}
+
+function persistSessionAssetBudget(budget, folder) {
+  const assetBytesUsed = budget.used;
+  return setSession((current) => {
+    // A download from a previous session may finish after a new one started.
+    if (budget !== sessionAssetBudget || current.folder !== folder) return null;
+    return { assetBytesUsed };
+  });
 }
 
 async function updateBadge(status) {
@@ -327,23 +367,28 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     const urlTree = message.urlTree ?? true;
     const saveAssets = message.saveAssets ?? true;
     const assetLimits = normalizeAssetLimits(message);
-    sessionAssetBudget = { used: 0 };
+    let nextBudget;
+    let nextCapturedUrls;
     // Ne vider les URLs que si le dossier change (= nouvelle session)
-    getSession()
-      .then((prev) => {
-        if (prev.folder !== folder) {
-          capturedUrls.clear();
-        }
-        return setSession({
+    restoreSessionAssetBudget()
+      .then(() => setSession((prev) => {
+        const isNewSession = prev.folder !== folder;
+        nextBudget = isNewSession ? { used: 0, folder } : sessionAssetBudget;
+        nextCapturedUrls = isNewSession ? new Set() : capturedUrls;
+        return {
           active: true,
           folder,
           delay,
           urlTree,
           saveAssets,
           ...assetLimits,
-          capturedUrls: [...capturedUrls],
-        });
-      })
+          capturedUrls: [...nextCapturedUrls],
+          assetBytesUsed: nextBudget.used,
+        };
+      }, () => {
+        sessionAssetBudget = nextBudget;
+        capturedUrls = nextCapturedUrls;
+      }))
       .then(async (session) => {
         updateBadge(true);
         sendResponse({ ok: true, session });
@@ -1410,7 +1455,16 @@ function urlToPath(pageUrl) {
 }
 
 async function downloadInSession(markdown, title, folder, pageUrl) {
+  await restoreSessionAssetBudget();
+  // A session switch publishes storage and memory together before capture.
+  await sessionUpdateQueue;
+  const assetBudget = sessionAssetBudget;
   const session = await getSession();
+  // Extraction or the storage read may outlive the session that requested it.
+  // Reject before reserving bytes against a different session's budget.
+  if (session.folder !== folder || assetBudget.folder !== folder || assetBudget !== sessionAssetBudget) {
+    throw new Error("Capture session is no longer current");
+  }
 
   let mdPath; // chemin du fichier .md sans le dossier racine
   if (session.urlTree && pageUrl) {
@@ -1430,7 +1484,8 @@ async function downloadInSession(markdown, title, folder, pageUrl) {
   // Download assets if the option is enabled
   if (session.saveAssets) {
     markdown = await downloadAssets(markdown, folder, mdPath, {
-      assetBudget: sessionAssetBudget,
+      assetBudget,
+      persistAssetBudget: () => persistSessionAssetBudget(assetBudget, folder),
       maxAssetSizeMb: session.maxAssetSizeMb,
       maxSessionAssetSizeMb: session.maxSessionAssetSizeMb,
     });
@@ -1518,13 +1573,18 @@ async function downloadAssets(markdown, folder, mdPath, options = {}) {
       // collectively exceed the session budget; refund what the asset did not use.
       const reservedBytes = Math.min(maxAssetBytes, remaining);
       W2M.safeAssets.reserveAssetBytes(budget, reservedBytes, maxSessionBytes);
+      const persistBudget = async () => {
+        if (options.persistAssetBudget) await options.persistAssetBudget();
+      };
       let asset;
       try {
+        await persistBudget();
         asset = await W2M.safeAssets.fetchValidatedAsset(imgUrl, {
           maxBytes: reservedBytes,
         });
       } catch (fetchError) {
         budget.used -= reservedBytes;
+        await persistBudget();
         throw fetchError;
       }
       budget.used -= reservedBytes - asset.bytes;
@@ -1538,6 +1598,7 @@ async function downloadAssets(markdown, folder, mdPath, options = {}) {
       usedLocalNames.add(localName);
 
       try {
+        await persistBudget();
         await w2mDownload({
           url: asset.dataUrl,
           filename: `${assetsDir}/${localName}`,
@@ -1545,7 +1606,15 @@ async function downloadAssets(markdown, folder, mdPath, options = {}) {
         });
       } catch (downloadError) {
         budget.used -= asset.bytes;
+        await persistBudget();
         throw downloadError;
+      }
+      try {
+        await persistBudget();
+      } catch (commitError) {
+        // The actual charge was persisted before download. A failed redundant
+        // write must not discard a saved image or report it as skipped.
+        console.warn("[W2M] Asset budget commit:", commitError.message);
       }
 
       downloaded.set(imgUrl, localName);
