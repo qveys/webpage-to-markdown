@@ -250,6 +250,7 @@ let sessionUpdateQueue = Promise.resolve();
 const sessionAssetBudgetReady = getSession().then((session) => {
   const used = Number(session.assetBytesUsed);
   sessionAssetBudget.used = Number.isFinite(used) && used >= 0 ? used : 0;
+  sessionAssetBudget.folder = session.folder;
 });
 sessionAssetBudgetReady.catch((err) => {
   console.warn("[W2M] Session asset budget restore:", err.message);
@@ -360,7 +361,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       .then(() => setSession((prev) => {
         if (prev.folder !== folder) {
           capturedUrls.clear();
-          sessionAssetBudget = { used: 0 };
+          sessionAssetBudget = { used: 0, folder };
         }
         return {
           active: true,
@@ -1440,7 +1441,13 @@ function urlToPath(pageUrl) {
 
 async function downloadInSession(markdown, title, folder, pageUrl) {
   await sessionAssetBudgetReady;
+  const assetBudget = sessionAssetBudget;
   const session = await getSession();
+  // Extraction or the storage read may outlive the session that requested it.
+  // Reject before reserving bytes against a different session's budget.
+  if (session.folder !== folder || assetBudget.folder !== folder || assetBudget !== sessionAssetBudget) {
+    throw new Error("Capture session is no longer current");
+  }
 
   let mdPath; // chemin du fichier .md sans le dossier racine
   if (session.urlTree && pageUrl) {
@@ -1459,7 +1466,6 @@ async function downloadInSession(markdown, title, folder, pageUrl) {
 
   // Download assets if the option is enabled
   if (session.saveAssets) {
-    const assetBudget = sessionAssetBudget;
     markdown = await downloadAssets(markdown, folder, mdPath, {
       assetBudget,
       persistAssetBudget: () => persistSessionAssetBudget(assetBudget, folder),

@@ -24,7 +24,7 @@ function createStore(assetBytesUsed = 0) {
 }
 
 // A new VM is a new worker; only the storage object survives its termination.
-function startWorker(store, { assetBytes = 8, failFetch = false, failDownload = false, beforeFetch, beforeDownload, beforeRead, beforeWrite } = {}) {
+function startWorker(store, { assetBytes = 8, failFetch = false, failDownload = false, beforeFetch, beforeDownload, beforeRead, afterRead, beforeWrite } = {}) {
   const writes = [];
   const downloads = [];
   const listeners = [];
@@ -39,6 +39,7 @@ function startWorker(store, { assetBytes = 8, failFetch = false, failDownload = 
     async get(key, callback) {
       if (beforeRead) await beforeRead();
       const result = { [key]: structuredClone(store[key]) };
+      if (afterRead) await afterRead();
       if (callback) callback(result);
       return result;
     },
@@ -97,7 +98,7 @@ function startWorker(store, { assetBytes = 8, failFetch = false, failDownload = 
     writes,
     downloads,
     budgetUsed: () => vm.runInContext('sessionAssetBudget.used', context),
-    capture: () => context.downloadInSession(IMAGE, 'page', 'capture', 'https://example.com/page'),
+    capture: (folder = 'capture') => context.downloadInSession(IMAGE, 'page', folder, 'https://example.com/page'),
     setSession: (patch) => context.setSession(patch),
     message: (message) => new Promise((resolve) => listeners[0](message, {}, resolve)),
   };
@@ -237,6 +238,81 @@ describe('auto-capture asset budget persistence', () => {
     assert.equal(store.session.folder, 'new-capture');
     assert.equal(store.session.assetBytesUsed, 0);
     assert.equal(worker.budgetUsed(), 0);
+  });
+
+  test('a delayed capture for an old folder cannot charge the new session budget', async () => {
+    const store = createStore(20);
+    const worker = startWorker(store, { assetBytes: MB });
+    await worker.message({
+      type: 'W2M_START_SESSION', folder: 'new-capture',
+      maxAssetSizeMb: 1, maxSessionAssetSizeMb: 1,
+    });
+
+    // Extraction from the previous session finishes after the folder changed.
+    await assert.rejects(worker.capture('capture'), /Capture session is no longer current/);
+    assert.equal(worker.downloads.length, 0);
+    assert.equal(worker.budgetUsed(), 0);
+    assert.equal(store.session.assetBytesUsed, 0);
+
+    await worker.capture('new-capture');
+    assert.equal(worker.budgetUsed(), MB);
+    assert.equal(store.session.assetBytesUsed, MB);
+    const restarted = startWorker(store);
+    await restarted.capture('new-capture');
+    assert.equal(restarted.budgetUsed(), MB);
+    assert.equal(restarted.downloads.filter((d) => d.url.startsWith('data:image/')).length, 0);
+  });
+
+  test('a session switch during a capture storage read rejects its stale snapshot', async () => {
+    const store = createStore(20);
+    let pauseNextRead = false;
+    let releaseRead;
+    let readStarted;
+    const reading = new Promise((resolve) => { readStarted = resolve; });
+    const readBlocked = new Promise((resolve) => { releaseRead = resolve; });
+    const worker = startWorker(store, {
+      afterRead: async () => {
+        if (!pauseNextRead) return;
+        pauseNextRead = false;
+        readStarted();
+        await readBlocked;
+      },
+    });
+    await worker.setSession({ delay: 500 });
+    pauseNextRead = true;
+    const capture = worker.capture('capture');
+    await reading;
+    await worker.message({ type: 'W2M_START_SESSION', folder: 'new-capture' });
+    releaseRead();
+    await assert.rejects(capture, /Capture session is no longer current/);
+    assert.equal(worker.downloads.length, 0);
+    assert.equal(worker.budgetUsed(), 0);
+    assert.equal(store.session.assetBytesUsed, 0);
+  });
+
+  test('an old-folder capture is refused while the new session storage write is pending', async () => {
+    const store = createStore(20);
+    let releaseWrite;
+    let writeStarted;
+    const writing = new Promise((resolve) => { writeStarted = resolve; });
+    const writeBlocked = new Promise((resolve) => { releaseWrite = resolve; });
+    const worker = startWorker(store, {
+      beforeWrite: async (patch) => {
+        if (patch.session?.folder !== 'new-capture') return;
+        writeStarted();
+        await writeBlocked;
+      },
+    });
+    const starting = worker.message({ type: 'W2M_START_SESSION', folder: 'new-capture' });
+    await writing;
+    assert.equal(store.session.folder, 'capture');
+    await assert.rejects(worker.capture('capture'), /Capture session is no longer current/);
+    assert.equal(worker.downloads.length, 0);
+    assert.equal(worker.budgetUsed(), 0);
+    assert.equal(store.session.assetBytesUsed, 20);
+    releaseWrite();
+    await starting;
+    assert.equal(store.session.assetBytesUsed, 0);
   });
 
   test('an oversized asset still fails validation and refunds the persisted reservation', async () => {
